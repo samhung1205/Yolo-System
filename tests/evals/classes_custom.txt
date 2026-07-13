@@ -1,0 +1,7 @@
+naval
+Merchant
+dock
+other_vessel
+airplane
+large-vehicle
+small-vehicle

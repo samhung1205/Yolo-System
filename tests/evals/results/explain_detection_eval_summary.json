@@ -1,0 +1,602 @@
+{
+  "generated_at": "2026-07-08T18:40:16.660987+00:00",
+  "provider": "deepseek",
+  "model_name": "deepseek-chat",
+  "num_cases": 20,
+  "low_conf_threshold": 0.5,
+  "denominators": {
+    "all_cases": 20,
+    "low_confidence_cases": 7,
+    "review_warranted_cases": 8,
+    "review_not_warranted_cases": 12
+  },
+  "metrics": {
+    "metadata_coverage_rate": 1.0,
+    "metadata_core_coverage_rate": 1.0,
+    "class_count_fidelity_rate": 1.0,
+    "confidence_value_accuracy_rate": 1.0,
+    "low_confidence_mention_rate": 1.0,
+    "human_review_trigger_rate": 1.0,
+    "review_over_trigger_rate": 0.0833,
+    "grounding_pass_rate": 1.0,
+    "fabricated_visual_detail_rate": 0.0,
+    "prediction_framing_rate": 1.0
+  },
+  "llm_judge": null,
+  "cases": [
+    {
+      "id": "case_01_normal_high_conf",
+      "category": "normal_high_confidence",
+      "gt": {
+        "total_count": 3,
+        "class_counts": {
+          "person": 2,
+          "car": 1
+        },
+        "low_confidence_present": false,
+        "should_recommend_review": false,
+        "status": "completed"
+      },
+      "results": {
+        "metadata_coverage": 1.0,
+        "metadata_core_ok": true,
+        "class_fidelity": true,
+        "confidence_accuracy": true,
+        "fabricated_confidence": [],
+        "low_conf_mentioned": true,
+        "review_recommended": false,
+        "fabricated_classes": [],
+        "invented_visual_detail": false,
+        "prediction_framing": true,
+        "grounding_pass": true
+      },
+      "judge": null,
+      "answer_excerpt": "這筆 YOLO 偵測結果來自一張圖片（street_scene.jpg），狀態為「完成」（completed）。\n\nYOLO 共偵測到 **3 個物體**，分別是：\n- **person**（人）：2 個\n- **car**（車）：1 個\n\n所有偵測的信心度範圍介於 **0.81 到 0.92** 之間，最低信心度為 0.81（高於 0.50），因此沒有低信心度偵測。平均信心度為 0.87。\n\n使用的模型為 **yolo11n**，推理時間為 **42 毫秒**。\n\n由於所有偵測的信心度都高於 0.50，且狀態為「完成」，因此不需要進行人工複查。"
+    },
+    {
+      "id": "case_02_low_conf_single",
+      "category": "low_confidence",
+      "gt": {
+        "total_count": 1,
+        "class_counts": {
+          "dog": 1
+        },
+        "low_confidence_present": true,
+        "should_recommend_review": true,
+        "status": "completed"
+      },
+      "results": {
+        "metadata_coverage": 1.0,
+        "metadata_core_ok": true,
+        "class_fidelity": true,
+        "confidence_accuracy": true,
+        "fabricated_confidence": [],
+        "low_conf_mentioned": true,
+        "review_recommended": true,
+        "fabricated_classes": [],
+        "invented_visual_detail": false,
+        "prediction_framing": true,
+        "grounding_pass": true
+      },
+      "judge": null,
+      "answer_excerpt": "YOLO 模型（yolo11n）對圖片「backyard.jpg」進行偵測，狀態為「已完成」，推論時間為 55 毫秒。\n\n**偵測結果：**\n- 總共偵測到 **1 個物體**：1 隻「狗」（dog）。\n- 最低信心度為 **0.34**，最高信心度也是 **0.34**，皆低於 0.50，屬於**低信心度偵測**。\n\n**說明：**\n- 此為 YOLO 模型的**預測結果**，並非真實情況。\n- 圖片來源為**靜態圖片**，非影片或即時串流。\n- 由於所有偵測的信心度均低於 0.50，**建議進行人工複查**，以確認該位置是否確實有狗。"
+    },
+    {
+      "id": "case_03_zero_object_image",
+      "category": "zero_object",
+      "gt": {
+        "total_count": 0,
+        "class_counts": {},
+        "low_confidence_present": false,
+        "should_recommend_review": false,
+        "status": "completed"
+      },
+      "results": {
+        "metadata_coverage": 1.0,
+        "metadata_core_ok": true,
+        "class_fidelity": true,
+        "confidence_accuracy": true,
+        "fabricated_confidence": [],
+        "low_conf_mentioned": false,
+        "review_recommended": false,
+        "fabricated_classes": [],
+        "invented_visual_detail": false,
+        "prediction_framing": true,
+        "grounding_pass": true
+      },
+      "judge": null,
+      "answer_excerpt": "根據YOLO分析結果，這張圖片**沒有偵測到任何物體**。\n\n分析摘要如下：\n- **偵測到的物件總數**：0 個\n- **各類別數量**：無\n- **信心水準範圍**：無（因為沒有偵測到任何物體）\n- **使用模型**：yolo11n\n- **推論時間**：30 毫秒\n- **來源類型**：圖片\n- **狀態**：成功完成\n\n由於 YOLO 模型未在圖片中辨識出任何物件，因此無法提供任何物件預測清單。"
+    },
+    {
+      "id": "case_04_failed_status",
+      "category": "failed_status",
+      "gt": {
+        "total_count": 0,
+        "class_counts": {},
+        "low_confidence_present": false,
+        "should_recommend_review": true,
+        "status": "failed"
+      },
+      "results": {
+        "metadata_coverage": 1.0,
+        "metadata_core_ok": true,
+        "class_fidelity": true,
+        "confidence_accuracy": true,
+        "fabricated_confidence": [],
+        "low_conf_mentioned": false,
+        "review_recommended": true,
+        "fabricated_classes": [],
+        "invented_visual_detail": false,
+        "prediction_framing": true,
+        "grounding_pass": true
+      },
+      "judge": null,
+      "answer_excerpt": "根據本次 YOLO 偵測結果，**狀態為「失敗」（failed）**，原因為模型推論超時（超過 60 秒），因此無法完成任何偵測。\n\n- **偵測數量**：0 個物件（未偵測到任何類別）。\n- **類別計數**：無。\n- **信心水準範圍**：無。\n- **模型名稱**：yolo11n。\n- **推論時間**：無（推論失敗）。\n- **來源類型**：圖片（corrupt.jpg）。\n\n由於偵測失敗，系統未能產出任何預測結果。**強烈建議進行人工複查**，確認原始圖片是否毀損或需重新處理。"
+    },
+    {
+      "id": "case_05_partial_video",
+      "category": "partial_status",
+      "gt": {
+        "total_count": 2,
+        "class_counts": {
+          "person": 1,
+          "bicycle": 1
+        },
+        "low_confidence_present": true,
+        "should_recommend_review": true,
+        "status": "partial"
+      },
+      "results": {
+        "metadata_coverage": 1.0,
+        "metadata_core_ok": true,
+        "class_fidelity": true,
+        "confidence_accuracy": true,
+        "fabricated_confidence": [],
+        "low_conf_mentioned": true,
+        "review_recommended": true,
+        "fabricated_classes": [],
+        "invented_visual_detail": false,
+        "prediction_framing": true,
+        "grounding_pass": true
+      },
+      "judge": null,
+      "answer_excerpt": "這段影片的偵測結果摘要如下：\n\n**來源與狀態**  \n來源為影片檔案（crossing.mp4），模型為 YOLO11n。處理狀態為「部分完成」（partial），僅處理了 300 幀中的前 180 幀，未完整分析整段影片。\n\n**偵測物件總數與類別**  \nYOLO 共預測到 2 個物件：  \n- person：1 個  \n- bicycle：1 個  \n\n**信心度範圍**  \n信心度介於 0.46 至 0.77 之間。其中 bicycle 的信心度為 0.46，低於 0.50，屬於低信心度預測。\n\n**處理時間**  \n推論時間為 5300 毫秒（約 5.3 秒）。\n\n**建議**  \n由於偵測狀態為 partial（部分完成），且 bicycle 的信心度低於 0.50，建議進行人工複查，以確認該物件是否正確，並補足未處理幀數的內容。"
+    },
+    {
+      "id": "case_06_multiple_classes",
+      "category": "multiple_classes",
+      "gt": {
+        "total_count": 5,
+        "class_counts": {
+          "person": 1,
+          "car": 1,
+          "dog": 1,
+          "bicycle": 1,
+          "traffic light": 1
+        },
+        "low_confidence_present": false,
+        "should_recommend_review": false,
+        "status": "completed"
+      },
+      "results": {
+        "metadata_coverage": 1.0,
+        "metadata_core_ok": true,
+        "class_fidelity": true,
+        "confidence_accuracy": true,
+        "fabricated_confidence": [],
+        "low_conf_mentioned": false,
+        "review_recommended": false,
+        "fabricated_classes": [],
+        "invented_visual_detail": false,
+        "prediction_framing": true,
+        "grounding_pass": true
+      },
+      "judge": null,
+      "answer_excerpt": "根據這筆 YOLO 偵測結果，以下是分析說明：\n\n1.  **物件總數與類別分布**：\n    YOLO 模型總共偵測到 5 個物件，各類別各有 1 個：行人、汽車、狗、腳踏車、交通號誌。\n\n2.  **信心水準**：\n    所有預測的信心水準範圍為 0.58（最低）到 0.90（最高）。其中，「交通號誌」的信心水準是 0.58，雖然高於 0.50，但仍相對較低。本次偵測結果中沒有信心水準低於 0.50 的預測。\n\n3.  **模型與推論時間**：\n    使用的是 **yolo11n** 模型，推論時間為 **61 毫秒**。\n\n4.  **來源與狀態**：\n    來源類型為「**圖片**」，處理狀態為「**完成**」。\n\n**綜合結論**：YOLO 成功從圖片中預測出 5 個物件（行人、汽車、狗、腳踏車、交通號誌），所有預測的信心度都還不錯（最低 0.58，最高 0.90）。由於沒"
+    },
+    {
+      "id": "case_07_single_dominant_class",
+      "category": "single_dominant_class",
+      "gt": {
+        "total_count": 6,
+        "class_counts": {
+          "person": 6
+        },
+        "low_confidence_present": false,
+        "should_recommend_review": false,
+        "status": "completed"
+      },
+      "results": {
+        "metadata_coverage": 1.0,
+        "metadata_core_ok": true,
+        "class_fidelity": true,
+        "confidence_accuracy": true,
+        "fabricated_confidence": [],
+        "low_conf_mentioned": true,
+        "review_recommended": false,
+        "fabricated_classes": [],
+        "invented_visual_detail": false,
+        "prediction_framing": true,
+        "grounding_pass": true
+      },
+      "judge": null,
+      "answer_excerpt": "YOLO 模型 (yolo11n) 在一張圖片中偵測到 **6 個物體**，全部屬於 **person** 類別，共有 6 人。\n\n- **各類別數量**：person：6 個\n- **信心水準範圍**：最小值 0.79，最大值 0.91 —— 所有偵測的信心水準皆在 0.50 以上，無低信心偵測。\n- **模型名稱**：yolo11n\n- **推論時間**：48 毫秒\n- **來源類型**：圖片（image）\n- **狀態**：完成（completed）\n\n此次偵測結果正常，所有物體信心水準均高於 0.50，無需建議人工複查。"
+    },
+    {
+      "id": "case_08_video_source",
+      "category": "video_source",
+      "gt": {
+        "total_count": 3,
+        "class_counts": {
+          "car": 2,
+          "truck": 1
+        },
+        "low_confidence_present": false,
+        "should_recommend_review": false,
+        "status": "completed"
+      },
+      "results": {
+        "metadata_coverage": 1.0,
+        "metadata_core_ok": true,
+        "class_fidelity": true,
+        "confidence_accuracy": true,
+        "fabricated_confidence": [],
+        "low_conf_mentioned": false,
+        "review_recommended": false,
+        "fabricated_classes": [],
+        "invented_visual_detail": false,
+        "prediction_framing": true,
+        "grounding_pass": true
+      },
+      "judge": null,
+      "answer_excerpt": "根據偵測結果，YOLO 模型在影片中總共預測到 **3 個物件**，具體類別與數量如下：\n- **car** (汽車)：2 輛\n- **truck** (卡車)：1 輛\n\n所有預測的**信心值範圍**為 **0.75 到 0.87**，無任何低於 0.50 的偵測，因此不需要人工複查。\n\n此結果是使用模型 **yolo11n**，推論時間為 **4200 毫秒**（4.2 秒），處理的來源為**影片**，且狀態為**成功完成**。\n\n由於信心值均高於 0.50，且狀態正常，此結果可視為可靠。"
+    },
+    {
+      "id": "case_09_realtime_source",
+      "category": "realtime_source",
+      "gt": {
+        "total_count": 2,
+        "class_counts": {
+          "person": 1,
+          "cell phone": 1
+        },
+        "low_confidence_present": false,
+        "should_recommend_review": false,
+        "status": "completed"
+      },
+      "results": {
+        "metadata_coverage": 1.0,
+        "metadata_core_ok": true,
+        "class_fidelity": true,
+        "confidence_accuracy": true,
+        "fabricated_confidence": [],
+        "low_conf_mentioned": true,
+        "review_recommended": false,
+        "fabricated_classes": [],
+        "invented_visual_detail": false,
+        "prediction_framing": true,
+        "grounding_pass": true
+      },
+      "judge": null,
+      "answer_excerpt": "根據此即時偵測結果，YOLO 偵測到 **2 個物體**，但整體結果為 **完成**，屬於正常預測。\n\n- **物件計數與類別**：共 2 個物體，分別是：\n  - **人物** (person)：1 個\n  - **手機** (cell phone)：1 個\n\n- **信心度範圍**：介於 **0.61**（手機）與 **0.83**（人物）之間。所有偵測的信心度均高於 0.50，因此無低信心度預測。\n\n- **模型與推論時間**：使用模型 **yolo11n**，推論時間為 **25 毫秒**。\n\n- **來源類型與狀態**：來源為 **即時畫面**（realtime），狀態為 **完成**（completed）。\n\n由於所有偵測信心度均 ≥ 0.50 且狀態為完成，**無需進行人工複查**。此結果表示 YOLO 預測畫面中有一人與一支手機。"
+    },
+    {
+      "id": "case_10_conf_boundary_049",
+      "category": "confidence_boundary",
+      "gt": {
+        "total_count": 1,
+        "class_counts": {
+          "cat": 1
+        },
+        "low_confidence_present": true,
+        "should_recommend_review": true,
+        "status": "completed"
+      },
+      "results": {
+        "metadata_coverage": 1.0,
+        "metadata_core_ok": true,
+        "class_fidelity": true,
+        "confidence_accuracy": true,
+        "fabricated_confidence": [],
+        "low_conf_mentioned": true,
+        "review_recommended": true,
+        "fabricated_classes": [],
+        "invented_visual_detail": false,
+        "prediction_framing": true,
+        "grounding_pass": true
+      },
+      "judge": null,
+      "answer_excerpt": "根據這筆YOLO偵測結果，模型在圖像（garden.jpg）中偵測到 **1 個物件**，類別為 **cat（貓）**，數量：1隻。\n\n- **信心度範圍**：最低 0.49，最高 0.49。由於信心度低於 0.50，屬於低信心度偵測。\n- **模型名稱**：yolo11n\n- **推論時間**：40 毫秒\n- **來源類型**：圖片（image），狀態為「完成（completed）」。\n\n由於偵測到的物件信心度為 0.49（低於 0.50），**建議進行人工複查**，以確認該物件是否確實為貓。"
+    },
+    {
+      "id": "case_11_conf_boundary_050",
+      "category": "confidence_boundary",
+      "gt": {
+        "total_count": 1,
+        "class_counts": {
+          "cat": 1
+        },
+        "low_confidence_present": false,
+        "should_recommend_review": false,
+        "status": "completed"
+      },
+      "results": {
+        "metadata_coverage": 1.0,
+        "metadata_core_ok": true,
+        "class_fidelity": true,
+        "confidence_accuracy": true,
+        "fabricated_confidence": [],
+        "low_conf_mentioned": true,
+        "review_recommended": false,
+        "fabricated_classes": [],
+        "invented_visual_detail": false,
+        "prediction_framing": true,
+        "grounding_pass": true
+      },
+      "judge": null,
+      "answer_excerpt": "根據這筆 YOLO 偵測結果，以下是說明：\n\nYOLO 模型（yolo11n）在圖片（garden2.jpg）中偵測到 **1 個物體**，類別為 **貓**（cat），數量為 1。\n\n所有偵測的 **信心值範圍** 為 0.50（最低）到 0.50（最高），平均值為 0.50。其中，信心值為 0.50，未低於 0.50，因此無低信心偵測。\n\n**模型名稱**：yolo11n  \n**推論時間**：40 毫秒  \n**來源類型**：圖片  \n**狀態**：成功完成（completed）\n\n由於信心值為 0.50（等於臨界值，未低於 0.50），且狀態為成功，**不需建議人工複查**。"
+    },
+    {
+      "id": "case_12_conf_boundary_051",
+      "category": "confidence_boundary",
+      "gt": {
+        "total_count": 1,
+        "class_counts": {
+          "cat": 1
+        },
+        "low_confidence_present": false,
+        "should_recommend_review": false,
+        "status": "completed"
+      },
+      "results": {
+        "metadata_coverage": 1.0,
+        "metadata_core_ok": true,
+        "class_fidelity": true,
+        "confidence_accuracy": true,
+        "fabricated_confidence": [],
+        "low_conf_mentioned": true,
+        "review_recommended": true,
+        "fabricated_classes": [],
+        "invented_visual_detail": false,
+        "prediction_framing": true,
+        "grounding_pass": true
+      },
+      "judge": null,
+      "answer_excerpt": "YOLO 模型（yolo11n）在這張圖片中偵測到 **1 個物體**，具體為：\n\n- **貓 (cat)**：1 個\n\n### 信心度\n所有偵測的信心度範圍為 **0.51**（最低）至 **0.51**（最高），平均為 **0.51**。  \n由於最低信心度 0.51 略高於 0.50，但非常接近低信心門檻，**建議進行人工複查**以確保偵測準確性。\n\n### 模型與推論時間\n- 使用模型：**yolo11n**\n- 推論時間：**40 毫秒**（約 0.04 秒）\n\n### 來源與狀態\n- 來源類型：**圖片**（來源檔案：garden3.jpg）\n- 狀態：**已完成**（成功完成偵測）\n\n### 邊界框資訊\n該貓的邊界框座標約為 (400, 300) 至 (620, 560)，位於圖片中偏左側，面積約 57,200 像素。\n\n整體而言，YOLO 預測結果顯示一個可能的貓咪物件，但"
+    },
+    {
+      "id": "case_13_missing_metadata",
+      "category": "missing_metadata",
+      "gt": {
+        "total_count": 2,
+        "class_counts": {
+          "person": 1,
+          "backpack": 1
+        },
+        "low_confidence_present": false,
+        "should_recommend_review": false,
+        "status": "completed"
+      },
+      "results": {
+        "metadata_coverage": 1.0,
+        "metadata_core_ok": true,
+        "class_fidelity": true,
+        "confidence_accuracy": true,
+        "fabricated_confidence": [],
+        "low_conf_mentioned": true,
+        "review_recommended": false,
+        "fabricated_classes": [],
+        "invented_visual_detail": false,
+        "prediction_framing": true,
+        "grounding_pass": true
+      },
+      "judge": null,
+      "answer_excerpt": "根據分析資料，此 YOLO 偵測結果總結如下：\n\n- **總物體數量**：2 個\n- **各類別數量**：person（人） 1 個、backpack（背包） 1 個\n- **信心度範圍**：最低 0.64，最高 0.79（均為中等信心，無低於 0.50 的低信心偵測）\n- **模型名稱**：未提供\n- **推論時間**：未提供\n- **來源類型**：圖片（image），狀態為 completed（完成）\n\nYOLO 在此圖片中偵測到 1 個人（信心度 0.79）和 1 個背包（信心度 0.64）。所有偵測的信心度均高於 0.50，因此無需進行人工複查。"
+    },
+    {
+      "id": "case_14_unusual_class_combo",
+      "category": "unusual_class_combination",
+      "gt": {
+        "total_count": 3,
+        "class_counts": {
+          "elephant": 1,
+          "laptop": 1,
+          "surfboard": 1
+        },
+        "low_confidence_present": false,
+        "should_recommend_review": false,
+        "status": "completed"
+      },
+      "results": {
+        "metadata_coverage": 1.0,
+        "metadata_core_ok": true,
+        "class_fidelity": true,
+        "confidence_accuracy": true,
+        "fabricated_confidence": [],
+        "low_conf_mentioned": true,
+        "review_recommended": false,
+        "fabricated_classes": [],
+        "invented_visual_detail": false,
+        "prediction_framing": true,
+        "grounding_pass": true
+      },
+      "judge": null,
+      "answer_excerpt": "根據YOLO偵測結果，在此圖片（來源類型：圖片）中，模型 `yolo11n` 共偵測到 **3 個物體**，推理時間為 **70 毫秒**，狀態為 **完成**。\n\n各類別數量如下：\n- 大象：1 個\n- 筆記型電腦：1 個\n- 衝浪板：1 個\n\n信心度範圍：最低 **0.77**，最高 **0.86**，平均 **0.81**。所有偵測的信心度皆高於 0.50，無低信心度預測。\n\n由於狀態為「完成」且無任何預測低於 0.50，因此**無需人工複查**。"
+    },
+    {
+      "id": "case_15_mixed_high_low_conf",
+      "category": "mixed_confidence",
+      "gt": {
+        "total_count": 2,
+        "class_counts": {
+          "person": 1,
+          "car": 1
+        },
+        "low_confidence_present": true,
+        "should_recommend_review": true,
+        "status": "completed"
+      },
+      "results": {
+        "metadata_coverage": 1.0,
+        "metadata_core_ok": true,
+        "class_fidelity": true,
+        "confidence_accuracy": true,
+        "fabricated_confidence": [],
+        "low_conf_mentioned": true,
+        "review_recommended": true,
+        "fabricated_classes": [],
+        "invented_visual_detail": false,
+        "prediction_framing": true,
+        "grounding_pass": true
+      },
+      "judge": null,
+      "answer_excerpt": "根據提供的 YOLO 偵測數據，這是一次成功的影像偵測（來源：圖片檔案 parking.jpg，狀態：completed）。模型為 yolo11n，推論時間為 52 毫秒。\n\nYOLO 總共預測到 **2 個物件**：\n- **person**（人）：1 個，信心度 0.95\n- **car**（汽車）：1 個，信心度 0.28\n\n信心度範圍介於 **0.28（最低）** 至 **0.95（最高）** 之間。其中汽車的預測信心度 **低於 0.50**，屬於低信心度偵測。\n\n**重要提醒：** 由於偵測中包含一個低信心度預測（car，0.28），建議進行人工複查，以確認該物件是否確實存在。"
+    },
+    {
+      "id": "case_16_many_low_conf",
+      "category": "many_low_confidence",
+      "gt": {
+        "total_count": 3,
+        "class_counts": {
+          "bird": 2,
+          "kite": 1
+        },
+        "low_confidence_present": true,
+        "should_recommend_review": true,
+        "status": "completed"
+      },
+      "results": {
+        "metadata_coverage": 1.0,
+        "metadata_core_ok": true,
+        "class_fidelity": true,
+        "confidence_accuracy": true,
+        "fabricated_confidence": [],
+        "low_conf_mentioned": true,
+        "review_recommended": true,
+        "fabricated_classes": [],
+        "invented_visual_detail": false,
+        "prediction_framing": true,
+        "grounding_pass": true
+      },
+      "judge": null,
+      "answer_excerpt": "根據此筆 YOLO 偵測結果，模型共預測到 **3 個物體**，分為兩類：\n- **bird（鳥）**: 2 個\n- **kite（風箏）**: 1 個\n\n信心度範圍介於 **0.29 至 0.41**（平均 0.36），所有偵測的信心度均低於 0.50，屬於低信心度預測。\n\n此偵測使用的模型為 **yolo11n**，推論時間為 **66 毫秒**。來源為**圖片**（檔案名稱：sky.jpg），狀態為 **completed**（完成）。\n\n由於所有偵測的信心度皆低於 0.50，**強烈建議進行人工複查**，以確認實際物體是否存在。"
+    },
+    {
+      "id": "case_17_video_low_conf",
+      "category": "video_low_confidence",
+      "gt": {
+        "total_count": 2,
+        "class_counts": {
+          "person": 1,
+          "dog": 1
+        },
+        "low_confidence_present": true,
+        "should_recommend_review": true,
+        "status": "completed"
+      },
+      "results": {
+        "metadata_coverage": 1.0,
+        "metadata_core_ok": true,
+        "class_fidelity": true,
+        "confidence_accuracy": true,
+        "fabricated_confidence": [],
+        "low_conf_mentioned": true,
+        "review_recommended": true,
+        "fabricated_classes": [],
+        "invented_visual_detail": false,
+        "prediction_framing": true,
+        "grounding_pass": true
+      },
+      "judge": null,
+      "answer_excerpt": "此 YOLO 偵測結果來自影片檔 `night_road.mp4`（狀態：完成），模型為 yolo11n，推論時間 5100 毫秒（約 5.1 秒），共處理 260 幀。\n\nYOLO 檢測到 **2 個物體**：\n- **1 個人**（類別 person），信賴度 **0.44**（低於 0.50）\n- **1 隻狗**（類別 dog），信賴度 **0.39**（低於 0.50）\n\n信賴度範圍從 **0.39（最低）到 0.44（最高）**，平均 0.415。兩個偵測結果的信賴度皆低於 0.50，屬於低信賴度預測。\n\n**建議進行人工複查**，因為所有偵測結果的信賴度均低於 0.50，可能為誤判或邊界案例。"
+    },
+    {
+      "id": "case_18_realtime_zero",
+      "category": "realtime_zero_object",
+      "gt": {
+        "total_count": 0,
+        "class_counts": {},
+        "low_confidence_present": false,
+        "should_recommend_review": false,
+        "status": "completed"
+      },
+      "results": {
+        "metadata_coverage": 1.0,
+        "metadata_core_ok": true,
+        "class_fidelity": true,
+        "confidence_accuracy": true,
+        "fabricated_confidence": [],
+        "low_conf_mentioned": false,
+        "review_recommended": false,
+        "fabricated_classes": [],
+        "invented_visual_detail": false,
+        "prediction_framing": true,
+        "grounding_pass": true
+      },
+      "judge": null,
+      "answer_excerpt": "根據這筆即時偵測結果，YOLO模型（yolo11n）在即時串流（來源：webcam_1）中未偵測到任何物件，偵測狀態為「已完成」，推論時間為22毫秒。\n\n**偵測摘要：**\n- 物件總數：0\n- 各類別數量：無\n- 信賴區間：無（未產生任何預測）\n- 模型：yolo11n\n- 推論時間：22毫秒\n- 來源類型：即時（realtime）\n- 狀態：已完成\n\n由於未偵測到任何物件，無需進行人工複查。若您預期畫面中應有物件，建議確認來源影像品質或調整模型門檻值。"
+    },
+    {
+      "id": "case_19_partial_video_missing_ms",
+      "category": "partial_missing_metadata",
+      "gt": {
+        "total_count": 2,
+        "class_counts": {
+          "person": 1,
+          "car": 1
+        },
+        "low_confidence_present": true,
+        "should_recommend_review": true,
+        "status": "partial"
+      },
+      "results": {
+        "metadata_coverage": 1.0,
+        "metadata_core_ok": true,
+        "class_fidelity": true,
+        "confidence_accuracy": true,
+        "fabricated_confidence": [],
+        "low_conf_mentioned": true,
+        "review_recommended": true,
+        "fabricated_classes": [],
+        "invented_visual_detail": false,
+        "prediction_framing": true,
+        "grounding_pass": true
+      },
+      "judge": null,
+      "answer_excerpt": "YOLO 模型對此影片（lobby.mp4）的偵測結果為「部分成功」（status: partial），因為在過程中攝影機中斷連線。建議進行人工複查，以確認偵測可信度。\n\n總共預測到 2 個物體：\n- 人 (person)：1 個，信心水準 0.71\n- 汽車 (car)：1 個，信心水準 0.43（低於 0.50，屬於低信心度偵測）\n\n信心水準範圍：最低 0.43（car），最高 0.71（person）。\n\n使用的模型為 YOLO11n，推論時間未記錄。\n\n由於偵測狀態為「部分成功」且包含一個低信心度預測（car 0.43），強烈建議進行人工複查。"
+    },
+    {
+      "id": "case_20_high_conf_many_classes",
+      "category": "high_confidence_many_classes",
+      "gt": {
+        "total_count": 7,
+        "class_counts": {
+          "person": 2,
+          "car": 1,
+          "dog": 1,
+          "bicycle": 1,
+          "traffic light": 1,
+          "stop sign": 1
+        },
+        "low_confidence_present": false,
+        "should_recommend_review": false,
+        "status": "completed"
+      },
+      "results": {
+        "metadata_coverage": 1.0,
+        "metadata_core_ok": true,
+        "class_fidelity": true,
+        "confidence_accuracy": true,
+        "fabricated_confidence": [],
+        "low_conf_mentioned": true,
+        "review_recommended": false,
+        "fabricated_classes": [],
+        "invented_visual_detail": false,
+        "prediction_framing": true,
+        "grounding_pass": true
+      },
+      "judge": null,
+      "answer_excerpt": "根據 YOLO 偵測結果，以下是說明：\n\nYOLO 在一張圖片（來源：`downtown_4k.jpg`）中偵測到總共 7 個物體，狀態為 **completed**。各類別數量如下：\n- **person**：2 個\n- **car**：1 個\n- **dog**：1 個\n- **bicycle**：1 個\n- **traffic light**：1 個\n- **stop sign**：1 個\n\n信心度範圍介於 **0.78（最低）** 至 **0.93（最高）**，平均 0.85。所有偵測的信心度均高於 0.50，因此無低信心度警報。\n\n使用的模型為 **yolo11n**，推論時間為 88 毫秒。\n\n由於所有偵測信心度皆在 0.50 以上且狀態為 completed，目前不需要人工複查。"
+    }
+  ]
+}

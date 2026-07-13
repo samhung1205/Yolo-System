@@ -1,0 +1,45 @@
+# FastAPI & Server
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0
+
+# Database
+sqlalchemy>=2.0.0
+pymysql>=1.1.0
+alembic>=1.13.0
+cryptography>=42.0.0
+
+# Auth & Security
+python-jose[cryptography]>=3.3.0
+bcrypt>=4.1.0
+# passlib removed: incompatible with bcrypt >= 4.x; using bcrypt directly
+
+# Validation & Settings
+pydantic>=2.7.0
+pydantic-settings>=2.2.0
+python-multipart>=0.0.9
+
+# HTTP Client (for external APIs)
+httpx>=0.27.0
+requests>=2.31.0
+
+# AI / Detection
+ultralytics>=8.3.242
+pillow>=10.0.0
+opencv-python-headless>=4.10.0
+
+# Agentic AI (Phase 6A-1)
+# LangChain / LangGraph drive the /api/agent supervisor workflow.
+# The agent layer is wrapped in lazy imports so missing packages will not
+# prevent FastAPI startup; in that case /api/agent/* responds with 503.
+langchain>=0.3.0
+langchain-openai>=0.2.0
+langgraph>=0.2.0
+# DeepAgents is intentionally optional and disabled by default.
+# To enable, set AGENT_ENABLE_DEEPAGENTS=true and uncomment the line below.
+# deepagents>=0.0.5
+
+# Dev / Testing
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
+httpx>=0.27.0
+python-dotenv>=1.0.0

@@ -1,0 +1,65 @@
+.idea/
+design-system/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+*.pyo
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+env/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Legacy local-only adapters pending credential migration
+mysql/dataDB.py
+utils/deepseek.py
+docs/current-system-analysis.md
+yolo.sql
+
+# Database
+*.sqlite
+*.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
+logs/
+
+# YOLO / ML
+runs/
+*.pt
+*.onnx
+pre_result/
+pre_labels/
+
+# Node
+node_modules/
+dist/
+.cache/
+
+# Static generated files
+static/results/
+backend/static/detections/
+backend/static/avatars/
+backend/static/uploads/
+
+# Pytest
+.pytest_cache/
+.coverage
+htmlcov/

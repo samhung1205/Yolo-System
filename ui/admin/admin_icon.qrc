@@ -1,0 +1,13 @@
+<RCC>
+  <qresource prefix="img">
+    <file>img/删除.png</file>
+    <file>img/搜索.png</file>
+    <file>img/新增.png</file>
+    <file>img/退出.png</file>
+    <file>img/个人中心.png</file>
+    <file>img/用户设置.png</file>
+    <file>img/首页.png</file>
+    <file>img/kk.jpg</file>
+    <file>img/头像加号.png</file>
+  </qresource>
+</RCC>
