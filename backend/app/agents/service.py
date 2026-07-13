@@ -91,6 +91,8 @@ def create_agent_reply(
             mode=safe_mode,
             tool_calls=[],
             references=[],
+            success=False,
+            errors=["agent_runtime_unavailable"],
         )
 
     history_messages = _build_history_messages(
@@ -119,34 +121,38 @@ def create_agent_reply(
             mode=safe_mode,
             tool_calls=[],
             references=[],
+            success=False,
+            errors=["agent_service_failure"],
         )
 
     answer = result.get("final_answer") or "(no answer)"
     tool_results = result.get("tool_results") or []
     references = result.get("references") or []
+    errors = result.get("errors") or []
 
     # Persist the turn alongside provider-based chat history so users keep a
     # unified record. provider="langgraph-agent" prevents collision with
     # /api/chat's provider field.
-    try:
-        turn_index = chat_repository.get_next_turn_index(
-            db,
-            user_id=current_user.id,
-            conversation_id=normalized_conversation_id,
-        )
-        effective_model = model_name_override or settings.agent_effective_model
-        chat_repository.create_log(
-            db,
-            user_id=current_user.id,
-            conversation_id=normalized_conversation_id,
-            turn_index=turn_index,
-            provider=AGENT_PROVIDER_TAG,
-            model_name=effective_model,
-            question=message,
-            answer=answer,
-        )
-    except Exception:  # pragma: no cover - logging is best-effort
-        logger.exception("Failed to persist agent chat log")
+    if not errors:
+        try:
+            turn_index = chat_repository.get_next_turn_index(
+                db,
+                user_id=current_user.id,
+                conversation_id=normalized_conversation_id,
+            )
+            effective_model = model_name_override or settings.agent_effective_model
+            chat_repository.create_log(
+                db,
+                user_id=current_user.id,
+                conversation_id=normalized_conversation_id,
+                turn_index=turn_index,
+                provider=AGENT_PROVIDER_TAG,
+                model_name=effective_model,
+                question=message,
+                answer=answer,
+            )
+        except Exception:  # pragma: no cover - logging is best-effort
+            logger.exception("Failed to persist agent chat log")
 
     return AgentChatResponse(
         conversation_id=normalized_conversation_id,
@@ -154,6 +160,8 @@ def create_agent_reply(
         mode=safe_mode,
         tool_calls=tool_results,
         references=references,
+        success=not errors,
+        errors=errors,
     )
 
 

@@ -8,7 +8,19 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-from app.api.routes import agents, auth, chat, detections, health, models, static_files, users, upload
+from app.api.routes import (
+    agents,
+    auth,
+    chat,
+    detections,
+    health,
+    models,
+    reports,
+    static_files,
+    upload,
+    users,
+    yolo_models,
+)
 
 app = FastAPI(
     title="YOLO System API",
@@ -46,6 +58,8 @@ app.include_router(detections.router, prefix="/api/detections", tags=["Detection
 app.include_router(chat.router, prefix="/api/chat", tags=["Chat"])
 app.include_router(agents.router, prefix="/api/agent", tags=["Agent"])
 app.include_router(models.router, prefix="/api/models", tags=["Models"])
+app.include_router(yolo_models.router, prefix="/api/yolo-models", tags=["YOLO Models"])
+app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
 
 
 @app.on_event("startup")

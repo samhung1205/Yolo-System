@@ -8,12 +8,20 @@ const detectionService = {
     const params = new URLSearchParams();
     params.set("conf", String(options.conf ?? 0.25));
     params.set("iou", String(options.iou ?? 0.45));
+    if (options.modelKey) {
+      params.set("model_key", options.modelKey);
+    }
 
     const response = await api.post(`/api/detections/image?${params.toString()}`, formData, {
       headers: {
         "Content-Type": "multipart/form-data",
       },
     });
+    return response.data;
+  },
+
+  async listYoloModels() {
+    const response = await api.get("/api/yolo-models");
     return response.data;
   },
 

@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 import { normalizeApiError } from "../services/api";
 import agentService from "../services/agentService";
@@ -15,6 +17,7 @@ const BUILTIN_MODES = [
   { key: "report", label: "Generate Report" },
   { key: "admin_help", label: "Admin Assistance" },
 ];
+const MARKDOWN_PLUGINS = [remarkGfm];
 
 function getDefaultMessage(mode, detectionId) {
   if (detectionId) {
@@ -52,6 +55,7 @@ export default function AgentPage() {
   const [loading, setLoading] = useState(false);
   const [streaming, setStreaming] = useState(true);
   const [error, setError] = useState("");
+  const [reportDownloading, setReportDownloading] = useState("");
   const threadRef = useRef(null);
   const abortRef = useRef(null);
   // Tracks the last message we auto-filled, so we can safely replace it when
@@ -97,9 +101,11 @@ export default function AgentPage() {
   const [selectedModel, setSelectedModel] = useState(null);
 
   useEffect(() => {
+    let active = true;
     agentService
       .listAgentModes()
       .then((data) => {
+        if (!active) return;
         if (Array.isArray(data) && data.length > 0) {
           setModes(
             data.map((m) => ({
@@ -111,10 +117,15 @@ export default function AgentPage() {
         }
       })
       .catch(() => {});
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {
+    let active = true;
     modelService.listModels().then((groups) => {
+      if (!active) return;
       if (Array.isArray(groups) && groups.length > 0) {
         setProviderGroups(groups);
         // Prefer the first provider that is actually usable (API key set /
@@ -124,15 +135,12 @@ export default function AgentPage() {
         setSelectedModel(usable.models[0] || null);
       }
     }).catch(() => {});
+    return () => {
+      active = false;
+    };
   }, []);
 
   const currentModels = providerGroups.find((g) => g.provider === selectedProvider)?.models || [];
-
-  function handleAgentProviderChange(provider) {
-    setSelectedProvider(provider);
-    const group = providerGroups.find((g) => g.provider === provider);
-    setSelectedModel(group?.models[0] || null);
-  }
 
   useEffect(() => {
     if (threadRef.current) {
@@ -288,6 +296,12 @@ export default function AgentPage() {
         model: selectedModel || undefined,
       });
 
+      if (response.success === false) {
+        throw new Error(
+          response.answer || response.errors?.[0] || "Agent 無法完成這次請求"
+        );
+      }
+
       setConversationId(response.conversation_id);
       setMessages((prev) => {
         const updated = [...prev];
@@ -334,6 +348,19 @@ export default function AgentPage() {
   function handleDetectionIdChange(value) {
     setDetectionId(value);
     applyDefaultMessage(mode, value, message);
+  }
+
+  async function handleReportDownload(format) {
+    if (!detectionId) return;
+    setReportDownloading(format);
+    setError("");
+    try {
+      await agentService.downloadDetectionReport(Number(detectionId), format);
+    } catch (err) {
+      setError(normalizeApiError(err, "報告下載失敗"));
+    } finally {
+      setReportDownloading("");
+    }
   }
 
   return (
@@ -406,6 +433,28 @@ export default function AgentPage() {
             />
           </label>
 
+          {mode === "report" && detectionId ? (
+            <div className="report-download-actions">
+              <span className="detail-label">Deterministic Report</span>
+              <button
+                type="button"
+                className="button button-secondary"
+                onClick={() => handleReportDownload("markdown")}
+                disabled={Boolean(reportDownloading)}
+              >
+                {reportDownloading === "markdown" ? "準備中..." : "下載 Markdown"}
+              </button>
+              <button
+                type="button"
+                className="button button-secondary"
+                onClick={() => handleReportDownload("pdf")}
+                disabled={Boolean(reportDownloading)}
+              >
+                {reportDownloading === "pdf" ? "產生中..." : "下載 PDF"}
+              </button>
+            </div>
+          ) : null}
+
           {conversationId ? (
             <div className="agent-meta">
               <span className="detail-label">Conversation</span>
@@ -434,7 +483,11 @@ export default function AgentPage() {
                         <span className="agent-streaming-indicator"> ▍</span>
                       ) : null}
                     </span>
-                    <p>{msg.content || (msg.isStreaming ? "" : "(no answer)")}</p>
+                    <div className="markdown-report">
+                      <ReactMarkdown remarkPlugins={MARKDOWN_PLUGINS}>
+                        {msg.content || (msg.isStreaming ? "" : "(no answer)")}
+                      </ReactMarkdown>
+                    </div>
 
                     {!msg.isStreaming && msg.tool_calls?.length > 0 ? (
                       <div className="agent-tool-calls">

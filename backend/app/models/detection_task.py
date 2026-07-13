@@ -4,7 +4,7 @@ Stores uploaded media and its inference result summary.
 """
 from datetime import datetime
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, func
+from sqlalchemy import JSON, DateTime, Float, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
@@ -23,6 +23,11 @@ class DetectionTask(Base):
     result_video_path: Mapped[str | None] = mapped_column(String(255), nullable=True)
     preview_image_path: Mapped[str | None] = mapped_column(String(255), nullable=True)
     model_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    model_key: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    model_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    model_class_map_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    confidence_threshold: Mapped[float | None] = mapped_column(Float, nullable=True)
+    iou_threshold: Mapped[float | None] = mapped_column(Float, nullable=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="processing", index=True)
     inference_ms: Mapped[float | None] = mapped_column(Float, nullable=True)
     image_width: Mapped[int | None] = mapped_column(Integer, nullable=True)

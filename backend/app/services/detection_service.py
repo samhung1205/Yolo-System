@@ -11,6 +11,11 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.static_tokens import build_signed_static_url
 from app.db.session import SessionLocal
+from app.integrations.model_registry import (
+    YoloModelRegistryError,
+    YoloModelSpec,
+    get_yolo_model,
+)
 from app.integrations.yolo_engine import YoloEngine
 from app.models.detection_task import DetectionTask
 from app.models.user import User
@@ -37,15 +42,22 @@ def create_image_detection(
     file: UploadFile,
     conf: float = 0.25,
     iou: float = 0.45,
+    model_key: str | None = None,
 ) -> DetectionTaskRead:
     _validate_upload(file)
+    model_spec = _resolve_model(model_key)
 
     task = detection_repository.create_task(
         db,
         user_id=current_user.id,
         source_type="image",
         source_filename=file.filename or "uploaded_image",
-        model_name=Path(settings.YOLO_DEFAULT_MODEL).name,
+        model_name=model_spec.checkpoint_path.name,
+        model_key=model_spec.key,
+        model_sha256=model_spec.current_sha256(),
+        model_class_map_json=model_spec.provenance_snapshot(),
+        confidence_threshold=conf,
+        iou_threshold=iou,
         status="processing",
     )
 
@@ -56,7 +68,7 @@ def create_image_detection(
         source_fs_path, source_rel_path = _store_original_image(task.id, file)
         detection_repository.update_task(db, task, source_image_path=source_rel_path)
 
-        engine = YoloEngine()
+        engine = YoloEngine(model_key=model_spec.key)
         detection_result = engine.detect_image(source_fs_path, conf=conf, iou=iou)
 
         result_fs_path, result_rel_path = _store_result_image(task.id, detection_result.annotated_image)
@@ -67,6 +79,9 @@ def create_image_detection(
             source_image_path=source_rel_path,
             result_image_path=result_rel_path,
             model_name=detection_result.model_name,
+            model_key=detection_result.model_key,
+            model_sha256=detection_result.model_sha256,
+            model_class_map_json=detection_result.model_class_map,
             status="completed",
             inference_ms=detection_result.inference_ms,
             image_width=detection_result.image_width,
@@ -109,15 +124,24 @@ def create_video_detection_task(
     *,
     current_user: User,
     file: UploadFile,
+    conf: float = 0.25,
+    iou: float = 0.45,
+    model_key: str | None = None,
 ) -> DetectionTaskRead:
     _validate_video_upload(file)
+    model_spec = _resolve_model(model_key)
 
     task = detection_repository.create_task(
         db,
         user_id=current_user.id,
         source_type="video",
         source_filename=file.filename or "uploaded_video",
-        model_name=Path(settings.YOLO_DEFAULT_MODEL).name,
+        model_name=model_spec.checkpoint_path.name,
+        model_key=model_spec.key,
+        model_sha256=model_spec.current_sha256(),
+        model_class_map_json=model_spec.provenance_snapshot(),
+        confidence_threshold=conf,
+        iou_threshold=iou,
         status="processing",
     )
 
@@ -163,7 +187,7 @@ def process_video_detection_task(*, task_id: int, conf: float = 0.25, iou: float
         result_video_fs_path, result_video_rel_path = _allocate_result_video_path(task.id)
         detection_repository.update_task(db, task, result_video_path=result_video_rel_path, status="processing")
 
-        engine = YoloEngine()
+        engine = YoloEngine(model_key=task.model_key)
         detection_result = engine.detect_video(
             source_fs_path,
             output_video_path=result_video_fs_path,
@@ -179,6 +203,9 @@ def process_video_detection_task(*, task_id: int, conf: float = 0.25, iou: float
             result_video_path=result_video_rel_path,
             preview_image_path=preview_rel_path,
             model_name=detection_result.model_name,
+            model_key=detection_result.model_key,
+            model_sha256=detection_result.model_sha256,
+            model_class_map_json=detection_result.model_class_map,
             status="completed",
             inference_ms=detection_result.inference_ms,
             image_width=detection_result.image_width,
@@ -271,6 +298,16 @@ def _validate_upload(file: UploadFile) -> None:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Only image uploads are supported for Phase 3 MVP",
         )
+
+
+def _resolve_model(model_key: str | None) -> YoloModelSpec:
+    try:
+        return get_yolo_model(model_key)
+    except YoloModelRegistryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
 
 
 def _validate_video_upload(file: UploadFile) -> None:
@@ -402,6 +439,11 @@ def _serialize_task_summary(task: DetectionTask) -> DetectionTaskSummaryRead:
         preview_image_path=task.preview_image_path,
         preview_image_url=_to_static_url(task.preview_image_path),
         model_name=task.model_name,
+        model_key=task.model_key,
+        model_sha256=task.model_sha256,
+        model_class_map=task.model_class_map_json,
+        confidence_threshold=task.confidence_threshold,
+        iou_threshold=task.iou_threshold,
         status=task.status,
         inference_ms=task.inference_ms,
         image_width=task.image_width,

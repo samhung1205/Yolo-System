@@ -24,6 +24,7 @@ def detect_image(
     current_user: Annotated[User, Depends(get_current_user)],
     conf: float = Query(default=0.25, ge=0.0, le=1.0),
     iou: float = Query(default=0.45, ge=0.0, le=1.0),
+    model_key: str | None = Query(default=None, min_length=1, max_length=100),
 ):
     return detection_service.create_image_detection(
         db,
@@ -31,6 +32,7 @@ def detect_image(
         file=file,
         conf=conf,
         iou=iou,
+        model_key=model_key,
     )
 
 
@@ -42,11 +44,15 @@ def detect_video(
     current_user: Annotated[User, Depends(get_current_user)],
     conf: float = Query(default=0.25, ge=0.0, le=1.0),
     iou: float = Query(default=0.45, ge=0.0, le=1.0),
+    model_key: str | None = Query(default=None, min_length=1, max_length=100),
 ):
     task = detection_service.create_video_detection_task(
         db,
         current_user=current_user,
         file=file,
+        conf=conf,
+        iou=iou,
+        model_key=model_key,
     )
     background_tasks.add_task(
         detection_service.process_video_detection_task,

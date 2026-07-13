@@ -13,6 +13,19 @@ export default function DetectionPage() {
   const [conf, setConf] = useState(0.25);
   const [iou, setIou] = useState(0.45);
   const [downloading, setDownloading] = useState(false);
+  const [yoloModels, setYoloModels] = useState([]);
+  const [modelKey, setModelKey] = useState("");
+  const [modelsLoading, setModelsLoading] = useState(true);
+  const [modelsError, setModelsError] = useState("");
+
+  const selectedModel = useMemo(
+    () => yoloModels.find((model) => model.key === modelKey) || null,
+    [modelKey, yoloModels]
+  );
+  const unavailableModels = useMemo(
+    () => yoloModels.filter((model) => !model.available),
+    [yoloModels]
+  );
 
   const previewUrl = useMemo(() => {
     if (!file) {
@@ -26,6 +39,36 @@ export default function DetectionPage() {
       if (previewUrl) URL.revokeObjectURL(previewUrl);
     };
   }, [previewUrl]);
+
+  useEffect(() => {
+    let active = true;
+
+    detectionService
+      .listYoloModels()
+      .then((models) => {
+        if (!active) return;
+        setYoloModels(models);
+        const defaultModel =
+          models.find((model) => model.available && model.is_default) ||
+          models.find((model) => model.available);
+        if (defaultModel) {
+          setModelKey(defaultModel.key);
+        } else {
+          setModelsError("目前沒有可用的 YOLO checkpoint。");
+        }
+      })
+      .catch((err) => {
+        if (!active) return;
+        setModelsError(normalizeApiError(err, "無法取得 YOLO 模型清單"));
+      })
+      .finally(() => {
+        if (active) setModelsLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   async function handleDownloadResult() {
     if (!result?.result_image_url) return;
@@ -52,7 +95,11 @@ export default function DetectionPage() {
     setError("");
 
     try {
-      const detection = await detectionService.detectImage(file, { conf, iou });
+      const detection = await detectionService.detectImage(file, {
+        conf,
+        iou,
+        modelKey,
+      });
       setResult(detection);
     } catch (err) {
       setError(normalizeApiError(err, "圖片偵測失敗"));
@@ -88,6 +135,55 @@ export default function DetectionPage() {
             <p className="muted small" style={{ marginTop: 6 }}>支援 JPG、PNG、WEBP，單檔最大 10 MB</p>
           </label>
 
+          <label className="field">
+            <span>選擇推論模型</span>
+            <select
+              value={modelKey}
+              onChange={(event) => {
+                setModelKey(event.target.value);
+                setResult(null);
+              }}
+              disabled={modelsLoading || !yoloModels.some((model) => model.available)}
+              required
+            >
+              {modelsLoading ? <option value="">載入模型清單中...</option> : null}
+              {!modelsLoading && !modelKey ? <option value="">請選擇模型</option> : null}
+              {yoloModels.map((model) => (
+                <option key={model.key} value={model.key} disabled={!model.available}>
+                  {model.display_name}
+                  {model.available ? "" : "（不可用）"}
+                </option>
+              ))}
+            </select>
+            {selectedModel ? (
+              <div className="model-provenance">
+                <span>{selectedModel.dataset_variant}</span>
+                <span>{selectedModel.class_count} classes</span>
+                <span>imgsz {selectedModel.input_size}</span>
+                <code>sha256:{selectedModel.sha256?.slice(0, 12) || "unavailable"}</code>
+              </div>
+            ) : null}
+          </label>
+
+          {modelsError ? (
+            <div className="alert alert-error" role="alert">
+              {modelsError}
+            </div>
+          ) : null}
+
+          {unavailableModels.length ? (
+            <details className="model-availability">
+              <summary>{unavailableModels.length} 個 checkpoint 暫不可用</summary>
+              <ul>
+                {unavailableModels.map((model) => (
+                  <li key={model.key}>
+                    <strong>{model.display_name}</strong>：{model.unavailable_reason}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          ) : null}
+
           <div className="threshold-controls">
             <label className="threshold-row">
               <span>信心閾值 <strong>(conf = {conf.toFixed(2)})</strong></span>
@@ -117,7 +213,7 @@ export default function DetectionPage() {
 
           {error ? <div className="alert alert-error" role="alert" aria-live="assertive">{error}</div> : null}
 
-          <button type="submit" className="button" disabled={!file || loading}>
+          <button type="submit" className="button" disabled={!file || !modelKey || loading}>
             {loading ? "辨識中..." : "開始偵測"}
           </button>
         </form>
@@ -195,6 +291,14 @@ export default function DetectionPage() {
             <span className="muted">
               {result.objects?.length || 0} 個物件 · {result.inference_ms ?? "-"} ms
             </span>
+          </div>
+          <div className="model-provenance result-provenance">
+            <span>{result.model_key || result.model_name}</span>
+            <span>conf {result.confidence_threshold ?? conf}</span>
+            <span>IoU {result.iou_threshold ?? iou}</span>
+            {result.model_sha256 ? (
+              <code>sha256:{result.model_sha256.slice(0, 12)}</code>
+            ) : null}
           </div>
           <div className="table-wrapper">
             <table>

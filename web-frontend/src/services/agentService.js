@@ -113,6 +113,22 @@ const agentService = {
     const response = await api.get("/api/agent/modes");
     return response.data;
   },
+
+  async downloadDetectionReport(detectionId, format = "pdf") {
+    const response = await api.get(`/api/reports/detections/${detectionId}`, {
+      params: { format },
+      responseType: "blob",
+    });
+    const extension = format === "markdown" ? "md" : "pdf";
+    const blobUrl = URL.createObjectURL(response.data);
+    const anchor = document.createElement("a");
+    anchor.href = blobUrl;
+    anchor.download = `yolo-detection-${detectionId}-report.${extension}`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(blobUrl);
+  },
 };
 
 export default agentService;

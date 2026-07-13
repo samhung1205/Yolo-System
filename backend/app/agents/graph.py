@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 
 from app.agents import subagents
 from app.agents.llm import (
+    AgentLLMInvocationError,
     MockChatModel,
     deepagents_available,
     get_chat_model,
@@ -125,7 +126,7 @@ def _call_tools_or_subagent_node(state: AgentState, *, db: Session, current_user
                 return state
             tool_results.append({"tool": "yolo_explainer", "ok": True})
             references.append({"type": "detection", "detection_id": int(detection_id)})
-            state["__llm_messages"] = subagents.build_yolo_explainer_messages(
+            state["llm_messages"] = subagents.build_yolo_explainer_messages(
                 state["messages"][-1]["content"] if state.get("messages") else "",
                 payload,
             )
@@ -133,7 +134,7 @@ def _call_tools_or_subagent_node(state: AgentState, *, db: Session, current_user
         elif intent == "detection_history_analysis":
             payload = subagents.run_history_analyst(db, current_user=current_user)
             tool_results.append({"tool": "history_analyst", "ok": payload.get("ok", False)})
-            state["__llm_messages"] = subagents.build_history_analyst_messages(
+            state["llm_messages"] = subagents.build_history_analyst_messages(
                 state["messages"][-1]["content"] if state.get("messages") else "",
                 payload,
             )
@@ -157,11 +158,11 @@ def _call_tools_or_subagent_node(state: AgentState, *, db: Session, current_user
                 return state
             tool_results.append({"tool": "report_agent", "ok": True})
             references.append({"type": "detection", "detection_id": int(detection_id)})
-            state["__llm_messages"] = subagents.build_report_agent_messages(
+            state["llm_messages"] = subagents.build_report_agent_messages(
                 state["messages"][-1]["content"] if state.get("messages") else "",
                 payload,
             )
-            state["__report_markdown"] = payload.get("markdown")
+            state["report_markdown"] = payload.get("markdown")
 
         elif intent == "admin_help":
             if not current_user.is_admin:
@@ -169,7 +170,7 @@ def _call_tools_or_subagent_node(state: AgentState, *, db: Session, current_user
                 return state
             payload = subagents.run_admin_assistant(db, current_user=current_user)
             tool_results.append({"tool": "admin_assistant", "ok": payload.get("ok", False)})
-            state["__llm_messages"] = subagents.build_admin_assistant_messages(
+            state["llm_messages"] = subagents.build_admin_assistant_messages(
                 state["messages"][-1]["content"] if state.get("messages") else "",
                 payload,
             )
@@ -182,7 +183,7 @@ def _call_tools_or_subagent_node(state: AgentState, *, db: Session, current_user
                 "role": "user",
                 "content": "",
             }
-            state["__llm_messages"] = system + extra + history + [user_msg]
+            state["llm_messages"] = system + extra + history + [user_msg]
             tool_results.append({"tool": "general_chat", "ok": True})
 
     except PermissionError as exc:
@@ -200,21 +201,29 @@ def _compose_answer_node(state: AgentState) -> AgentState:
     if state.get("errors"):
         return state
 
-    messages = state.get("__llm_messages") or []
+    messages = state.get("llm_messages") or []
     llm = get_chat_model(
         provider=state.get("provider_name"),
         model_name=state.get("model_name_override"),
     )
-    response = llm.invoke(messages)
+    try:
+        response = llm.invoke(messages)
+    except AgentLLMInvocationError as exc:
+        logger.warning("Agent LLM failed: %s", exc)
+        state["errors"] = (state.get("errors") or []) + ["llm_invocation_failed"]
+        state["final_answer"] = "AI 模型目前無法完成回覆，請稍後再試或選擇其他模型。"
+        state.pop("llm_messages", None)
+        state.pop("report_markdown", None)
+        return state
     answer = (response.content or "").strip() or "(no answer)"
 
-    report_markdown = state.get("__report_markdown")
+    report_markdown = state.get("report_markdown")
     if report_markdown:
         answer = f"{report_markdown}\n\n---\n\n{answer}"
 
     state["final_answer"] = answer
-    state.pop("__llm_messages", None)
-    state.pop("__report_markdown", None)
+    state.pop("llm_messages", None)
+    state.pop("report_markdown", None)
     return state
 
 
@@ -236,8 +245,8 @@ def _handle_error_node(state: AgentState) -> AgentState:
     else:
         state["final_answer"] = f"Agent 執行失敗：{errors[0]}"
 
-    state.pop("__llm_messages", None)
-    state.pop("__report_markdown", None)
+    state.pop("llm_messages", None)
+    state.pop("report_markdown", None)
     return state
 
 
@@ -266,6 +275,8 @@ def _build_state(
         final_answer="",
         references=[],
         errors=[],
+        llm_messages=[],
+        report_markdown=None,
         provider_name=provider_name or None,
         model_name_override=model_name_override or None,
     )
@@ -403,23 +414,21 @@ def stream_graph(
 
     tool_results: list[dict[str, Any]] = state.get("tool_results") or []
     references: list[dict[str, Any]] = state.get("references") or []
-    report_markdown: Optional[str] = state.get("__report_markdown")
+    report_markdown: Optional[str] = state.get("report_markdown")
 
     yield ("ready", {"tool_results": tool_results, "references": references})
 
     if state.get("errors"):
         state = _handle_error_node(state)
         answer = state.get("final_answer") or ""
-        if answer:
-            yield ("answer_chunk", answer)
-        yield ("done", {"final_answer": answer, "tool_results": tool_results, "references": references})
+        yield ("error", answer or "Agent 執行失敗。")
         return
 
     if report_markdown:
         header = report_markdown + "\n\n---\n\n"
         yield ("answer_chunk", header)
 
-    messages_for_llm = state.get("__llm_messages") or []
+    messages_for_llm = state.get("llm_messages") or []
     llm = get_chat_model(
         provider=state.get("provider_name"),
         model_name=state.get("model_name_override"),

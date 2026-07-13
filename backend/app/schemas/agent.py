@@ -92,6 +92,8 @@ class AgentChatResponse(BaseModel):
     mode: str
     tool_calls: Optional[list[dict[str, Any]]] = None
     references: Optional[list[dict[str, Any]]] = None
+    success: bool = True
+    errors: list[str] = Field(default_factory=list)
 
 
 class AgentModeRead(BaseModel):

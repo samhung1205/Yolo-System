@@ -63,6 +63,7 @@ class Settings(BaseSettings):
     )
 
     # YOLO
+    YOLO_DEFAULT_MODEL_KEY: str = "seven_class_asff"
     YOLO_DEFAULT_MODEL: str = "pt/bset.pt"
     YOLO_RESULTS_DIR: str = "static/results"
     DETECTION_SOURCE_DIR: str = "static/detections/originals"

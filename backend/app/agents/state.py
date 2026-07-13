@@ -41,6 +41,11 @@ class AgentState(TypedDict, total=False):
     references: list[dict[str, Any]]
     errors: list[str]
 
+    # Intermediate values must be declared so LangGraph preserves them between
+    # nodes. Undeclared keys are discarded when state transitions are applied.
+    llm_messages: list[AgentMessage]
+    report_markdown: Optional[str]
+
     # Per-request LLM override (set by service layer, read by compose_answer_node)
     provider_name: Optional[str]
     model_name_override: Optional[str]

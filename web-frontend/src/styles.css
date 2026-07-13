@@ -275,12 +275,111 @@ img {
 }
 
 input,
-textarea {
+textarea,
+.field select {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 12px 14px;
   background: #fff;
+}
+
+.field select:focus-visible {
+  outline: 3px solid var(--accent-dim);
+  border-color: var(--accent);
+}
+
+.model-provenance {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.model-provenance span,
+.model-provenance code {
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel-alt);
+}
+
+.model-availability {
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.model-availability summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.model-availability ul {
+  margin: 10px 0 0;
+  padding-left: 22px;
+}
+
+.result-provenance {
+  margin: -6px 0 16px;
+}
+
+.report-download-actions {
+  display: grid;
+  gap: 8px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.markdown-report {
+  min-width: 0;
+  line-height: 1.6;
+}
+
+.markdown-report > :first-child {
+  margin-top: 0;
+}
+
+.markdown-report > :last-child {
+  margin-bottom: 0;
+}
+
+.markdown-report h1,
+.markdown-report h2,
+.markdown-report h3 {
+  margin: 1.1em 0 0.45em;
+  color: var(--text);
+  line-height: 1.3;
+}
+
+.markdown-report h1 {
+  font-size: 1.3rem;
+}
+
+.markdown-report h2 {
+  font-size: 1.08rem;
+}
+
+.markdown-report p,
+.markdown-report ul {
+  margin: 0.55em 0;
+}
+
+.markdown-report code {
+  overflow-wrap: anywhere;
+  font-size: 0.82em;
+}
+
+.markdown-report table {
+  display: block;
+  overflow-x: auto;
+  margin: 12px 0;
+  font-size: 0.84rem;
+}
+
+.markdown-report th,
+.markdown-report td {
+  white-space: nowrap;
 }
 
 textarea {

@@ -26,6 +26,7 @@ requests>=2.31.0
 ultralytics>=8.3.242
 pillow>=10.0.0
 opencv-python-headless>=4.10.0
+reportlab>=4.0,<5
 
 # Agentic AI (Phase 6A-1)
 # LangChain / LangGraph drive the /api/agent supervisor workflow.

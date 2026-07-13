@@ -9,14 +9,21 @@ import cv2
 from fastapi import HTTPException, status
 from PIL import Image
 
-from app.core.config import settings
+from app.integrations.model_registry import (
+    YoloModelRegistryError,
+    YoloModelSpec,
+    get_yolo_model,
+)
 
 _MODEL_CACHE: dict[str, object] = {}
 
 
 @dataclass
 class DetectionRunResult:
+    model_key: str
     model_name: str
+    model_sha256: str
+    model_class_map: dict[str, dict[str, str]]
     image_width: int
     image_height: int
     inference_ms: float
@@ -26,7 +33,10 @@ class DetectionRunResult:
 
 @dataclass
 class VideoDetectionRunResult:
+    model_key: str
     model_name: str
+    model_sha256: str
+    model_class_map: dict[str, dict[str, str]]
     image_width: int
     image_height: int
     inference_ms: float
@@ -36,8 +46,15 @@ class VideoDetectionRunResult:
 
 
 class YoloEngine:
-    def __init__(self, model_path: str | None = None):
-        self.model_path = Path(model_path or settings.YOLO_DEFAULT_MODEL)
+    def __init__(self, model_key: str | None = None):
+        try:
+            self.model_spec: YoloModelSpec = get_yolo_model(model_key)
+        except YoloModelRegistryError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(exc),
+            ) from exc
+        self.model_path = self.model_spec.checkpoint_path
 
     def detect_image(self, image_path: Path, conf: float = 0.25, iou: float = 0.45) -> DetectionRunResult:
         model = self._load_model()
@@ -47,30 +64,16 @@ class YoloEngine:
         inference_ms = round((perf_counter() - started_at) * 1000, 2)
 
         image_height, image_width = result.orig_shape
-        objects = []
-
-        boxes = result.boxes
-        if boxes is not None:
-            xyxy = boxes.xyxy.tolist()
-            class_ids = boxes.cls.tolist()
-            confidences = boxes.conf.tolist()
-
-            for index, (bbox, class_id, confidence) in enumerate(zip(xyxy, class_ids, confidences), start=1):
-                objects.append(
-                    {
-                        "object_index": index,
-                        "class_id": int(class_id),
-                        "class_name": str(result.names[int(class_id)]),
-                        "confidence": float(confidence),
-                        "bbox": [float(value) for value in bbox],
-                    }
-                )
+        objects = self._extract_objects(result)
 
         annotated_bgr = result.plot()
         annotated_image = Image.fromarray(annotated_bgr[:, :, ::-1])
 
         return DetectionRunResult(
+            model_key=self.model_spec.key,
             model_name=self.model_path.name,
+            model_sha256=self.model_spec.current_sha256() or "",
+            model_class_map=self.model_spec.provenance_snapshot(),
             image_width=image_width,
             image_height=image_height,
             inference_ms=inference_ms,
@@ -154,7 +157,10 @@ class YoloEngine:
         preview_image = Image.fromarray(preview_frame)
 
         return VideoDetectionRunResult(
+            model_key=self.model_spec.key,
             model_name=self.model_path.name,
+            model_sha256=self.model_spec.current_sha256() or "",
+            model_class_map=self.model_spec.provenance_snapshot(),
             image_width=image_width,
             image_height=image_height,
             inference_ms=inference_ms,
@@ -163,8 +169,7 @@ class YoloEngine:
             preview_image=preview_image,
         )
 
-    @staticmethod
-    def _extract_objects(result) -> list[dict]:
+    def _extract_objects(self, result) -> list[dict]:
         objects = []
         boxes = result.boxes
         if boxes is None:
@@ -183,7 +188,10 @@ class YoloEngine:
                 {
                     "object_index": object_index,
                     "class_id": int(class_id),
-                    "class_name": str(result.names[int(class_id)]),
+                    "class_name": self.model_spec.canonical_class_names.get(
+                        int(class_id),
+                        str(result.names[int(class_id)]),
+                    ),
                     "confidence": float(confidence),
                     "bbox": [float(value) for value in bbox],
                 }
@@ -209,6 +217,33 @@ class YoloEngine:
                 detail="Ultralytics is not installed in the backend environment",
             ) from exc
 
-        model = YOLO(str(self.model_path))
+        try:
+            model = YOLO(str(self.model_path))
+        except Exception as exc:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=(
+                    f"Unable to load registered YOLO model '{self.model_spec.key}': "
+                    f"{exc}"
+                ),
+            ) from exc
+
+        loaded_names = {int(key): str(value) for key, value in model.names.items()}
+        if model.task != self.model_spec.task:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=(
+                    f"Registered YOLO model '{self.model_spec.key}' has task "
+                    f"'{model.task}', expected '{self.model_spec.task}'."
+                ),
+            )
+        if loaded_names != self.model_spec.checkpoint_class_names:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=(
+                    f"Registered YOLO model '{self.model_spec.key}' has an unexpected "
+                    "checkpoint class mapping."
+                ),
+            )
         _MODEL_CACHE[model_key] = model
         return model

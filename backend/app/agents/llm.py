@@ -27,6 +27,10 @@ class AgentLLMResponse:
     model_name: str
 
 
+class AgentLLMInvocationError(RuntimeError):
+    """Raised when a configured real LLM cannot complete a request."""
+
+
 class _BaseAgentChatModel:
     provider: str = "base"
     model_name: str = ""
@@ -104,16 +108,20 @@ class _LangChainChatModel(_BaseAgentChatModel):
         self.model_name = model_name
 
     def invoke(self, messages: list[dict[str, str]]) -> AgentLLMResponse:
+        if not messages:
+            raise AgentLLMInvocationError("Agent message payload is empty.")
         try:
             lc_messages = _to_langchain_messages(messages)
+            if not lc_messages:
+                raise AgentLLMInvocationError("Agent message payload is empty.")
             response = self._model.invoke(lc_messages)
+        except AgentLLMInvocationError:
+            raise
         except Exception as exc:  # pragma: no cover - defensive
             logger.warning("LangChain chat model invocation failed: %s", exc)
-            return AgentLLMResponse(
-                content=f"[agent-error] LLM invocation failed: {exc}",
-                provider=self.provider,
-                model_name=self.model_name,
-            )
+            raise AgentLLMInvocationError(
+                f"{self.provider}/{self.model_name} invocation failed"
+            ) from exc
 
         content = getattr(response, "content", None)
         if isinstance(content, list):
@@ -134,8 +142,12 @@ class _LangChainChatModel(_BaseAgentChatModel):
 
     def stream(self, messages: list[dict[str, str]]) -> Iterable[AgentLLMResponse]:
         """Delegate to LangChain's native streaming interface."""
+        if not messages:
+            raise AgentLLMInvocationError("Agent message payload is empty.")
         try:
             lc_messages = _to_langchain_messages(messages)
+            if not lc_messages:
+                raise AgentLLMInvocationError("Agent message payload is empty.")
             for lc_chunk in self._model.stream(lc_messages):
                 delta = getattr(lc_chunk, "content", "") or ""
                 if isinstance(delta, list):
@@ -150,6 +162,8 @@ class _LangChainChatModel(_BaseAgentChatModel):
                         provider=self.provider,
                         model_name=self.model_name,
                     )
+        except AgentLLMInvocationError:
+            raise
         except Exception as exc:  # pragma: no cover - defensive
             logger.warning("LangChain streaming failed: %s; falling back to invoke", exc)
             yield self.invoke(messages)

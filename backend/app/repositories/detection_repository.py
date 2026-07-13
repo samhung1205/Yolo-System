@@ -14,6 +14,11 @@ def create_task(
     source_type: str,
     source_filename: str,
     model_name: str,
+    model_key: str | None = None,
+    model_sha256: str | None = None,
+    model_class_map_json: dict | None = None,
+    confidence_threshold: float | None = None,
+    iou_threshold: float | None = None,
     status: str = "processing",
 ) -> DetectionTask:
     task = DetectionTask(
@@ -21,6 +26,11 @@ def create_task(
         source_type=source_type,
         source_filename=source_filename,
         model_name=model_name,
+        model_key=model_key,
+        model_sha256=model_sha256,
+        model_class_map_json=model_class_map_json,
+        confidence_threshold=confidence_threshold,
+        iou_threshold=iou_threshold,
         status=status,
     )
     db.add(task)

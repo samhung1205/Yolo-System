@@ -44,9 +44,9 @@ def generate_detection_report_markdown_tool(
     lines.append("")
     lines.append("## 1. Task Summary")
     lines.append(f"- detection_id: {detail['detection_id']}")
-    lines.append(f"- user_id: {detail['user_id']}")
     lines.append(f"- status: {detail['status']}")
     lines.append(f"- created_at: {detail.get('created_at')}")
+    lines.append("- report_version: 1.0")
     lines.append("")
 
     lines.append("## 2. Input Source")
@@ -62,6 +62,14 @@ def generate_detection_report_markdown_tool(
 
     lines.append("## 3. Model and Inference")
     lines.append(f"- model_name: {detail['model_name']}")
+    if detail.get("model_key"):
+        lines.append(f"- model_key: {detail['model_key']}")
+    if detail.get("model_sha256"):
+        lines.append(f"- checkpoint_sha256: {detail['model_sha256']}")
+    if detail.get("confidence_threshold") is not None:
+        lines.append(f"- confidence_threshold: {detail['confidence_threshold']}")
+    if detail.get("iou_threshold") is not None:
+        lines.append(f"- iou_threshold: {detail['iou_threshold']}")
     lines.append(f"- inference_ms: {detail.get('inference_ms')}")
     if detail.get("error_message"):
         lines.append(f"- error_message: {detail['error_message']}")
