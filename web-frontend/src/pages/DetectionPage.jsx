@@ -18,10 +18,6 @@ export default function DetectionPage() {
   const [modelsLoading, setModelsLoading] = useState(true);
   const [modelsError, setModelsError] = useState("");
 
-  const selectedModel = useMemo(
-    () => yoloModels.find((model) => model.key === modelKey) || null,
-    [modelKey, yoloModels]
-  );
   const unavailableModels = useMemo(
     () => yoloModels.filter((model) => !model.available),
     [yoloModels]
@@ -155,14 +151,6 @@ export default function DetectionPage() {
                 </option>
               ))}
             </select>
-            {selectedModel ? (
-              <div className="model-provenance">
-                <span>{selectedModel.dataset_variant}</span>
-                <span>{selectedModel.class_count} classes</span>
-                <span>imgsz {selectedModel.input_size}</span>
-                <code>sha256:{selectedModel.sha256?.slice(0, 12) || "unavailable"}</code>
-              </div>
-            ) : null}
           </label>
 
           {modelsError ? (
