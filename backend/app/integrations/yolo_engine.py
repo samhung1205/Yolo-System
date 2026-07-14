@@ -64,7 +64,13 @@ class YoloEngine:
         model = self._load_model()
 
         started_at = perf_counter()
-        result = model.predict(source=str(image_path), conf=conf, iou=iou, verbose=False)[0]
+        result = model.predict(
+            source=str(image_path),
+            conf=conf,
+            iou=iou,
+            imgsz=self.model_spec.input_size,
+            verbose=False,
+        )[0]
         inference_ms = round((perf_counter() - started_at) * 1000, 2)
 
         image_height, image_width = result.orig_shape
@@ -138,7 +144,14 @@ class YoloEngine:
                     break
 
                 frame_count += 1
-                result = model.track(source=frame, persist=True, conf=conf, iou=iou, verbose=False)[0]
+                result = model.track(
+                    source=frame,
+                    persist=True,
+                    conf=conf,
+                    iou=iou,
+                    imgsz=self.model_spec.input_size,
+                    verbose=False,
+                )[0]
                 annotated_bgr = result.plot()
                 writer.write(annotated_bgr)
 
