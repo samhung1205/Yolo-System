@@ -66,6 +66,10 @@ def generate_detection_report_markdown_tool(
         lines.append(f"- model_key: {detail['model_key']}")
     if detail.get("model_sha256"):
         lines.append(f"- checkpoint_sha256: {detail['model_sha256']}")
+    runtime_modules = (detail.get("model_class_map") or {}).get("runtime_modules") or {}
+    for module_name, module_sha256 in sorted(runtime_modules.items()):
+        lines.append(f"- runtime_module: {module_name}")
+        lines.append(f"  - source_sha256: {module_sha256}")
     if detail.get("confidence_threshold") is not None:
         lines.append(f"- confidence_threshold: {detail['confidence_threshold']}")
     if detail.get("iou_threshold") is not None:

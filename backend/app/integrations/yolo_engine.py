@@ -9,6 +9,10 @@ import cv2
 from fastapi import HTTPException, status
 from PIL import Image
 
+from app.integrations.legacy_checkpoint_compat import (
+    LegacyCheckpointCompatibilityError,
+    install_legacy_checkpoint_modules,
+)
 from app.integrations.model_registry import (
     YoloModelRegistryError,
     YoloModelSpec,
@@ -208,6 +212,17 @@ class YoloEngine:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"YOLO model not found: {self.model_path}",
             )
+
+        try:
+            install_legacy_checkpoint_modules(self.model_spec.key)
+        except LegacyCheckpointCompatibilityError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=(
+                    f"Unable to prepare registered YOLO model '{self.model_spec.key}': "
+                    f"{exc}"
+                ),
+            ) from exc
 
         try:
             from ultralytics import YOLO

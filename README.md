@@ -174,6 +174,21 @@ cd /Users/SAM/Desktop/Agents/Yolo_system/web-frontend
 npm run dev -- --host 127.0.0.1 --port 5173
 ```
 
+### 自訂 YOLO checkpoint 相容層
+
+Web 平台只載入 registry 核准的已訓練 checkpoint，不使用根目錄的舊版
+`tasks.py` 建構模型。ASFF、DySample 與 EfficientViM checkpoint 所保存的歷史
+Python module path，由
+`backend/app/integrations/legacy_checkpoint_compat.py` 映射到版本庫內的原始碼：
+
+- `models/custom_modules/ASFFHead.py`
+- `SCAM_DySample.py`
+- `AddModules/EfficientViMBlock.py`
+
+因此不需要、也不應再把這些檔案複製到 conda 環境的 Ultralytics
+`site-packages`。根目錄 `tasks.py` 與 `AddModules/Dysample.py` 僅保留為舊訓練
+架構參考，不是 FastAPI 推論 runtime dependency。
+
 ---
 
 ## 目前 Phase 狀態

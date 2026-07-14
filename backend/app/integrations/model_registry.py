@@ -11,6 +11,10 @@ from hashlib import file_digest
 from pathlib import Path
 
 from app.core.config import settings
+from app.integrations.legacy_checkpoint_compat import (
+    legacy_source_fingerprints,
+    legacy_source_status,
+)
 
 _BACKEND_ROOT = Path(__file__).resolve().parents[2]
 
@@ -78,13 +82,20 @@ class YoloModelSpec:
         digest = self.current_sha256()
         if digest != self.expected_sha256:
             return False, "Checkpoint fingerprint changed; registry review is required."
+        sources_available, reason = legacy_source_status(self.key)
+        if not sources_available:
+            return False, reason
         return True, None
 
     def provenance_snapshot(self) -> dict[str, dict[str, str]]:
-        return {
+        snapshot = {
             "checkpoint": {str(key): value for key, value in self.checkpoint_class_names.items()},
             "canonical": {str(key): value for key, value in self.canonical_class_names.items()},
         }
+        runtime_modules = legacy_source_fingerprints(self.key)
+        if runtime_modules:
+            snapshot["runtime_modules"] = runtime_modules
+        return snapshot
 
     def public_metadata(self) -> dict:
         available, reason = self.availability()
@@ -162,8 +173,6 @@ _MODEL_SPECS = (
         expected_sha256="5585146589104ec6b2207e8353432df7159a2cade6279401627061eca5f2fcfc",
         checkpoint_class_names=FOUR_CLASS_CHECKPOINT,
         canonical_class_names=FOUR_CLASS_CANONICAL,
-        selectable=False,
-        disabled_reason="Required SCAM_DySample module is not installed in the backend runtime.",
     ),
     YoloModelSpec(
         key="four_class_evmblock",
@@ -174,8 +183,6 @@ _MODEL_SPECS = (
         expected_sha256="213768fd62ec04215973a260aac7f150db62d41f6e06f843ca616ab6748b72f7",
         checkpoint_class_names=FOUR_CLASS_CHECKPOINT,
         canonical_class_names=FOUR_CLASS_CANONICAL,
-        selectable=False,
-        disabled_reason="Required ultralytics.nn.AddModules package is not installed.",
     ),
     YoloModelSpec(
         key="seven_class_dysample",
@@ -186,8 +193,6 @@ _MODEL_SPECS = (
         expected_sha256="7d0558155460b75865b29d5e6392e0e2307ee2d98738b7f254595d18ce8bb430",
         checkpoint_class_names=SEVEN_CLASS_CHECKPOINT,
         canonical_class_names=SEVEN_CLASS_CANONICAL,
-        selectable=False,
-        disabled_reason="Required SCAM_DySample module is not installed in the backend runtime.",
     ),
     YoloModelSpec(
         key="four_class_obb",

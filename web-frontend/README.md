@@ -36,9 +36,9 @@ VITE_API_BASE_URL=http://127.0.0.1:8001
 VITE_PROXY_TARGET=http://127.0.0.1:8001
 ```
 
-本地驗證建議組合：
+標準本地驗證組合：
 ```bash
-VITE_API_BASE_URL=http://127.0.0.1:8006
-VITE_PROXY_TARGET=http://127.0.0.1:8006
-npm run dev -- --host 127.0.0.1 --port 5176
+VITE_API_BASE_URL=http://127.0.0.1:8000
+VITE_PROXY_TARGET=http://127.0.0.1:8000
+npm run dev -- --host 127.0.0.1 --port 5173
 ```
