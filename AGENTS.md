@@ -166,7 +166,7 @@
 - [x] 盤點 legacy 專案
 - [x] 建立 README.md
 - [x] 建立 AGENTS.md
-- [x] 建立 docs/current-system-analysis.md
+- [x] 建立 legacy 現況分析（後併入 README.md「Legacy 專案現況與重構目標」，獨立檔案已移除）
 - [x] 建立新目錄骨架
 
 **Phase 1 — ✅ 完成（待 MySQL 密碼確認後執行 migration）**
@@ -335,7 +335,7 @@ cd backend && uvicorn main:app --reload
 | 目錄結構變動 | `README.md`（目錄結構區塊） |
 | 啟動方式變動 | `README.md`（啟動方式區塊） |
 | Phase 推進 | `README.md`（Phase 狀態表）+ `AGENTS.md`（當前 Phase） |
-| 新增重要模組 | `docs/current-system-analysis.md` 或相關 docs |
+| 新增重要模組 | `docs/architecture.md` 或相關 docs |
 
 ---
 
@@ -344,7 +344,7 @@ cd backend && uvicorn main:app --reload
 ### 每次進入新工作階段時，請先：
 1. 閱讀 `README.md`（了解目前 phase 與架構）
 2. 閱讀 `AGENTS.md`（了解限制與規則）
-3. 閱讀 `docs/current-system-analysis.md`（了解 legacy 現況）
+3. 閱讀 `docs/architecture.md`（了解架構與資料流；legacy 現況見 README.md）
 4. 閱讀本次任務相關的原始碼檔案
 
 ### 輸出報告格式

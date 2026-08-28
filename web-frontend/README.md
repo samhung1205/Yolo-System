@@ -1,6 +1,6 @@
 # Web Frontend
 
-> **狀態**: Phase 5 Web MVP 已建立，API / runtime 驗證完成，待人工瀏覽器最終驗收。
+> **狀態**: Phase 5 已完成，Phase 6A 的 Agent Console 與批次分析頁亦已併入。
 
 ## 技術選型
 
@@ -16,15 +16,17 @@
 - `RegisterPage`
 - `DashboardPage`
 - `DetectionPage`
+- `BatchDetectionPage`
 - `DetectionHistoryPage`
 - `ProfilePage`
 - `ChatPage`
+- `AgentPage`（`/agent`，使用 SSE streaming）
 - `admin/UserManagementPage`
 
 ## 啟動方式
 
 ```bash
-cd /Users/SAM/Desktop/Agents/Yolo_system/web-frontend
+cd web-frontend
 npm install
 npm run dev
 ```

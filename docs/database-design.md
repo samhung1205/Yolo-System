@@ -228,7 +228,7 @@ users (1) ──────< chat_logs (M)
 
 ### 執行指令
 ```bash
-cd /Users/SAM/Desktop/Agents/Yolo_system/backend
+cd backend
 alembic upgrade head
 ```
 

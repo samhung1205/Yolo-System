@@ -1,18 +1,38 @@
 # YOLO System — 桌面版 + Web 版雙軌架構
 
-> 本專案為 PySide6 legacy project 的漸進式重構版本，目標是在保留現有桌面版功能的前提下，引入 FastAPI 後端與 React Web 前端，實現前後端分離的雙軌架構。
+> 把一支 UI、業務邏輯與 SQL 全部耦合在同一層的 PySide6 桌面程式，
+> 在不中斷既有功能的前提下，逐步重構成桌面版與 React Web 共用同一組
+> FastAPI 後端的偵測平台。
+
+**目前狀態**：後端、Web 前端與桌面版主流程皆可執行；容器化與部署（Phase 6）尚未開始，目前僅支援本機執行。
+
+**技術棧**：FastAPI · SQLAlchemy · Alembic · MySQL · React 18 + Vite · PySide6 · Ultralytics YOLO · LangGraph
+
+### 從哪裡開始讀
+
+| 想知道 | 看這裡 |
+|---|---|
+| 架構怎麼演進、資料流長怎樣 | [docs/architecture.md](docs/architecture.md) |
+| 有哪些 API 端點 | [docs/api-spec.md](docs/api-spec.md) |
+| 資料表設計與 legacy 對照 | [docs/database-design.md](docs/database-design.md) |
+| 怎麼跑起來 | 本文件的[啟動方式](#啟動方式) |
+| 各階段做了什麼 | 本文件的[開發歷程](#開發歷程) |
 
 ---
 
 ## 專案簡介
 
-本系統整合了 YOLO 影像辨識、DeepSeek AI 對話、使用者管理、管理員後台等功能。原始版本為純 PySide6 桌面應用程式，UI、業務邏輯、資料庫操作高度耦合。重構目標是在不破壞現有功能的前提下，建立可維護、可展示的雙軌架構。
+本系統整合 YOLO 影像偵測、AI 對話與 agent 助理、使用者與管理員後台。原始版本為純 PySide6 桌面應用程式，UI、業務邏輯與資料庫操作高度耦合；重構的核心是把「誰可以直接存取資料庫、模型與外部 API」從 UI 移到後端，使桌面版與 Web 版能共用同一份業務邏輯。
 
 ---
 
 ## Legacy 專案現況與重構目標
 
 ### Legacy 現況
+
+> 以下描述的是重構「之前」的狀態，作為對照保留。`mysql/dataDB.py` 與
+> `utils/deepseek.py` 已在重構過程中移除，現行程式碼中不再存在。
+
 - **框架**: PySide6 桌面應用
 - **資料庫**: MySQL（直接在 UI handler 中執行 SQL）
 - **密碼**: 明文儲存於資料庫
@@ -41,7 +61,7 @@ PySide6 UI ──直接調用──> utils/deepseek.py ──> DeepSeek API
 PySide6 UI ──直接調用──> detect_mainui.py ──> YOLO
 ```
 
-### 新架構（目標）
+### 現行架構
 ```
 PySide6 Desktop App ──HTTP──> FastAPI Backend ──> MySQL (SQLAlchemy)
 React Web Frontend  ──HTTP──> FastAPI Backend ──> MySQL (SQLAlchemy)
@@ -59,24 +79,30 @@ Yolo_system/
 │
 ├── README.md                   # 本文件
 ├── AGENTS.md                   # AI 協作規範文件
-├── yolo.sql                    # Legacy 資料庫 schema（參考用）
 │
 ├── docs/                       # 專案文件
-│   ├── current-system-analysis.md  # Legacy 系統分析
-│   ├── architecture.md         # 新架構設計
-│   ├── api-spec.md             # API 規格文件
+│   ├── architecture.md         # 架構設計
+│   ├── api-spec.md             # API 規格
 │   ├── database-design.md      # 資料庫設計
-│   └── roadmap.md              # 開發路線圖
+│   ├── roadmap.md              # 開發路線圖
+│   ├── 01_phase6a_backend_agentic_layer.md
+│   ├── 02_phase6a_web_desktop_agent_ui.md
+│   ├── evals/                  # explain_detection eval 框架說明
+│   └── prompts/                # agent / 稽核用 prompt
 │
-├── backend/                    # FastAPI 後端（Phase 1 起建立）
+├── backend/                    # FastAPI 後端
 │   ├── app/
 │   │   ├── api/routes/         # API 路由
-│   │   ├── core/               # 設定、安全、JWT
+│   │   ├── core/               # 設定、安全、JWT、簽章靜態 URL
 │   │   ├── db/                 # SQLAlchemy 設定
 │   │   ├── models/             # ORM 模型
 │   │   ├── schemas/            # Pydantic schemas
-│   │   └── services/           # 業務邏輯服務
-│   ├── migrations/             # Alembic migrations
+│   │   ├── repositories/       # 資料存取層
+│   │   ├── services/           # 業務邏輯服務
+│   │   ├── integrations/       # YOLO engine、模型註冊表、chat providers
+│   │   └── agents/             # LangGraph supervisor、subagents、tools
+│   ├── migrations/versions/    # Alembic migrations
+│   ├── tests/                  # 後端單元測試
 │   ├── .env.example            # 環境變數範例
 │   ├── requirements.txt
 │   └── main.py
@@ -100,7 +126,9 @@ Yolo_system/
 │   │   └── styles.css
 │   └── README.md
 │
-│── [Legacy 檔案 - 根目錄]
+├── tests/evals/                # explain_detection component eval 與結果
+│
+│── [桌面版進入點與 legacy UI - 根目錄]
 │   ├── Login.py
 │   ├── Register.py
 │   ├── MainUI.py
@@ -108,9 +136,8 @@ Yolo_system/
 │   ├── AdminAddUser.py
 │   ├── AdminEditUser.py
 │   ├── AICSMain.py
-│   ├── detect_mainui.py
+│   ├── detect_mainui.py        # webcam / RTSP，尚未後端化
 │   ├── PersonFormMain.py
-│   ├── mysql/dataDB.py
 │   ├── utils/
 │   └── ui/
 ```
@@ -119,16 +146,16 @@ Yolo_system/
 
 ## 啟動方式
 
-### Legacy 桌面版（目前可用）
+### 桌面版
 ```bash
 # 需要 Python 3.9-3.11, PySide6, pymysql, ultralytics
-cd /path/to/Yolo_system
+# 於 repo 根目錄執行
 # 可選：若 backend 不在 http://127.0.0.1:8000，先設定 API base URL
 # export YOLO_API_BASE_URL=http://127.0.0.1:8000
 python Login.py
 ```
 
-### Backend（Phase 3 目前可用）
+### Backend
 ```bash
 cd backend
 cp .env.example .env   # 填入實際 MySQL 密碼與其他設定
@@ -156,7 +183,7 @@ conda run -n yolo-backend uvicorn main:app --reload --port 8000
 
 > **macOS Sonoma 注意事項**：pip venv 安裝的 native extension (.so) 會觸發 Gatekeeper 掃描（每次約 60-100 秒）。建議使用 conda 環境（約 20 秒）。
 
-### Web Frontend（Phase 5 MVP 目前可用）
+### Web Frontend
 ```bash
 cd web-frontend
 npm install
@@ -166,11 +193,11 @@ npm run dev
 本地驗證若沿用目前專案的 mock chat / detection 測試組合，建議直接用：
 ```bash
 # backend
-cd /Users/SAM/Desktop/Agents/Yolo_system/backend
+cd backend
 conda run -n yolo-backend uvicorn main:app --reload --host 127.0.0.1 --port 8000
 
 # frontend
-cd /Users/SAM/Desktop/Agents/Yolo_system/web-frontend
+cd web-frontend
 npm run dev -- --host 127.0.0.1 --port 5173
 ```
 
@@ -217,27 +244,37 @@ Python module path，由
 
 | 文件 | 說明 |
 |------|------|
-| [current-system-analysis.md](docs/current-system-analysis.md) | Legacy 系統深度分析 |
-| [architecture.md](docs/architecture.md) | 新架構設計說明 |
+| [architecture.md](docs/architecture.md) | 架構設計、資料流與 agent 層邊界 |
 | [api-spec.md](docs/api-spec.md) | API 端點規格 |
-| [database-design.md](docs/database-design.md) | 新資料表設計 |
+| [database-design.md](docs/database-design.md) | 資料表設計與 legacy 對照 |
 | [roadmap.md](docs/roadmap.md) | 開發路線圖與里程碑 |
+| [01_phase6a_backend_agentic_layer.md](docs/01_phase6a_backend_agentic_layer.md) | Agentic layer 設計說明 |
+| [02_phase6a_web_desktop_agent_ui.md](docs/02_phase6a_web_desktop_agent_ui.md) | Web / Desktop Agent UI 整合 |
+| [evals/explain_detection_eval_framework.md](docs/evals/explain_detection_eval_framework.md) | explain_detection component eval 框架 |
 | [AGENTS.md](AGENTS.md) | AI 協作規範 |
 
----
-
-## 後續 Roadmap
-
-1. **Phase 1** — FastAPI backend MVP：auth、JWT、基本 user CRUD、health check
-2. **Phase 2** — 桌面版登入/註冊/使用者管理/個資操作改接 API，並以 JWT 驗證自動登入
-3. **Phase 3** — YOLO detection 封裝為後端 service，先完成 image/video，後續補 webcam/RTSP
-4. **Phase 4** — provider-based chat service 後端化，desktop 不再直接持有外部模型 API key
-5. **Phase 5** — React 前端：登入、detection 展示、聊天介面
-6. **Phase 6** — Docker compose、Alembic migration、測試、CI/CD 說明
+> Legacy 系統的現況分析請見上方「Legacy 專案現況與重構目標」；原本獨立的
+> `docs/current-system-analysis.md` 已不再維護。
 
 ---
 
-## Phase 2 完成範圍
+## 後續工作
+
+Phase 0–5 與 6A 系列已完成（見上方 Phase 狀態表）。目前仍待辦：
+
+1. **Phase 6** — Docker compose、部署文件、CI/CD（尚未開始，目前僅支援本機執行）
+2. webcam / RTSP 改為後端任務或獨立 streaming service
+3. image detection 由同步呼叫改為非同步任務；影片改用真正的 job queue（含進度與取消）
+4. Web 一般對話頁接上 `POST /api/chat/stream`（Agent 頁已使用 SSE）
+
+---
+
+## 開發歷程
+
+> 以下為各階段的完成範圍與當時的已知限制，保留作為決策紀錄。
+> 只想了解目前狀態的話，看上方的「Phase 狀態表」與「後續工作」即可。
+
+#### Phase 2 完成範圍
 
 - `Login.py` / `Register.py` 已改呼叫 backend auth API，不再直接查 MySQL。
 - `AdminMainUI.py` / `AdminAddUser.py` / `AdminEditUser.py` 已改呼叫 `/api/users/*`。
@@ -245,12 +282,12 @@ Python module path，由
 - Desktop 端透過 `QSettings` 保存 JWT，啟動時會用 `/api/auth/me` 驗證 token 再自動登入。
 - 已登入後的頭像更新改走 `/api/upload/avatar`，並同步快取到本地 `user_avatars/`。
 
-## Phase 2 完成當時已知限制
+### Phase 2 完成當時已知限制
 
 - 註冊前頭像仍沿用本地暫存，尚未改成匿名上傳或註冊後補傳。
 - YOLO、DeepSeek 主流程仍是 legacy local call，尚未進入 backend service phase。
 
-## Phase 3 已完成範圍
+### Phase 3 已完成範圍
 
 - backend 已新增 detection domain：
   - `DetectionTask`
@@ -270,21 +307,21 @@ Python module path，由
   - 原始影片：`static/detections/videos/originals`
   - 結果影片：`static/detections/videos/results`
   - preview 圖：`static/detections/previews`
-- 桌面端 [MainUI.py](/Users/SAM/Desktop/Agents/Yolo_system/MainUI.py) 已改為：
+- 桌面端 [MainUI.py](MainUI.py) 已改為：
   - 單張圖片走 backend image detection
   - 本地影片檔走 backend video detection
   - detection history 可讀 backend
   - 結果圖/結果影片可由 UI 開啟
 
-## Phase 3 已知限制
+### Phase 3 已知限制
 
-- webcam 偵測仍走 legacy [detect_mainui.py](/Users/SAM/Desktop/Agents/Yolo_system/detect_mainui.py)
-- RTSP / 串流仍走 legacy [detect_mainui.py](/Users/SAM/Desktop/Agents/Yolo_system/detect_mainui.py)
+- webcam 偵測仍走 legacy [detect_mainui.py](detect_mainui.py)
+- RTSP / 串流仍走 legacy [detect_mainui.py](detect_mainui.py)
 - video detection 目前只保存 preview frame 的 detection objects，不是每一幀都入庫
 - 桌面端影片 detection 目前仍以輪詢等待完成，尚未做真正非阻塞 UI 任務管理
 - history UI 目前是動態 dialog，尚未做完整篩選/分頁/刪除
 
-## Phase 4 已完成範圍
+### Phase 4 已完成範圍
 
 - backend 已新增 chat domain：
   - `ChatLog`
@@ -308,7 +345,7 @@ Python module path，由
 - provider 選擇改由 `.env` 控制：
   - `CHAT_PROVIDER=openai`
   - `CHAT_PROVIDER=deepseek`
-- Desktop [AICSMain.py](/Users/SAM/Desktop/Agents/Yolo_system/AICSMain.py) 已改為：
+- Desktop [AICSMain.py](AICSMain.py) 已改為：
   - 使用 backend `/api/chat`
   - 使用 backend `/api/chat/stream` 逐段更新 assistant bubble
   - 同一視窗內自動沿用 `conversation_id`
@@ -316,13 +353,13 @@ Python module path，由
   - 保留原本 chat bubble UI 與非阻塞互動流程
 - backend 會將單輪聊天結果寫入 `chat_logs`
 
-## Phase 4 已知限制
+### Phase 4 已知限制
 
 - Desktop 目前僅支援同一視窗內的多輪上下文，尚未加入 history 切換 UI
 - `utils/deepseek.py` 仍保留在 repo 中作為 legacy 參考，但已退出 desktop 主流程
 - 真正的 provider 執行層驗證仍需要本機有效 API key
 
-## Phase 5 已完成範圍
+### Phase 5 已完成範圍
 
 - 已建立 React + Vite 前端骨架：
   - React Router
@@ -360,18 +397,18 @@ Python module path，由
   - image detection / detection history
   - profile
   - chat（`CHAT_PROVIDER=mock`）
-- desktop 的 [Register.py](/Users/SAM/Desktop/Agents/Yolo_system/Register.py)、[AdminAddUser.py](/Users/SAM/Desktop/Agents/Yolo_system/AdminAddUser.py)、[AdminEditUser.py](/Users/SAM/Desktop/Agents/Yolo_system/AdminEditUser.py) 已同步改為相同帳號規則：
+- desktop 的 [Register.py](Register.py)、[AdminAddUser.py](AdminAddUser.py)、[AdminEditUser.py](AdminEditUser.py) 已同步改為相同帳號規則：
   - `username`：英數字 `3-32` 位
   - `email`：合法 Email
   - `password`：至少 `8` 位，且需同時包含英文與數字
 
-## Phase 5 已知限制
+### Phase 5 已知限制
 
 - ChatPage 走非串流 `/api/chat`，尚未接 SSE `/api/chat/stream`（Web streaming 待辦）
 - Web 端尚未做 detection video streaming / avatar upload
 - webcam / RTSP detection 尚未 backend 化（Phase 3+ 待辦）
 
-## Phase 3 已驗證結果
+### Phase 3 已驗證結果
 
 - backend 實測通過：
   - `alembic upgrade head`
@@ -389,13 +426,13 @@ Python module path，由
   - `video_predict()`
   - detection history 讀取
 - 本輪執行層驗證額外修正：
-  - [backend/requirements.txt](/Users/SAM/Desktop/Agents/Yolo_system/backend/requirements.txt) 補上 `opencv-python-headless`
-  - [PersonFormMain.py](/Users/SAM/Desktop/Agents/Yolo_system/PersonFormMain.py) 改用 [ui_state.py](/Users/SAM/Desktop/Agents/Yolo_system/desktop-app/ui_state.py)，移除對 legacy `mysql.dataDB.SI` 的依賴
-  - [MainUI.py](/Users/SAM/Desktop/Agents/Yolo_system/MainUI.py) 修正動態按鈕建立順序，避免 `pushButton_history` / `pushButton_open_result` 尚未建立就先綁定事件
+  - [backend/requirements.txt](backend/requirements.txt) 補上 `opencv-python-headless`
+  - [PersonFormMain.py](PersonFormMain.py) 改用 [ui_state.py](desktop-app/ui_state.py)，移除對 legacy `mysql.dataDB.SI` 的依賴
+  - [MainUI.py](MainUI.py) 修正動態按鈕建立順序，避免 `pushButton_history` / `pushButton_open_result` 尚未建立就先綁定事件
 
-## Phase 4 手動驗證方式
+### Phase 4 手動驗證方式
 
-1. 在 [backend/.env](/Users/SAM/Desktop/Agents/Yolo_system/backend/.env) 設定：
+1. 在 `backend/.env` 設定（可由 `backend/.env.example` 複製）：
 ```bash
 CHAT_PROVIDER=openai
 OPENAI_API_KEY=sk-...
@@ -404,16 +441,16 @@ CHAT_CONTEXT_MAX_TURNS=10
 ```
 2. 啟 backend：
 ```bash
-cd /Users/SAM/Desktop/Agents/Yolo_system/backend
+cd backend
 conda run -n yolo-backend alembic upgrade head
 conda run -n yolo-backend uvicorn main:app --reload --port 8000
 ```
 3. 啟 desktop：
 ```bash
-cd /Users/SAM/Desktop/Agents/Yolo_system
+# 於 repo 根目錄執行
 python Login.py
 ```
-4. 登入後開啟 [AICSMain.py](/Users/SAM/Desktop/Agents/Yolo_system/AICSMain.py) 對話視窗
+4. 登入後開啟 [AICSMain.py](AICSMain.py) 對話視窗
 5. 送出一則問題，確認：
    - user bubble 正常顯示
    - assistant bubble 會逐段顯示 backend 串流回覆
@@ -433,7 +470,7 @@ curl -N -X POST "http://127.0.0.1:8000/api/chat/stream" \
   -d '{"question":"請用三句話介紹本系統"}'
 ```
 
-## Phase 6A-1 — Backend Agentic Layer（LangGraph）
+### Phase 6A-1 — Backend Agentic Layer（LangGraph）
 
 新增了 `/api/agent/*` 智慧助理入口，與既有 `/api/chat` 完全獨立。設計重點：
 
@@ -442,14 +479,14 @@ curl -N -X POST "http://127.0.0.1:8000/api/chat/stream" \
 - LangChain / LangGraph / DeepAgents 一律 lazy import；任一缺套件或缺 API key 時 backend 仍能啟動，並回傳 mock 回覆。
 - DeepAgents 為 **optional enhancement**，預設關閉。`requirements.txt` 中保留註解，需手動啟用。
 
-### 新增端點
+#### 新增端點
 
 ```text
 POST /api/agent/chat   # JWT 必填；mode = auto | general_chat | explain_detection | history_analysis | report | admin_help
 GET  /api/agent/modes  # JWT 必填；回傳可用 mode 與 admin_only flag
 ```
 
-### 啟動方式
+#### 啟動方式
 
 依現有指引啟動 backend：
 
@@ -474,7 +511,7 @@ AGENT_RECURSION_LIMIT=25
 
 本地驗證可設 `AGENT_PROVIDER=mock` 不需要 API key。
 
-### 測試方式
+#### 測試方式
 
 ```bash
 TOKEN=...  # 從 /api/auth/login 取得
@@ -498,7 +535,7 @@ curl -X POST "http://127.0.0.1:8000/api/agent/chat" \
   -d '{"message":"請產出 detection 報告","mode":"report","detection_id":1}'
 ```
 
-### DeepAgents（optional enhancement）
+#### DeepAgents（optional enhancement）
 
 預設關閉。若要啟用：
 
@@ -506,16 +543,16 @@ curl -X POST "http://127.0.0.1:8000/api/agent/chat" \
 2. `.env` 設定 `AGENT_ENABLE_DEEPAGENTS=true`。
 3. 後端啟動後會在 `agents.llm.deepagents_available()` 中顯示 `True`，本階段尚未把 DeepAgents 直接接入 supervisor，僅保留 flag 與 readiness check。
 
-### Phase 6A-1 已知限制
+#### Phase 6A-1 已知限制
 
 - 尚未提供 agent streaming（`/api/agent/chat/stream`）。
 - DeepAgents flag 目前僅做 import readiness，沒有實際使用 deepagents.subagents。
 
 ---
 
-## Phase 6A-2 — Web Agent Console（Web Frontend & Desktop Agent UI）
+### Phase 6A-2 — Web Agent Console（Web Frontend & Desktop Agent UI）
 
-### Web Agent Console（`/agent`）
+#### Web Agent Console（`/agent`）
 
 新增了獨立的 AI Agent 智慧助理頁面，與 `/chat` 完全分開：
 
@@ -540,7 +577,7 @@ curl -X POST "http://127.0.0.1:8000/api/agent/chat" \
 /agent?mode=report&detection_id=123              ← Generate Report
 ```
 
-### Web Frontend 啟動方式
+#### Web Frontend 啟動方式
 
 ```bash
 cd web-frontend
@@ -549,12 +586,12 @@ npm run dev      # http://localhost:5173
 npm run build    # 生產版本 build 檢查
 ```
 
-### Desktop 整合狀態
+#### Desktop 整合狀態
 
 `desktop-app/api_client.py` 已包含 `agent_chat()` / `list_agent_modes()`（Phase 6A-1 完成）。
 Desktop PySide6 完整 Agent 對話 UI 為下一階段。
 
-### Phase 6A-3 — Agent Streaming（SSE）
+#### Phase 6A-3 — Agent Streaming（SSE）
 
 新增 `POST /api/agent/chat/stream`，SSE 事件格式與 `/api/chat/stream` 一致：
 
@@ -568,7 +605,7 @@ Web `AgentPage` 預設使用 streaming，右上角 **Streaming** checkbox 可切
 Desktop `AICSMain.py` 新增 `AgentApiThread` + `enable_agent_mode()` / `disable_agent_mode()` helper，
 可由 MainUI 或其他呼叫者切換至 LangGraph agent backend，不影響原本 `/api/chat/stream` 流程。
 
-### Phase 6A-3b — Desktop AgentWindow 獨立視窗
+#### Phase 6A-3b — Desktop AgentWindow 獨立視窗
 
 `AgentWindow.py` — 獨立 PySide6 QDialog，從 `MainUI.py` 的「AI Agent」按鈕開啟：
 
@@ -580,11 +617,11 @@ Desktop `AICSMain.py` 新增 `AgentApiThread` + `enable_agent_mode()` / `disable
 
 ---
 
-## Phase 6A-4 — LLM 模型選單
+### Phase 6A-4 — LLM 模型選單
 
 新增 `GET /api/models` 端點與前端 provider/model 選單，讓使用者可在 Chat 與 Agent 頁面即時切換 LLM。
 
-### 後端（`GET /api/models`）
+#### 後端（`GET /api/models`）
 
 | Provider | 出現條件 | 模型來源 |
 |----------|---------|---------|
@@ -593,19 +630,19 @@ Desktop `AICSMain.py` 新增 `AgentApiThread` + `enable_agent_mode()` / `disable
 | Ollama（本地） | 一律出現 | 即時呼叫 `OLLAMA_BASE_URL/api/tags`；Ollama 未啟動時 fallback 至 `OLLAMA_MODEL` |
 | mock | 不出現（僅內部測試用）| — |
 
-### 前端
+#### 前端
 
 - `web-frontend/src/services/modelService.js` — `listModels()` 呼叫 `GET /api/models`
 - `ChatPage.jsx` — textarea 上方顯示 provider / model 雙 select
 - `AgentPage.jsx` — controls 側邊欄 Detection ID 下方顯示 provider / model select
 
-### Per-request model override
+#### Per-request model override
 
 `POST /api/chat`、`POST /api/chat/stream`、`POST /api/agent/chat`、`POST /api/agent/chat/stream` 均已接受 optional `provider` 與 `model` 欄位，優先於 `.env` 設定。
 
 ---
 
-## Phase 6A-5 — 品質修復與 Agent / 下載強化（2026-07-12）
+### Phase 6A-5 — 品質修復與 Agent / 下載強化（2026-07-12）
 
 一次性收斂前期審查發現的問題，並新增兩項功能（完整清單見 `AGENTS.md` Phase 6A-5 區塊）：
 
@@ -623,7 +660,7 @@ Desktop `AICSMain.py` 新增 `AgentApiThread` + `enable_agent_mode()` / `disable
 
 ---
 
-## 批次影像分析 Phase 1（2026-07-23）
+### 批次影像分析 Phase 1（2026-07-23）
 
 一次上傳多張影像（或整個資料夾），逐張沿用現有單張圖片偵測流程，並用確定性 SQL 聚合回答「這批影像總共偵測到幾艘船/幾架飛機/幾輛車」「有幾張疑似漏檢（估計）」之類的問題。空間關係推論（例如「哪些船上有飛機」）與影片逐幀問答為後續 Phase。
 
@@ -649,15 +686,15 @@ Desktop `AICSMain.py` 新增 `AgentApiThread` + `enable_agent_mode()` / `disable
 
 ---
 
-## Phase 3 手動驗證方式
+### Phase 3 手動驗證方式
 
 1. 啟 backend：
 ```bash
-conda run -n yolo-backend bash -lc 'cd /Users/SAM/Desktop/Agents/Yolo_system/backend && YOLO_DEFAULT_MODEL=../yolo11n.pt uvicorn main:app --host 127.0.0.1 --port 8001'
+conda run -n yolo-backend bash -lc 'cd backend && YOLO_DEFAULT_MODEL=../yolo11n.pt uvicorn main:app --host 127.0.0.1 --port 8001'
 ```
 2. 另開 terminal 啟桌面端：
 ```bash
-cd /Users/SAM/Desktop/Agents/Yolo_system
+# 於 repo 根目錄執行
 export YOLO_API_BASE_URL=http://127.0.0.1:8001
 conda run -n yolo-backend python Login.py
 ```

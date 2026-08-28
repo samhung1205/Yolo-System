@@ -25,7 +25,7 @@ Phase 0 ✅  →  Phase 1 🔜  →  Phase 2  →  Phase 3  →  Phase 4  →  P
 - [x] 識別所有關鍵問題（SQL injection, 明文密碼, 硬編碼設定）
 - [x] 建立 `README.md`
 - [x] 建立 `AGENTS.md`
-- [x] 建立 `docs/current-system-analysis.md`
+- [x] 建立 legacy 現況分析（後併入 `README.md`，獨立檔案已移除）
 - [x] 建立 `docs/architecture.md`
 - [x] 建立 `docs/api-spec.md`
 - [x] 建立 `docs/database-design.md`

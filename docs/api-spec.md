@@ -785,6 +785,67 @@ Desktop 端使用 `DesktopApiClient.stream_agent_chat()`（`AICSMain.py → Agen
 
 ---
 
+## YOLO Models 端點
+
+### GET /api/yolo-models
+> 需要 JWT 驗證。回傳模型註冊表（`app/integrations/model_registry.py`）中登記的
+> YOLO checkpoint。客戶端只能以 `key` 指定模型，不接受檔案路徑，避免任意
+> checkpoint 載入。
+
+每筆會即時計算檔案的 SHA-256 並與註冊表登記值比對：檔案缺失、指紋不符，或
+自訂模組的來源檔不存在時，`available` 為 `false` 並在 `unavailable_reason`
+說明原因。
+
+**Response 200**
+```json
+[
+  {
+    "key": "seven_class_asff",
+    "display_name": "YOLO11n + ASFF (7 classes)",
+    "checkpoint": "pt/7classes/yolo11n_asff.pt",
+    "architecture": "YOLO11n + ASFF",
+    "dataset_variant": "7-class multimodal",
+    "task": "detect",
+    "input_size": 960,
+    "checkpoint_class_names": { "0": "naval", "1": "Merchant" },
+    "canonical_class_names": { "0": "naval", "1": "merchant" },
+    "class_count": 7,
+    "sha256": "40479020fc96399858e4cb009cf80f181e290a4f1c56002a0754b42c1660210b",
+    "available": true,
+    "is_default": true,
+    "unavailable_reason": null
+  }
+]
+```
+
+---
+
+## Reports 端點
+
+### GET /api/reports/detections/{detection_id}
+> 需要 JWT 驗證。下載指定 detection 的報告；僅限該任務的擁有者或 admin。
+
+**Query 參數**
+
+| 參數 | 型別 | 預設 | 說明 |
+|------|------|------|------|
+| `format` | `markdown` \| `pdf` | `pdf` | 輸出格式 |
+
+**Response 200**
+- `format=pdf`：`application/pdf`
+- `format=markdown`：`text/markdown; charset=utf-8`
+
+兩者皆帶 `Content-Disposition: attachment; filename="yolo-detection-{id}-report.{ext}"`。
+
+**錯誤**
+
+| 狀態碼 | 情況 |
+|--------|------|
+| 403 | 非擁有者且非 admin |
+| 404 | detection 不存在 |
+
+---
+
 ## 目前限制
 
 - `POST /api/detections/image` 為同步執行

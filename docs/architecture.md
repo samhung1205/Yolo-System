@@ -1,7 +1,7 @@
 # 架構設計文件
 
-> **版本**: v0.9 (Chat conversation delete + Web UX)
-> **最後更新**: 2026-07-24
+> **版本**: v1.0（Agent streaming 與 Web `/agent` 狀態校正）
+> **最後更新**: 2026-08-28
 
 ---
 
@@ -243,8 +243,8 @@ Desktop AICSMain
 ### 8.1 定位
 
 ```text
-PySide6 Desktop  ──HTTP──>  /api/agent/chat  ──>  AgentService
-React Web        ──future──>                     │
+PySide6 Desktop  ──HTTP──>  /api/agent/chat          ──>  AgentService
+React Web        ──HTTP──>  /api/agent/chat/stream        │
                                                  ├── LangGraph Supervisor
                                                  │     ├── classify_intent
                                                  │     ├── call_tools_or_subagent
@@ -296,16 +296,20 @@ classify_intent ──> call_tools_or_subagent ──┬──> compose_answer �
 
 ### 8.4 已知限制
 
-- 尚未實作 agent streaming（`stream_agent_reply` 仍是 placeholder）。
 - DeepAgents 整合僅保留 flag，沒有真實 subagent registry。
-- Web Frontend 尚未提供 `/agent` 入口（屬 Phase 6A-2）。
+- Agent 工具僅唯讀；不提供 create / update / delete，也不能觸發 YOLO 推論。
+
+> 更正（2026-08-28）：本節先前記載「agent streaming 尚未實作」與「Web
+> Frontend 尚未提供 `/agent` 入口」，兩者皆已於 Phase 6A-2／6A-3 完成：
+> `POST /api/agent/chat/stream` 由 `agents/service.stream_agent_reply()`
+> 實作為 SSE，Web 端入口為 `web-frontend/src/pages/AgentPage.jsx`
+> （路由 `/agent`）。
 
 ---
 
 ## 9. 下一步建議
 
-1. 完成人工瀏覽器逐頁 walkthrough，正式關閉 Phase 5
-2. 視需求補 Web chat streaming UI
-3. 將 image detection 也統一為 async task
-4. 將 webcam / RTSP 改為 backend 任務或專門 streaming service
-5. Phase 6A-2：Web / Desktop Agent UI 整合 + 視情況加上 agent streaming
+1. 補 Web 一般對話頁的 streaming UI（`/chat` 尚未接 SSE；`/agent` 已接）
+2. 將 image detection 也統一為 async task
+3. 將 webcam / RTSP 改為 backend 任務或專門 streaming service
+4. Phase 6：Docker、部署文件與 CI/CD
