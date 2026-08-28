@@ -28,6 +28,9 @@ yolo.sql
 *.sqlite
 *.db
 
+# Cursor local skills (not part of the application)
+.agents/
+
 # IDE
 .idea/
 .vscode/
