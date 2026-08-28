@@ -1,8 +1,8 @@
 # API 規格文件
 
-> **版本**: v0.7 (Phase 6A-4 LLM Model Selector)  
+> **版本**: v0.9 (Chat conversation delete)
 > **Base URL**: `http://localhost:8000`  
-> **最後更新**: 2026-06-09
+> **最後更新**: 2026-07-24
 
 ---
 
@@ -308,6 +308,15 @@ GET /static/detections/results/task_12_a1b2c3d4.jpg?sig=<hmac>&exp=<unix_ts>
 }
 ```
 
+### DELETE /api/chat/{conversation_id}
+> 刪除目前使用者指定 conversation 的所有 `chat_logs`。刪除條件同時包含 JWT user id 與 `conversation_id`，不可刪除其他使用者的對話。
+
+**Response 204**
+- 無回應 body
+
+**可能錯誤**
+- `404 Not Found`：對話不存在或不屬於目前使用者
+
 ### POST /api/chat/stream
 > SSE 串流聊天版本。Desktop 目前主要使用這條 API 逐段更新 assistant bubble。
 > 接受與 `POST /api/chat` 相同的 `provider` / `model` per-request override 欄位。
@@ -524,6 +533,77 @@ data: {"type":"error","message":"錯誤訊息"}
 
 ---
 
+## 批次影像分析端點（Phase 1，2026-07-23）
+
+> 一次上傳多張影像（或整個資料夾），每張圖片各自沿用單張圖片偵測流程建立一筆 `detection_tasks`，並以 `detection_batches` 分組追蹤進度；推論在背景任務中依序執行（非同步併發）。
+
+### POST /api/detections/batch
+> 建立批次，儲存所有有效圖片後立即回傳（202），推論在背景執行
+
+**Query Params**
+- `conf` (float, default `0.25`)
+- `iou` (float, default `0.45`)
+- `model_key` (string, optional)
+- `name` (string, optional，批次顯示名稱)
+
+**Request Body**
+- `files`: 多個圖片檔案（multipart，欄位名 `files`），單次最多 `DETECTION_BATCH_MAX_FILES`（預設 100，可透過 `.env` 調整，未來規劃提高到 500）
+- 非圖片格式的檔案會被略過（記錄在 `skipped_files`），不會中斷整批請求
+
+**Response 202**
+```json
+{
+  "id": 4,
+  "user_id": 3,
+  "name": null,
+  "model_name": "yolo11n_asff.pt",
+  "model_key": "seven_class_asff",
+  "model_sha256": "530e4cd5...",
+  "confidence_threshold": 0.25,
+  "iou_threshold": 0.45,
+  "status": "processing",
+  "total_files": 42,
+  "processed_count": 0,
+  "failed_count": 0,
+  "skipped_files": [".DS_Store"],
+  "error_message": null,
+  "created_at": "2026-07-23T12:00:00",
+  "updated_at": "2026-07-23T12:00:00",
+  "tasks": [
+    { "id": 101, "status": "pending", "source_filename": "img001.jpg", "object_count": 0, "...": "..." }
+  ]
+}
+```
+
+### GET /api/detections/batches
+> 一般使用者看自己的批次，admin 可看全部；分頁與 filter 慣例與 `GET /api/detections` 相同
+
+**Query Params**: `status`、`limit`（預設 20，最大 100）、`page`
+
+**Response 200**：`BatchRead[]`（不含 `tasks` 明細），Header 含 `X-Total-Count` / `X-Total-Pages`
+
+### GET /api/detections/batches/{batch_id}
+> 取得批次詳情，包含所有 task 摘要，供前端輪詢進度
+
+**Response 200**：`BatchDetailRead`（= `BatchRead` + `tasks: DetectionTaskSummaryRead[]`）
+
+### DELETE /api/detections/batches/{batch_id}
+> 刪除批次、其下所有 task 與相關靜態檔案
+
+**Response 204**
+
+**status 狀態機**
+| 狀態 | 說明 |
+|------|------|
+| `processing` | 批次已建立，背景任務逐張推論中 |
+| `completed` | 全部圖片成功完成 |
+| `completed_with_errors` | 部分圖片推論失敗，其餘成功 |
+| `failed` | 全部圖片都失敗（上傳失敗或模型載入失敗） |
+
+前端輪詢建議：`status` 為 `processing`/`pending` 時每 2 秒呼叫一次 `GET /api/detections/batches/{id}`，直到轉為終態。
+
+---
+
 ## Agent 端點（Phase 6A-1）
 
 > 這是 LangGraph supervisor 提供的進階智慧助理入口，與 `/api/chat` 完全獨立。寫入的 chat log `provider="langgraph-agent"`，與 provider-based chat 不衝突。
@@ -537,6 +617,7 @@ data: {"type":"error","message":"錯誤訊息"}
   "conversation_id": null,
   "mode": "explain_detection",
   "detection_id": 1,
+  "batch_id": null,
   "provider": "openai",
   "model": "gpt-4o"
 }
@@ -548,11 +629,20 @@ data: {"type":"error","message":"錯誤訊息"}
 |------|------|------|
 | `message` | ✅ | 使用者訊息，1-8000 字 |
 | `conversation_id` | ❌ | 缺省會自動產生 |
-| `mode` | ❌ | `auto` / `general_chat` / `explain_detection` / `history_analysis` / `report` / `admin_help`，缺省為 `auto` |
+| `mode` | ❌ | `auto` / `general_chat` / `explain_detection` / `history_analysis` / `report` / `batch_analysis` / `admin_help`，缺省為 `auto` |
 | `detection_id` | ❌ | `explain_detection` / `report` 模式必填；指向 `detection_tasks.id` |
+| `batch_id` | ❌ | `batch_analysis` 模式必填；指向 `detection_batches.id`（Phase 1 新增） |
 | `stream` | ❌ | 保留欄位（已改用 `/api/agent/chat/stream` 獨立端點） |
 | `provider` | ❌ | 覆蓋 `AGENT_PROVIDER`：`openai` / `deepseek` / `ollama` |
 | `model` | ❌ | 覆蓋預設 agent 模型名稱 |
+
+**`batch_analysis` 模式（Phase 1 新增）**
+
+搭配 `batch_id`，呼叫 `summarize_batch_tool` 對該批次所有圖片的 `detection_objects` 做
+`GROUP BY class_name` 聚合，可回答「這批影像總共偵測到幾艘船/幾架飛機/幾輛車」之類的
+問題。零偵測影像數只會標示為「疑似漏檢（估計）」，agent 不會宣稱這是確定的漏檢結論；
+若使用者詢問空間關係（例如「哪些船上有飛機」），agent 會明確說明目前只支援類別總數
+統計，不支援 bbox 空間關係判斷（規劃於後續 Phase）。
 
 **Response 200**
 
@@ -576,6 +666,26 @@ data: {"type":"error","message":"錯誤訊息"}
 - `mode=explain_detection` / `report` 缺 `detection_id` → `answer` 會說明需要提供 detection_id，HTTP 200。
 - 指定的 `detection_id` 不屬於使用者（非 admin）→ `answer` 會說明「無權存取指定的偵測任務」，HTTP 200。
 - LangChain / LangGraph 未安裝或 LLM provider 失敗 → 自動切換 mock LLM，回傳 mock 回覆，HTTP 200。
+
+**Agent 視覺能力（`AGENT_ENABLE_VISION`，Phase 6A-6 新增）**
+
+預設關閉。開啟後（`.env` 設定 `AGENT_ENABLE_VISION=true`），`explain_detection` / `report`
+模式除了原本的 bounding box / class 結構化資料，還會唯讀讀取該筆偵測的**已標註結果圖**
+（`result_image_path` > `preview_image_path` > `source_image_path`，base64 編碼），以
+multimodal `image_url` content block 一併送給 LLM。這讓有視覺能力的模型（例如 OpenAI
+`gpt-4o` / `gpt-4.1`、Ollama `llava` / `qwen2-vl`）可以直接描述影像中觀察到的內容，
+而不只是覆誦結構化統計數字——例如回答「這張圖裡有沒有飛機」時，即使該物件在 YOLO
+結果中信心不足或漏檢，模型仍可能從影像本身觀察到並如實回覆（並會明確標示這是「視覺
+觀察」而非「YOLO 偵測」）。
+
+- 此功能**不會觸發任何新的 YOLO 推論**，只讀取 `detection_service` 已產生的靜態檔案，
+  符合 agent read-only 原則。
+- 附加圖片後，`tool_calls` 會多一筆 `{"tool": "vision_image", "ok": true, "detail": "<path>"}`
+  （失敗時 `ok:false` 且 `detail` 為錯誤訊息，例如檔案過大或不存在）。
+- 若目前設定的 provider/model **不支援圖片輸入**，該次 LLM 呼叫會失敗，agent 回覆
+  「AI 模型目前無法完成回覆，請稍後再試或選擇其他模型。」，HTTP 200（不會造成 500）。
+- 圖片大小上限由 `AGENT_VISION_MAX_IMAGE_BYTES`（預設 6MB）控制，超過上限會跳過附圖但
+  仍正常回覆結構化資料的解釋。
 
 ### POST /api/agent/chat/stream  ← Phase 6A-3 新增
 > 需要 JWT 驗證 · Content-Type: application/json · Accept: text/event-stream
@@ -614,6 +724,7 @@ Desktop 端使用 `DesktopApiClient.stream_agent_chat()`（`AICSMain.py → Agen
   {"key": "explain_detection", "label": "解釋偵測結果",   "description": "...", "admin_only": false},
   {"key": "history_analysis",  "label": "偵測歷史分析",   "description": "...", "admin_only": false},
   {"key": "report",            "label": "產出報告",       "description": "...", "admin_only": false},
+  {"key": "batch_analysis",    "label": "批次影像分析",   "description": "...", "admin_only": false},
   {"key": "admin_help",        "label": "管理員輔助",     "description": "...", "admin_only": true}
 ]
 ```
@@ -628,6 +739,8 @@ Desktop 端使用 `DesktopApiClient.stream_agent_chat()`（`AICSMain.py → Agen
 | `/agent` | `POST /api/agent/chat`、`GET /api/agent/modes` | LangGraph agent（AgentPage.jsx → agentService.js） |
 | `/detections` 結果區 | 跳轉 `/agent?mode=explain_detection&detection_id={id}` | DetectionPage 快捷按鈕 |
 | `/detections/history` 詳情區 | 跳轉 `/agent?mode=report&detection_id={id}` | DetectionHistoryPage 快捷按鈕 |
+| `/detections/batch`（Phase 1 新增） | `POST /api/detections/batch`、`GET/DELETE /api/detections/batches*` | 批次上傳多張影像（或整個資料夾）、輪詢進度、逐張結果縮圖（BatchDetectionPage.jsx → detectionService.js） |
+| `/detections/batch` 詳情區 | 跳轉 `/agent?mode=batch_analysis&batch_id={id}` | BatchDetectionPage 快捷按鈕 |
 
 `agentService.js` 使用與 `chatService.js` 相同的 `api.js` axios instance（共用 token interceptor）。
 

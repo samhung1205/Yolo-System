@@ -8,13 +8,14 @@ const agentService = {
    * @param {{ conversationId?: string, mode?: string, detectionId?: number, stream?: boolean }} options
    */
   async sendAgentMessage(message, options = {}) {
-    const { conversationId, mode, detectionId, stream, provider, model } = options;
+    const { conversationId, mode, detectionId, batchId, stream, provider, model } = options;
     const payload = {
       message,
       mode: mode || "auto",
     };
     if (conversationId) payload.conversation_id = conversationId;
     if (detectionId != null) payload.detection_id = detectionId;
+    if (batchId != null) payload.batch_id = batchId;
     if (stream != null) payload.stream = stream;
     if (provider) payload.provider = provider;
     if (model) payload.model = model;
@@ -40,10 +41,11 @@ const agentService = {
    * @param {AbortSignal} [signal]
    */
   async *streamAgentMessage(message, options = {}, signal) {
-    const { conversationId, mode, detectionId, provider, model } = options;
+    const { conversationId, mode, detectionId, batchId, provider, model } = options;
     const payload = { message, mode: mode || "auto" };
     if (conversationId) payload.conversation_id = conversationId;
     if (detectionId != null) payload.detection_id = detectionId;
+    if (batchId != null) payload.batch_id = batchId;
     if (provider) payload.provider = provider;
     if (model) payload.model = model;
 

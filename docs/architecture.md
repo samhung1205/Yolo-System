@@ -1,7 +1,7 @@
 # 架構設計文件
 
-> **版本**: v0.8 (Phase 6A-2 Web Frontend & Desktop Agent UI)  
-> **最後更新**: 2026-05-14
+> **版本**: v0.9 (Chat conversation delete + Web UX)
+> **最後更新**: 2026-07-24
 
 ---
 
@@ -61,8 +61,9 @@ PySide6 Desktop  ──HTTP──>  FastAPI Backend  ──> MySQL
 - `ProfilePage.jsx`
   - 呼叫 `/api/auth/me`
 - `ChatPage.jsx`
-  - 呼叫 `POST /api/chat` / `GET /api/chat` / `GET /api/chat/{conversation_id}`
+  - 呼叫 `POST /api/chat` / `GET /api/chat` / `GET/DELETE /api/chat/{conversation_id}`
   - 一般 provider-based chat（OpenAI / DeepSeek），不走 agent layer
+  - Conversations 與聊天區共用固定高度；清單獨立捲動並支援 conversation 級刪除
 - `AgentPage.jsx` ← Phase 6A-2 新增
   - 路由：`/agent`
   - 呼叫 `POST /api/agent/chat`、`GET /api/agent/modes`
@@ -90,6 +91,7 @@ PySide6 Desktop  ──HTTP──>  FastAPI Backend  ──> MySQL
   - `POST /api/chat/stream`
   - `GET /api/chat`
   - `GET /api/chat/{conversation_id}`
+  - `DELETE /api/chat/{conversation_id}`
 - `app/services/chat_service.py`
   - provider 選擇、錯誤映射、chat log 寫入、conversation context 聚合
 - `app/integrations/chat_providers/*.py`

@@ -207,6 +207,8 @@ Python module path，由
 | Phase 6A-3b | Desktop AgentWindow 獨立視窗 | ✅ **已完成**（`AgentWindow.py` QDialog，MainUI 新增「AI Agent」按鈕） |
 | Phase 6A-4 | LLM 模型選單 | ✅ **已完成**（`GET /api/models`；Chat/Agent 頁面 per-request provider/model 切換） |
 | Phase 6A-5 | 品質修復與 Agent / 下載強化 | ✅ **已完成**（Agent prompt 捷徑修正、Web 下載結果圖/影片、chat_logs FK cascade、desktop session/執行緒修復） |
+| Phase 6A-6 | IME 輸入修復 + 對話滾動 + Agent Vision | ✅ **已完成**（中文輸入法送出誤判修復、對話 thread 滾動修復、`AGENT_ENABLE_VISION` 唯讀圖片附加） |
+| 批次影像分析 Phase 1 | 多圖 / 資料夾批次上傳 + 類別總數聚合 + Agent `batch_analysis` | ✅ **已完成**（`POST /api/detections/batch`、`detection_batches` 表、Web `/detections/batch` 頁面、Agent 新模式） |
 | Phase 6 | Docker、測試、部署文件完善 | ⏳ 待辦 |
 
 ---
@@ -336,6 +338,8 @@ Python module path，由
   - `ProfilePage`
   - `ChatPage`
   - `admin/UserManagementPage`
+- `DetectionHistoryPage` 已針對大量紀錄優化：Web 寬螢幕使用固定高度雙欄與獨立捲動，分頁固定於列表底部；900px 以下改為 Task List / Detail 單面板切換
+- `ChatPage` 已統一 Conversations / Chat 面板高度；歷史對話清單獨立捲動、最多載入最近 100 組，並可透過 `DELETE /api/chat/{conversation_id}` 二次確認後刪除
 - 已串接 backend API：
   - `/api/auth/login`
   - `/api/auth/register`
@@ -619,6 +623,32 @@ Desktop `AICSMain.py` 新增 `AgentApiThread` + `enable_agent_mode()` / `disable
 
 ---
 
+## 批次影像分析 Phase 1（2026-07-23）
+
+一次上傳多張影像（或整個資料夾），逐張沿用現有單張圖片偵測流程，並用確定性 SQL 聚合回答「這批影像總共偵測到幾艘船/幾架飛機/幾輛車」「有幾張疑似漏檢（估計）」之類的問題。空間關係推論（例如「哪些船上有飛機」）與影片逐幀問答為後續 Phase。
+
+**Backend**
+- migration `0010`：新增 `detection_batches` 表 + `detection_tasks.batch_id`（nullable FK，`ON DELETE CASCADE`）
+- `POST /api/detections/batch`：上傳多張圖片（欄位 `files`），單次上限 `DETECTION_BATCH_MAX_FILES`（預設 100，`.env` 可調，規劃未來提高到 500）；非圖片檔案自動略過（記錄於 `skipped_files`），不中斷整批請求；儲存完成後立即回傳 202，推論在背景任務中依序執行
+- `GET /api/detections/batches`、`GET /api/detections/batches/{id}`、`DELETE /api/detections/batches/{id}`：清單（分頁/篩選同既有慣例）、詳情（含每張圖 task 摘要，供前端輪詢進度）、刪除（含靜態檔案清理）
+- Agent 新模式 `batch_analysis`：`summarize_batch_tool` 對整批 `detection_objects` 做 `GROUP BY class_name` 聚合；`batch_analyst` subagent + `BATCH_ANALYST_PROMPT` 明確要求「零偵測影像數僅為估計提示，非確定漏檢結論」，且對空間關係問題誠實回覆目前不支援
+- `AgentState` / `run_graph` / `stream_graph` / `/api/agent/chat(/stream)` 新增 optional `batch_id`（與既有 `detection_id` 相同模式）
+
+**Web**
+- 新頁面 `/detections/batch`（`BatchDetectionPage.jsx`）：多檔/整個資料夾選擇、上傳進度條（輪詢 `GET /api/detections/batches/{id}`）、逐張縮圖結果、「用 Agent 分析這批」捷徑（`/agent?mode=batch_analysis&batch_id={id}`）
+- `detectionService.js` 新增 `detectImageBatch` / `listBatches` / `getBatch` / `deleteBatch`
+- `AgentPage.jsx` 新增 Batch ID 欄位與 `batch_analysis` 模式（沿用既有 Detection ID 欄位的智慧預填 / query params 同步邏輯）
+- Dashboard / 側邊選單新增「Batch Analysis」入口
+
+**已知限制**
+- 背景處理為單一 worker 依序執行（非併發），100 張視硬體效能可能需數十秒到數分鐘；未來擴到 500 張或多批次併發需 Phase 6 job queue
+- 僅支援影像批次；影片批次與逐幀問答為後續 Phase
+- 僅做每類別總數聚合，不做 bbox 空間關係判斷
+
+**驗證**：`alembic upgrade head` 通過（`detection_batches` 表 + `detection_tasks.batch_id` 已建立）、backend 全部新模組 import 成功、`npm run build` 通過。
+
+---
+
 ## Phase 3 手動驗證方式
 
 1. 啟 backend：
@@ -639,4 +669,4 @@ conda run -n yolo-backend python Login.py
 
 ---
 
-*最後更新: Phase 6A-5 品質修復與 Agent / 下載強化完成 — 2026-07-12*
+*最後更新: 批次影像分析 Phase 1 完成 — 2026-07-23*

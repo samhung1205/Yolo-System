@@ -62,6 +62,7 @@ def create_agent_reply(
     conversation_id: Optional[str] = None,
     mode: str = "auto",
     detection_id: Optional[int] = None,
+    batch_id: Optional[int] = None,
     provider_name: Optional[str] = None,
     model_name_override: Optional[str] = None,
 ) -> AgentChatResponse:
@@ -110,6 +111,7 @@ def create_agent_reply(
             conversation_id=normalized_conversation_id,
             mode=safe_mode,
             detection_id=detection_id,
+            batch_id=batch_id,
             provider_name=provider_name,
             model_name_override=model_name_override,
         )
@@ -177,6 +179,7 @@ def stream_agent_reply(
     conversation_id: Optional[str] = None,
     mode: str = "auto",
     detection_id: Optional[int] = None,
+    batch_id: Optional[int] = None,
     provider_name: Optional[str] = None,
     model_name_override: Optional[str] = None,
 ) -> Generator[str, None, None]:
@@ -233,6 +236,7 @@ def stream_agent_reply(
                 conversation_id=normalized_conversation_id,
                 mode=safe_mode,
                 detection_id=detection_id,
+                batch_id=batch_id,
                 provider_name=provider_name,
                 model_name_override=model_name_override,
             ):

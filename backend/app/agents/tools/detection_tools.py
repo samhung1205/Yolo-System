@@ -7,12 +7,24 @@ trigger YOLO inference (that remains the responsibility of
 """
 from __future__ import annotations
 
+import base64
+from pathlib import Path
 from typing import Any
 
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.models.user import User
 from app.repositories import detection_repository
+
+_STATIC_ROOT = Path("static")
+_MIME_TYPES_BY_EXT = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".webp": "image/webp",
+    ".bmp": "image/bmp",
+}
 
 
 def _ensure_owned(task, current_user: User) -> None:
@@ -91,6 +103,65 @@ def get_detection_detail_tool(
         return {"ok": False, "error": str(exc), "detection_id": detection_id}
     except Exception as exc:  # pragma: no cover - defensive
         return {"ok": False, "error": f"unexpected error: {exc}", "detection_id": detection_id}
+
+
+def load_detection_image_tool(
+    db: Session,
+    *,
+    current_user: User,
+    detection_id: int,
+) -> dict[str, Any]:
+    """Read the detection's annotated image off disk and base64-encode it.
+
+    This is still read-only and never triggers new YOLO inference — it only
+    loads a file that ``detection_service`` already produced. The result is
+    meant to be attached to a vision-capable LLM call so it can describe what
+    it actually sees, alongside (not instead of) the structured bbox/class
+    data from :func:`get_detection_detail_tool`.
+
+    Preference order: annotated result image > annotated video preview frame
+    > raw source image (only the latter has no bounding boxes drawn on it).
+
+    Permissions: same as :func:`get_detection_detail_tool` (owner or admin).
+    """
+    try:
+        task = detection_repository.get_task(db, detection_id)
+        _ensure_owned(task, current_user)
+    except (LookupError, PermissionError) as exc:
+        return {"ok": False, "error": str(exc), "detection_id": detection_id}
+
+    relative_path = task.result_image_path or task.preview_image_path or task.source_image_path
+    if not relative_path:
+        return {"ok": False, "error": "no image file available for this detection", "detection_id": detection_id}
+
+    static_root = _STATIC_ROOT.resolve()
+    full_path = (static_root / relative_path).resolve()
+    try:
+        full_path.relative_to(static_root)
+    except ValueError:
+        return {"ok": False, "error": "invalid image path", "detection_id": detection_id}
+
+    if not full_path.is_file():
+        return {"ok": False, "error": "image file not found on disk", "detection_id": detection_id}
+
+    max_bytes = settings.AGENT_VISION_MAX_IMAGE_BYTES
+    if full_path.stat().st_size > max_bytes:
+        return {
+            "ok": False,
+            "error": f"image exceeds the {max_bytes} byte vision size limit",
+            "detection_id": detection_id,
+        }
+
+    mime_type = _MIME_TYPES_BY_EXT.get(full_path.suffix.lower(), "image/jpeg")
+    encoded = base64.b64encode(full_path.read_bytes()).decode("ascii")
+    return {
+        "ok": True,
+        "detection_id": detection_id,
+        "mime_type": mime_type,
+        "image_base64": encoded,
+        "path_used": relative_path,
+        "is_annotated": relative_path in (task.result_image_path, task.preview_image_path),
+    }
 
 
 def aggregate_detection_stats(detail: dict[str, Any]) -> dict[str, Any]:

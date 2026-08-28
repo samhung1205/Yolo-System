@@ -75,7 +75,52 @@
 
 ## 當前 Phase
 
-> **目前已完成至 Phase 6A-5（品質修復與 Agent / 下載強化）。下一步：Phase 6（Docker、測試、部署文件完善）。**
+> **目前已完成至「批次影像分析 Phase 1」（多圖/資料夾批次上傳 + 類別總數聚合 + Agent `batch_analysis` 模式）。下一步：批次分析 Phase 2（空間關係推論）或 Phase 6（Docker、測試、部署文件完善），視優先順序決定。**
+
+**批次影像分析 Phase 1 — ✅ 完成（2026-07-23 多圖/資料夾批次上傳 + 確定性聚合統計）**
+
+*範圍界定*
+- 做：一次上傳最多 `DETECTION_BATCH_MAX_FILES`（預設 100，規劃未來提高到 500）張影像 → 逐張沿用現有單張圖片偵測流程 → 存成一個 `detection_batches` 群組 → Agent `batch_analysis` 模式能回答「這批影像總共偵測到幾艘船/幾架飛機/幾輛車」「有幾張疑似漏檢（估計）」
+- 不做（留給後續 Phase）：bbox 空間關係推論（例如「哪些船上有飛機」）、影片逐幀問答、Desktop UI
+
+*Backend*
+- [x] migration `0010`：新增 `detection_batches` 表（`status`/`total_files`/`processed_count`/`failed_count`/`skipped_files`/model provenance 欄位）；`detection_tasks` 新增 nullable `batch_id`（`ON DELETE CASCADE`）
+- [x] `app/models/detection_batch.py`：`DetectionBatch` ORM，`tasks` relationship 對應回 `DetectionTask.batch`
+- [x] `app/repositories/detection_repository.py`：`create_batch` / `update_batch` / `get_batch` / `list_batches` / `count_batches` / `delete_batch` / `get_pending_batch_tasks` / `count_objects_by_class_for_batch`（SQL `GROUP BY`，確定性聚合，不受記憶體內清單上限影響）
+- [x] `app/services/detection_service.py`：`create_image_batch()`（驗證張數上限、非圖片檔案略過但不擋整批、逐檔存檔失敗只影響該張）；`process_image_batch_task()`（背景任務逐張推論、每張都即時更新 `processed_count`/`failed_count` 供前端輪詢、模型只載入一次重複使用）；`list_batches` / `get_batch` / `delete_batch`（含靜態檔案清理）
+- [x] `app/api/routes/detections.py`：`POST /api/detections/batch`（202）、`GET /api/detections/batches`、`GET /api/detections/batches/{id}`、`DELETE /api/detections/batches/{id}`（註冊於 `/{detection_id}` 之前避免路由歧義）
+- [x] `app/schemas/detection.py`：`BatchRead` / `BatchDetailRead`
+- [x] `app/agents/tools/batch_tools.py`：`summarize_batch_tool`（read-only，擁有權檢查，`GROUP BY class_name` 聚合 + 零偵測影像疑似漏檢提示 + per-image breakdown 上限 50 筆但總數永遠精確）、`list_batch_images_by_class_tool`
+- [x] `app/agents/subagents/batch_analyst.py` + `BATCH_ANALYST_PROMPT`：明確要求「零偵測僅為估計，非確定漏檢」、遇到空間關係問題誠實回覆目前不支援
+- [x] `app/agents/state.py` / `graph.py` / `service.py` / `schemas/agent.py` / `api/routes/agents.py`：新增 `batch_id` 全鏈路傳遞（`run_graph`/`stream_graph`/`AgentChatRequest`），新增 `batch_analysis` mode 與 intent 路由（含關鍵字自動判斷）
+- [x] `.env.example` / `core/config.py`：`DETECTION_BATCH_MAX_FILES=100`
+
+*Web*
+- [x] 新頁面 `web-frontend/src/pages/BatchDetectionPage.jsx`（路由 `/detections/batch`）：多檔/整個資料夾選擇（`webkitdirectory`）、上傳後輪詢進度條、逐張縮圖 + 狀態、刪除批次、「用 Agent 分析這批」捷徑
+- [x] `detectionService.js`：`detectImageBatch` / `listBatches` / `getBatch` / `deleteBatch`
+- [x] `agentService.js` / `AgentPage.jsx`：新增 `batch_id` 支援（沿用既有 `detection_id` 的智慧預填 prompt / query params 同步邏輯），`batch_analysis` 模式預設 prompt
+- [x] `router/index.jsx`、`Layout.jsx`、`DashboardPage.jsx`：新增 Batch Analysis 入口
+- [x] `styles.css`：新增 `.batch-progress-bar` / `.batch-task-grid` / `.batch-task-card` / `.status-completed_with_errors`
+
+*已知限制（記錄為後續待辦）*
+- [ ] 背景處理為單一 worker 依序執行（非併發），100 張視硬體效能可能需數十秒到數分鐘；擴到 500 張或跨批次併發需 Phase 6 job queue
+- [ ] 僅支援影像批次；影片批次與逐幀問答為後續 Phase
+- [ ] `summarize_batch_tool` 僅做每類別總數聚合，不做 bbox 空間關係判斷（例如「船上有沒有飛機」）
+
+**Phase 6A-6 — ✅ 完成（2026-07-23 IME 修復 + 對話滾動 + Agent Vision）**
+
+*Web 輸入體驗修復*
+- [x] `ChatPage.jsx` / `AgentPage.jsx`：textarea 加上 `onCompositionStart` / `onCompositionEnd` + `isComposing`/`keyCode 229` 判斷，修復中文輸入法選字確認時被誤判為送出的問題
+- [x] `.chat-thread` / `.agent-thread`：修復 grid `1fr` + `overflow` 未生效的「grid blowout」問題（缺少 `min-height:0` 與明確上限），對話越長也不會撐開整個頁面版面，改為容器內滾動
+- [x] `ChatPage.jsx`：補上訊息滾動到底部的 `threadRef` + `useEffect`（`AgentPage.jsx` 已有，維持一致行為）
+
+*Agent 視覺能力（bounding box 以外的影像理解）*
+- [x] `detection_tools.load_detection_image_tool()`：唯讀讀取偵測結果圖（annotated，優先 `result_image_path` > `preview_image_path` > `source_image_path`）並 base64 編碼，不觸發任何新推論
+- [x] `AGENT_ENABLE_VISION`（預設 `false`）：開啟後 `explain_detection` / `report` 模式會把偵測影像以 multimodal `image_url` content block 附加給 LLM，需搭配支援圖片輸入的 provider/model（OpenAI gpt-4o / gpt-4.1、Ollama llava / qwen2-vl 等）；非視覺模型會導致該次請求以「AI 模型目前無法完成回覆」收尾，不會造成後端錯誤
+- [x] `YOLO_RESULT_EXPLAINER_PROMPT` / `REPORT_AGENT_PROMPT`：新增「圖片有附上時可描述實際觀察到的內容，但需與 YOLO 結構化偵測結果明確區分」的規則
+- [x] `GENERAL_CHAT_PROMPT`：一般聊天模式被問到特定偵測內容時，改為引導使用者切換至 Explain Detection / Report 並填入 Detection ID，而非模糊地說「需要提供圖片或 JSON」
+- [x] `AgentPage.jsx`：Detection ID 欄位新增即時提示（Explain Detection / Report 模式未填會顯示必填警示；Auto 模式未填會提示可能被當一般聊天處理）
+- [x] `tests/test_agent_vision_tool.py`：新增擁有權檢查、路徑穿越防護、檔案大小上限、優先順序的單元測試
 
 **Phase 6A-5 — ✅ 完成（2026-07-12 全面品質修復 + Agent 強化 + Web 下載功能）**
 
@@ -258,8 +303,10 @@ cd backend && uvicorn main:app --reload
 - [x] 建立 `DashboardPage`
 - [x] 建立 `DetectionPage`
 - [x] 建立 `DetectionHistoryPage`（含篩選 / 分頁 / 刪除）
+- [x] `DetectionHistoryPage` 大量紀錄 UX：固定高度雙欄、Task List / Detail 獨立捲動、固定分頁列、900px 以下單面板切換
 - [x] 建立 `ProfilePage`（含 nickname / password 自我更新）
 - [x] 建立 `ChatPage`
+- [x] `ChatPage` 大量對話 UX：左右面板同高、Conversations 獨立捲動、最近 100 組紀錄、conversation 級二次確認刪除
 - [x] 建立 `admin/UserManagementPage`（含 Edit 彈窗 + is_active 切換）
 - [x] 建立 `authService` / `detectionService` / `userService` / `chatService`
 - [x] `npm run build` 通過
@@ -377,4 +424,4 @@ cd backend && uvicorn main:app --reload --port 8000
 
 ---
 
-*最後更新: Phase 6A-5 品質修復與 Agent / 下載強化完成 — 2026-07-12*
+*最後更新: AI Chat Conversations UX 與刪除功能 — 2026-07-24*

@@ -85,3 +85,18 @@ def get_next_turn_index(
     if max_turn is None:
         return 1
     return int(max_turn) + 1
+
+
+def delete_conversation(
+    db: Session,
+    *,
+    user_id: int,
+    conversation_id: str,
+) -> int:
+    deleted_count = (
+        db.query(ChatLog)
+        .filter(ChatLog.user_id == user_id, ChatLog.conversation_id == conversation_id)
+        .delete(synchronize_session=False)
+    )
+    db.commit()
+    return int(deleted_count)

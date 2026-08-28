@@ -66,3 +66,26 @@ class DetectionTaskSummaryRead(BaseModel):
 class DetectionTaskRead(DetectionTaskSummaryRead):
     error_message: str | None
     objects: list[DetectionObjectRead]
+
+
+class BatchRead(BaseModel):
+    id: int
+    user_id: int
+    name: str | None
+    model_name: str
+    model_key: str | None
+    model_sha256: str | None
+    confidence_threshold: float | None
+    iou_threshold: float | None
+    status: str
+    total_files: int
+    processed_count: int
+    failed_count: int
+    skipped_files: list[str] = Field(default_factory=list)
+    error_message: str | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class BatchDetailRead(BatchRead):
+    tasks: list[DetectionTaskSummaryRead]

@@ -34,6 +34,7 @@ class AgentState(TypedDict, total=False):
     mode: str
     intent: str
     detection_id: Optional[int]
+    batch_id: Optional[int]
 
     # Workflow output
     tool_results: list[dict[str, Any]]

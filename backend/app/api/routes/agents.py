@@ -53,6 +53,12 @@ AGENT_MODES: list[AgentModeRead] = [
         admin_only=False,
     ),
     AgentModeRead(
+        key="batch_analysis",
+        label="批次影像分析",
+        description="搭配 batch_id，統計整批影像的類別總數與疑似漏檢張數（估計）。",
+        admin_only=False,
+    ),
+    AgentModeRead(
         key="admin_help",
         label="管理員輔助",
         description="管理員專用：摘要使用者與系統使用情況。",
@@ -75,6 +81,7 @@ def agent_chat(
         conversation_id=payload.conversation_id,
         mode=payload.mode or "auto",
         detection_id=payload.detection_id,
+        batch_id=payload.batch_id,
         provider_name=payload.provider,
         model_name_override=payload.model,
     )
@@ -99,6 +106,7 @@ def stream_agent_chat(
             conversation_id=payload.conversation_id,
             mode=payload.mode or "auto",
             detection_id=payload.detection_id,
+            batch_id=payload.batch_id,
             provider_name=payload.provider,
             model_name_override=payload.model,
         ),

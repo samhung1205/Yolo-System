@@ -15,11 +15,12 @@ const BUILTIN_MODES = [
   { key: "explain_detection", label: "Explain Detection" },
   { key: "history_analysis", label: "History Analysis" },
   { key: "report", label: "Generate Report" },
+  { key: "batch_analysis", label: "Batch Analysis" },
   { key: "admin_help", label: "Admin Assistance" },
 ];
 const MARKDOWN_PLUGINS = [remarkGfm];
 
-function getDefaultMessage(mode, detectionId) {
+function getDefaultMessage(mode, detectionId, batchId) {
   if (detectionId) {
     if (mode === "explain_detection") {
       return `請解釋這筆 detection 結果 (ID: ${detectionId})`;
@@ -27,6 +28,9 @@ function getDefaultMessage(mode, detectionId) {
     if (mode === "report") {
       return `請幫我產生這筆 detection 的 markdown 報告 (ID: ${detectionId})`;
     }
+  }
+  if (mode === "batch_analysis" && batchId) {
+    return `請統計這批影像 (Batch ID: ${batchId}) 中各類別總數，並指出有幾張影像沒偵測到任何物件。`;
   }
   if (mode === "history_analysis") {
     return "請分析我的偵測歷史紀錄，摘要各狀態數量、常見類別與平均推論時間，並指出值得注意的趨勢。";
@@ -43,12 +47,14 @@ export default function AgentPage() {
 
   const initialMode = searchParams.get("mode") || "auto";
   const initialDetectionId = searchParams.get("detection_id") || "";
+  const initialBatchId = searchParams.get("batch_id") || "";
 
   const [modes, setModes] = useState(BUILTIN_MODES);
   const [mode, setMode] = useState(initialMode);
   const [detectionId, setDetectionId] = useState(initialDetectionId);
+  const [batchId, setBatchId] = useState(initialBatchId);
   const [message, setMessage] = useState(
-    getDefaultMessage(initialMode, initialDetectionId)
+    getDefaultMessage(initialMode, initialDetectionId, initialBatchId)
   );
   const [messages, setMessages] = useState([]);
   const [conversationId, setConversationId] = useState(null);
@@ -58,15 +64,20 @@ export default function AgentPage() {
   const [reportDownloading, setReportDownloading] = useState("");
   const threadRef = useRef(null);
   const abortRef = useRef(null);
+  // True while an IME (e.g. Chinese/Japanese/Korean input method) composition
+  // is in progress, so the confirm-selection Enter key doesn't submit the form.
+  const isComposingRef = useRef(false);
   // Tracks the last message we auto-filled, so we can safely replace it when
-  // the mode / detection id changes without clobbering user-typed text.
-  const autoFilledRef = useRef(getDefaultMessage(initialMode, initialDetectionId));
+  // the mode / detection id / batch id changes without clobbering user-typed text.
+  const autoFilledRef = useRef(
+    getDefaultMessage(initialMode, initialDetectionId, initialBatchId)
+  );
 
-  function applyDefaultMessage(nextMode, nextDetectionId, currentMessage) {
+  function applyDefaultMessage(nextMode, nextDetectionId, nextBatchId, currentMessage) {
     const wasAutoFilled =
       !currentMessage || currentMessage === autoFilledRef.current;
     if (wasAutoFilled) {
-      const next = getDefaultMessage(nextMode, nextDetectionId);
+      const next = getDefaultMessage(nextMode, nextDetectionId, nextBatchId);
       autoFilledRef.current = next;
       setMessage(next);
     }
@@ -78,15 +89,18 @@ export default function AgentPage() {
   useEffect(() => {
     const nextMode = searchParams.get("mode");
     const nextDetectionId = searchParams.get("detection_id");
-    if (!nextMode && !nextDetectionId) return;
+    const nextBatchId = searchParams.get("batch_id");
+    if (!nextMode && !nextDetectionId && !nextBatchId) return;
     const resolvedMode = nextMode || "auto";
     const resolvedDetectionId = nextDetectionId || "";
+    const resolvedBatchId = nextBatchId || "";
     setMode(resolvedMode);
     setDetectionId(resolvedDetectionId);
+    setBatchId(resolvedBatchId);
     setMessage((current) => {
       const wasAutoFilled = !current || current === autoFilledRef.current;
       if (wasAutoFilled) {
-        const next = getDefaultMessage(resolvedMode, resolvedDetectionId);
+        const next = getDefaultMessage(resolvedMode, resolvedDetectionId, resolvedBatchId);
         autoFilledRef.current = next;
         return next;
       }
@@ -156,6 +170,14 @@ export default function AgentPage() {
   }, []);
 
   const isAdminOnlyMode = mode === "admin_help" && !user?.is_admin;
+  const detectionModes = ["explain_detection", "report"];
+  const requiresDetectionId = detectionModes.includes(mode);
+  const detectionIdMissingWarning = requiresDetectionId && !detectionId;
+  const requiresBatchId = mode === "batch_analysis";
+  const batchIdMissingWarning = requiresBatchId && !batchId;
+  // "Auto Select" without a Detection ID silently falls back to General Chat
+  // server-side, so questions about a specific image get no detection data.
+  const autoModeMissingDetectionId = mode === "auto" && !detectionId && !batchId;
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -196,6 +218,7 @@ export default function AgentPage() {
           conversationId,
           mode,
           detectionId: detectionId ? Number(detectionId) : undefined,
+          batchId: batchId ? Number(batchId) : undefined,
           provider: selectedProvider || undefined,
           model: selectedModel || undefined,
         },
@@ -292,6 +315,7 @@ export default function AgentPage() {
         conversationId,
         mode,
         detectionId: detectionId ? Number(detectionId) : undefined,
+        batchId: batchId ? Number(batchId) : undefined,
         provider: selectedProvider || undefined,
         model: selectedModel || undefined,
       });
@@ -342,12 +366,17 @@ export default function AgentPage() {
 
   function handleModeChange(nextMode) {
     setMode(nextMode);
-    applyDefaultMessage(nextMode, detectionId, message);
+    applyDefaultMessage(nextMode, detectionId, batchId, message);
   }
 
   function handleDetectionIdChange(value) {
     setDetectionId(value);
-    applyDefaultMessage(mode, value, message);
+    applyDefaultMessage(mode, value, batchId, message);
+  }
+
+  function handleBatchIdChange(value) {
+    setBatchId(value);
+    applyDefaultMessage(mode, detectionId, value, message);
   }
 
   async function handleReportDownload(format) {
@@ -422,7 +451,9 @@ export default function AgentPage() {
           </label>
 
           <label className="field">
-            <span>Detection ID (Optional)</span>
+            <span>
+              Detection ID{requiresDetectionId ? "" : "（一般模式可留空）"}
+            </span>
             <input
               type="number"
               min="1"
@@ -431,6 +462,37 @@ export default function AgentPage() {
               onChange={(e) => handleDetectionIdChange(e.target.value)}
               disabled={loading}
             />
+            {detectionIdMissingWarning ? (
+              <span className="field-hint field-hint-warning">
+                {mode === "report" ? "Generate Report" : "Explain Detection"}{" "}
+                模式需要填入 Detection ID，才能讀取這筆偵測的圖片與 bounding box 資料。
+              </span>
+            ) : autoModeMissingDetectionId ? (
+              <span className="field-hint">
+                提示：若要問「這張圖有沒有 XXX」之類的問題，請先填入該筆偵測的 Detection ID，
+                否則 Agent 會當作一般聊天回答、讀不到任何偵測資料。
+              </span>
+            ) : null}
+          </label>
+
+          <label className="field">
+            <span>
+              Batch ID{requiresBatchId ? "" : "（僅批次分析模式需要）"}
+            </span>
+            <input
+              type="number"
+              min="1"
+              placeholder="例：7"
+              value={batchId}
+              onChange={(e) => handleBatchIdChange(e.target.value)}
+              disabled={loading}
+            />
+            {batchIdMissingWarning ? (
+              <span className="field-hint field-hint-warning">
+                Batch Analysis 模式需要填入 Batch ID，才能統計該批影像的偵測結果。
+                可到「Batch Analysis」頁面上傳影像後取得 Batch ID。
+              </span>
+            ) : null}
           </label>
 
           {mode === "report" && detectionId ? (
@@ -527,11 +589,22 @@ export default function AgentPage() {
                 onChange={(e) => setMessage(e.target.value)}
                 placeholder="輸入要問 Agent 的問題"
                 disabled={loading || isAdminOnlyMode}
+                onCompositionStart={() => {
+                  isComposingRef.current = true;
+                }}
+                onCompositionEnd={() => {
+                  isComposingRef.current = false;
+                }}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    if (!loading && message.trim() && !isAdminOnlyMode) handleSubmit(e);
+                  if (e.key !== "Enter" || e.shiftKey) return;
+                  // isComposing / keyCode 229 guards the Enter keystroke used
+                  // to confirm an IME candidate (Chinese/Japanese/Korean input)
+                  // so it doesn't also submit the message.
+                  if (isComposingRef.current || e.nativeEvent?.isComposing || e.keyCode === 229) {
+                    return;
                   }
+                  e.preventDefault();
+                  if (!loading && message.trim() && !isAdminOnlyMode) handleSubmit(e);
                 }}
               />
               <div className="chat-input-bar">

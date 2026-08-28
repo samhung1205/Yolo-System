@@ -3,6 +3,7 @@ import { Navigate, createBrowserRouter } from "react-router-dom";
 import Layout from "../components/Layout";
 import ProtectedRoute from "../components/ProtectedRoute";
 import AgentPage from "../pages/AgentPage";
+import BatchDetectionPage from "../pages/BatchDetectionPage";
 import ChatPage from "../pages/ChatPage";
 import DashboardPage from "../pages/DashboardPage";
 import DetectionHistoryPage from "../pages/DetectionHistoryPage";
@@ -34,6 +35,10 @@ const router = createBrowserRouter([
           {
             path: "/detections",
             element: <DetectionPage />,
+          },
+          {
+            path: "/detections/batch",
+            element: <BatchDetectionPage />,
           },
           {
             path: "/detections/history",

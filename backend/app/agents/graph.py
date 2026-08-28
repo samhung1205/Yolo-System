@@ -46,6 +46,7 @@ MODE_TO_INTENT = {
     "history_analysis": "detection_history_analysis",
     "report": "generate_report",
     "admin_help": "admin_help",
+    "batch_analysis": "batch_analysis",
 }
 
 
@@ -53,6 +54,7 @@ def _classify_intent_node(state: AgentState) -> AgentState:
     """Pick an intent based on the explicit mode, then on heuristics."""
     mode = (state.get("mode") or "auto").lower()
     detection_id = state.get("detection_id")
+    batch_id = state.get("batch_id")
     message = (state.get("messages") or [{}])[-1].get("content", "") if state.get("messages") else ""
 
     if mode != "auto" and mode in MODE_TO_INTENT:
@@ -60,6 +62,14 @@ def _classify_intent_node(state: AgentState) -> AgentState:
         return state
 
     text = (message or "").lower()
+    if batch_id and any(
+        keyword in text for keyword in ("batch", "批次", "資料夾", "folder", "整批", "這批")
+    ):
+        state["intent"] = "batch_analysis"
+        return state
+    if batch_id and not detection_id:
+        state["intent"] = "batch_analysis"
+        return state
     if detection_id and any(keyword in text for keyword in ("report", "報告", "リポート")):
         state["intent"] = "generate_report"
         return state
@@ -125,6 +135,15 @@ def _call_tools_or_subagent_node(state: AgentState, *, db: Session, current_user
                 ]
                 return state
             tool_results.append({"tool": "yolo_explainer", "ok": True})
+            image_payload = payload.get("image")
+            if isinstance(image_payload, dict):
+                tool_results.append(
+                    {
+                        "tool": "vision_image",
+                        "ok": bool(image_payload.get("ok")),
+                        "detail": image_payload.get("path_used") or image_payload.get("error"),
+                    }
+                )
             references.append({"type": "detection", "detection_id": int(detection_id)})
             state["llm_messages"] = subagents.build_yolo_explainer_messages(
                 state["messages"][-1]["content"] if state.get("messages") else "",
@@ -157,12 +176,45 @@ def _call_tools_or_subagent_node(state: AgentState, *, db: Session, current_user
                 ]
                 return state
             tool_results.append({"tool": "report_agent", "ok": True})
+            image_payload = payload.get("image")
+            if isinstance(image_payload, dict):
+                tool_results.append(
+                    {
+                        "tool": "vision_image",
+                        "ok": bool(image_payload.get("ok")),
+                        "detail": image_payload.get("path_used") or image_payload.get("error"),
+                    }
+                )
             references.append({"type": "detection", "detection_id": int(detection_id)})
             state["llm_messages"] = subagents.build_report_agent_messages(
                 state["messages"][-1]["content"] if state.get("messages") else "",
                 payload,
             )
             state["report_markdown"] = payload.get("markdown")
+
+        elif intent == "batch_analysis":
+            batch_id = state.get("batch_id")
+            if not batch_id:
+                state["errors"] = (state.get("errors") or []) + [
+                    "batch_analysis requires batch_id"
+                ]
+                return state
+            payload = subagents.run_batch_analyst(
+                db,
+                current_user=current_user,
+                batch_id=int(batch_id),
+            )
+            if not payload.get("ok"):
+                state["errors"] = (state.get("errors") or []) + [
+                    payload.get("error", "batch_analysis failed")
+                ]
+                return state
+            tool_results.append({"tool": "batch_analyst", "ok": True})
+            references.append({"type": "batch", "batch_id": int(batch_id)})
+            state["llm_messages"] = subagents.build_batch_analyst_messages(
+                state["messages"][-1]["content"] if state.get("messages") else "",
+                payload,
+            )
 
         elif intent == "admin_help":
             if not current_user.is_admin:
@@ -238,6 +290,10 @@ def _handle_error_node(state: AgentState) -> AgentState:
         state["final_answer"] = "請提供有效的 detection_id 才能解釋 YOLO 結果。"
     elif any(err.startswith("generate_report requires") for err in errors):
         state["final_answer"] = "請提供有效的 detection_id 才能產出報告。"
+    elif any(err.startswith("batch_analysis requires") for err in errors):
+        state["final_answer"] = "請提供有效的 batch_id 才能分析這批影像。"
+    elif any("batch_not_found_or_not_owned" in err for err in errors):
+        state["final_answer"] = "找不到指定的批次，或您無權存取此批次，請確認 batch_id 是否正確。"
     elif any("not allowed" in err for err in errors):
         state["final_answer"] = "您無權存取指定的偵測任務。"
     elif any("not found" in err for err in errors):
@@ -258,6 +314,7 @@ def _build_state(
     conversation_id: str,
     mode: str,
     detection_id: Optional[int],
+    batch_id: Optional[int] = None,
     provider_name: Optional[str] = None,
     model_name_override: Optional[str] = None,
 ) -> AgentState:
@@ -271,6 +328,7 @@ def _build_state(
         mode=(mode or "auto").lower(),
         intent="",
         detection_id=int(detection_id) if detection_id is not None else None,
+        batch_id=int(batch_id) if batch_id is not None else None,
         tool_results=[],
         final_answer="",
         references=[],
@@ -336,6 +394,7 @@ def run_graph(
     conversation_id: str,
     mode: str,
     detection_id: Optional[int],
+    batch_id: Optional[int] = None,
     provider_name: Optional[str] = None,
     model_name_override: Optional[str] = None,
 ) -> dict[str, Any]:
@@ -347,6 +406,7 @@ def run_graph(
         conversation_id=conversation_id,
         mode=mode,
         detection_id=detection_id,
+        batch_id=batch_id,
         provider_name=provider_name,
         model_name_override=model_name_override,
     )
@@ -381,6 +441,7 @@ def stream_graph(
     conversation_id: str,
     mode: str,
     detection_id: Optional[int],
+    batch_id: Optional[int] = None,
     provider_name: Optional[str] = None,
     model_name_override: Optional[str] = None,
 ):
@@ -405,6 +466,7 @@ def stream_graph(
         conversation_id=conversation_id,
         mode=mode,
         detection_id=detection_id,
+        batch_id=batch_id,
         provider_name=provider_name,
         model_name_override=model_name_override,
     )

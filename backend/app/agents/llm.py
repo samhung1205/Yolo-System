@@ -43,6 +43,28 @@ class _BaseAgentChatModel:
         yield self.invoke(messages)
 
 
+def _mock_text_content(content: Any) -> str:
+    """Extract the text portion of a message content (str or multimodal list)."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = [
+            block.get("text", "")
+            for block in content
+            if isinstance(block, dict) and block.get("type") == "text"
+        ]
+        return " ".join(part for part in parts if part)
+    return ""
+
+
+def _content_has_image(content: Any) -> bool:
+    if not isinstance(content, list):
+        return False
+    return any(
+        isinstance(block, dict) and block.get("type") == "image_url" for block in content
+    )
+
+
 class MockChatModel(_BaseAgentChatModel):
     """Deterministic mock used when no real provider can be configured.
 
@@ -59,11 +81,15 @@ class MockChatModel(_BaseAgentChatModel):
     def invoke(self, messages: list[dict[str, str]]) -> AgentLLMResponse:
         user_message = ""
         tool_payload = ""
+        has_image = False
         for entry in reversed(messages):
             if not isinstance(entry, dict):
                 continue
             role = (entry.get("role") or "").lower()
-            content = entry.get("content") or ""
+            raw_content = entry.get("content")
+            content = _mock_text_content(raw_content)
+            if _content_has_image(raw_content):
+                has_image = True
             if role == "tool" and not tool_payload:
                 tool_payload = content
             elif role == "user" and not user_message:
@@ -72,6 +98,8 @@ class MockChatModel(_BaseAgentChatModel):
                 break
 
         sections: list[str] = ["[mock-agent] 我已收到您的請求。"]
+        if has_image:
+            sections.append("（此模式已附上偵測影像，但 mock provider 不會實際讀取圖片內容。）")
         if user_message:
             sections.append(f"使用者訊息：{user_message.strip()[:300]}")
         if tool_payload:

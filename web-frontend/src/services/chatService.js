@@ -21,6 +21,10 @@ const chatService = {
     const response = await api.get(`/api/chat/${conversationId}`);
     return response.data;
   },
+
+  async deleteConversation(conversationId) {
+    await api.delete(`/api/chat/${conversationId}`);
+  },
 };
 
 export default chatService;

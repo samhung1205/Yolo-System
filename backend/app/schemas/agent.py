@@ -19,6 +19,7 @@ ALLOWED_AGENT_MODES = {
     "history_analysis",
     "report",
     "admin_help",
+    "batch_analysis",
 }
 
 
@@ -29,6 +30,7 @@ class AgentChatRequest(BaseModel):
     conversation_id: Optional[str] = Field(default=None, max_length=64)
     mode: Optional[str] = Field(default="auto", max_length=32)
     detection_id: Optional[int] = Field(default=None, ge=1)
+    batch_id: Optional[int] = Field(default=None, ge=1)
     stream: Optional[bool] = Field(
         default=False,
         description="Reserved for Phase 6A-2; streaming is not implemented yet.",

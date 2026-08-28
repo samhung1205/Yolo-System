@@ -6,6 +6,19 @@ import { buildAssetUrl, normalizeApiError } from "../services/api";
 
 const STATUS_OPTIONS = ["", "completed", "failed", "processing", "pending"];
 const SOURCE_OPTIONS = ["", "image", "video"];
+const RECORD_DATE_FORMAT = new Intl.DateTimeFormat("zh-TW", {
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+});
+
+function formatRecordDate(value) {
+  if (!value) return "-";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : RECORD_DATE_FORMAT.format(date);
+}
 
 export default function DetectionHistoryPage() {
   const navigate = useNavigate();
@@ -18,6 +31,7 @@ export default function DetectionHistoryPage() {
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [downloadingAsset, setDownloadingAsset] = useState("");
+  const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
 
   // Filter state
   const [filterStatus, setFilterStatus] = useState("");
@@ -30,6 +44,11 @@ export default function DetectionHistoryPage() {
   const LIMIT = 20;
 
   const abortRef = useRef(null);
+  const listScrollRef = useRef(null);
+  const detailScrollRef = useRef(null);
+
+  const rangeStart = total === 0 ? 0 : (page - 1) * LIMIT + 1;
+  const rangeEnd = Math.min(page * LIMIT, total);
 
   const loadHistory = useCallback(
     async (currentPage = 1) => {
@@ -51,6 +70,7 @@ export default function DetectionHistoryPage() {
         setItems(rows);
         setTotal(count);
         setTotalPages(pages);
+        listScrollRef.current?.scrollTo({ top: 0 });
 
         if (rows.length > 0 && currentPage === 1) {
           const detail = await detectionService.getDetection(rows[0].id);
@@ -83,8 +103,13 @@ export default function DetectionHistoryPage() {
 
   useEffect(() => {
     setPage(1);
+    setMobileDetailOpen(false);
     loadHistory(1);
   }, [filterStatus, filterSource, loadHistory]);
+
+  useEffect(() => {
+    detailScrollRef.current?.scrollTo({ top: 0 });
+  }, [selected?.id]);
 
   async function handleSelect(id) {
     try {
@@ -92,6 +117,7 @@ export default function DetectionHistoryPage() {
       setSelected(detail);
       setDeleteError("");
       setConfirmDelete(false);
+      setMobileDetailOpen(true);
     } catch (err) {
       setError(normalizeApiError(err, "無法載入 detection detail"));
     }
@@ -106,6 +132,7 @@ export default function DetectionHistoryPage() {
     try {
       await detectionService.deleteDetection(selected.id);
       setSelected(null);
+      setMobileDetailOpen(false);
       const pages = await loadHistory(page);
       // Deleting the last item of the last page can leave us on an empty
       // page; clamp back to the new final page.
@@ -139,6 +166,7 @@ export default function DetectionHistoryPage() {
     loadHistory(newPage);
     setSelected(null);
     setConfirmDelete(false);
+    setMobileDetailOpen(false);
   }
 
   return (
@@ -202,14 +230,23 @@ export default function DetectionHistoryPage() {
 
       {error ? <div className="alert alert-error" role="alert" aria-live="assertive">{error}</div> : null}
 
-      <section className="history-layout">
+      <section className={mobileDetailOpen ? "history-layout history-detail-open" : "history-layout"}>
         {/* List Panel */}
-        <div className="panel">
-          <h2>Task List</h2>
-          {loading ? (
-            <p className="muted">載入中...</p>
-          ) : (
-            <>
+        <div className="panel history-panel history-list-panel">
+          <div className="panel-header-row history-panel-header">
+            <div>
+              <h2>Task List</h2>
+              <span className="muted small">
+                顯示 {rangeStart}-{rangeEnd}，共 {total} 筆
+              </span>
+            </div>
+            <span className="history-page-chip">Page {page}</span>
+          </div>
+
+          <div className="history-list-scroll" ref={listScrollRef}>
+            {loading ? (
+              <p className="muted">載入中...</p>
+            ) : (
               <div className="list-stack">
                 {items.map((item) => (
                   <button
@@ -217,51 +254,65 @@ export default function DetectionHistoryPage() {
                     key={item.id}
                     className={selected?.id === item.id ? "list-item list-item-active" : "list-item"}
                     onClick={() => handleSelect(item.id)}
+                    aria-pressed={selected?.id === item.id}
                   >
-                    <div className="list-item-title">
-                      #{item.id} · {item.source_filename}
+                    <div className="list-item-head">
+                      <div className="list-item-title" title={item.source_filename}>
+                        #{item.id} · {item.source_filename}
+                      </div>
+                      <time className="list-item-date" dateTime={item.created_at || undefined}>
+                        {formatRecordDate(item.created_at)}
+                      </time>
                     </div>
-                    <div className="muted small">
-                      <span className={`status-badge status-${item.status}`}>{item.status}</span>{" "}
-                      {item.source_type} · {item.object_count} objects
+                    <div className="list-item-meta">
+                      <span className={`status-badge status-${item.status}`}>{item.status}</span>
+                      <span>{item.source_type}</span>
+                      <span>{item.object_count} objects</span>
                     </div>
                   </button>
                 ))}
                 {!items.length ? <p className="muted">尚無符合條件的記錄。</p> : null}
               </div>
+            )}
+          </div>
 
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="pagination-row">
-                  <button
-                    type="button"
-                    className="button button-ghost"
-                    disabled={page <= 1}
-                    onClick={() => handlePageChange(page - 1)}
-                  >
-                    ← Prev
-                  </button>
-                  <span className="muted small">
-                    {page} / {totalPages}
-                  </span>
-                  <button
-                    type="button"
-                    className="button button-ghost"
-                    disabled={page >= totalPages}
-                    onClick={() => handlePageChange(page + 1)}
-                  >
-                    Next →
-                  </button>
-                </div>
-              )}
-            </>
-          )}
+          {/* Pagination remains visible while the records scroll. */}
+          <nav className="pagination-row history-pagination" aria-label="Detection records pagination">
+            <button
+              type="button"
+              className="button button-ghost"
+              disabled={page <= 1 || loading}
+              onClick={() => handlePageChange(page - 1)}
+            >
+              ← Prev
+            </button>
+            <span className="muted small">
+              {page} / {totalPages}
+            </span>
+            <button
+              type="button"
+              className="button button-ghost"
+              disabled={page >= totalPages || loading}
+              onClick={() => handlePageChange(page + 1)}
+            >
+              Next →
+            </button>
+          </nav>
         </div>
 
         {/* Detail Panel */}
-        <div className="panel">
-          <div className="panel-header-row">
-            <h2>Selected Detail</h2>
+        <div className="panel history-panel history-detail-panel">
+          <div className="panel-header-row history-panel-header">
+            <div className="history-detail-title">
+              <button
+                type="button"
+                className="button-ghost history-mobile-back"
+                onClick={() => setMobileDetailOpen(false)}
+              >
+                ← Task List
+              </button>
+              <h2>Selected Detail</h2>
+            </div>
             {selected && !confirmDelete && (
               <button
                 type="button"
@@ -295,120 +346,122 @@ export default function DetectionHistoryPage() {
             )}
           </div>
 
-          {deleteError ? <div className="alert alert-error" role="alert" aria-live="assertive">{deleteError}</div> : null}
+          <div className="history-detail-scroll" ref={detailScrollRef}>
+            {deleteError ? <div className="alert alert-error" role="alert" aria-live="assertive">{deleteError}</div> : null}
 
-          {selected ? (
-            <div className="detail-stack">
-              <div className="detail-grid">
-                <div>
-                  <span className="detail-label">Task ID</span>
-                  <strong>{selected.id}</strong>
+            {selected ? (
+              <div className="detail-stack">
+                <div className="detail-grid">
+                  <div>
+                    <span className="detail-label">Task ID</span>
+                    <strong>{selected.id}</strong>
+                  </div>
+                  <div>
+                    <span className="detail-label">Model</span>
+                    <strong>{selected.model_name}</strong>
+                  </div>
+                  <div>
+                    <span className="detail-label">Status</span>
+                    <span className={`status-badge status-${selected.status}`}>{selected.status}</span>
+                  </div>
+                  <div>
+                    <span className="detail-label">Inference</span>
+                    <strong>{selected.inference_ms ?? "-"} ms</strong>
+                  </div>
+                  <div>
+                    <span className="detail-label">Type</span>
+                    <strong>{selected.source_type}</strong>
+                  </div>
+                  <div>
+                    <span className="detail-label">Objects</span>
+                    <strong>{selected.objects?.length ?? 0}</strong>
+                  </div>
                 </div>
-                <div>
-                  <span className="detail-label">Model</span>
-                  <strong>{selected.model_name}</strong>
-                </div>
-                <div>
-                  <span className="detail-label">Status</span>
-                  <span className={`status-badge status-${selected.status}`}>{selected.status}</span>
-                </div>
-                <div>
-                  <span className="detail-label">Inference</span>
-                  <strong>{selected.inference_ms ?? "-"} ms</strong>
-                </div>
-                <div>
-                  <span className="detail-label">Type</span>
-                  <strong>{selected.source_type}</strong>
-                </div>
-                <div>
-                  <span className="detail-label">Objects</span>
-                  <strong>{selected.objects?.length ?? 0}</strong>
-                </div>
-              </div>
 
-              <div className="agent-shortcut-row">
-                <button
-                  type="button"
-                  className="button button-secondary"
-                  onClick={() => navigate(`/agent?mode=explain_detection&detection_id=${selected.id}`)}
-                >
-                  Explain with Agent
-                </button>
-                <button
-                  type="button"
-                  className="button button-secondary"
-                  onClick={() => navigate(`/agent?mode=report&detection_id=${selected.id}`)}
-                >
-                  Generate Report
-                </button>
+                <div className="agent-shortcut-row">
+                  <button
+                    type="button"
+                    className="button button-secondary"
+                    onClick={() => navigate(`/agent?mode=explain_detection&detection_id=${selected.id}`)}
+                  >
+                    Explain with Agent
+                  </button>
+                  <button
+                    type="button"
+                    className="button button-secondary"
+                    onClick={() => navigate(`/agent?mode=report&detection_id=${selected.id}`)}
+                  >
+                    Generate Report
+                  </button>
+                  {selected.result_image_url ? (
+                    <button
+                      type="button"
+                      className="button button-secondary"
+                      disabled={downloadingAsset === selected.result_image_url}
+                      onClick={() =>
+                        handleDownload(
+                          selected.result_image_url,
+                          `detection_${selected.id}_result.jpg`
+                        )
+                      }
+                    >
+                      {downloadingAsset === selected.result_image_url ? "下載中..." : "下載結果圖"}
+                    </button>
+                  ) : null}
+                  {selected.result_video_url ? (
+                    <button
+                      type="button"
+                      className="button button-secondary"
+                      disabled={downloadingAsset === selected.result_video_url}
+                      onClick={() =>
+                        handleDownload(
+                          selected.result_video_url,
+                          `detection_${selected.id}_result.mp4`
+                        )
+                      }
+                    >
+                      {downloadingAsset === selected.result_video_url ? "下載中..." : "下載結果影片"}
+                    </button>
+                  ) : null}
+                </div>
+
                 {selected.result_image_url ? (
-                  <button
-                    type="button"
-                    className="button button-secondary"
-                    disabled={downloadingAsset === selected.result_image_url}
-                    onClick={() =>
-                      handleDownload(
-                        selected.result_image_url,
-                        `detection_${selected.id}_result.jpg`
-                      )
-                    }
-                  >
-                    {downloadingAsset === selected.result_image_url ? "下載中..." : "下載結果圖"}
-                  </button>
+                  <img
+                    className="result-image"
+                    src={buildAssetUrl(selected.result_image_url)}
+                    alt="Detection detail result"
+                  />
                 ) : null}
-                {selected.result_video_url ? (
-                  <button
-                    type="button"
-                    className="button button-secondary"
-                    disabled={downloadingAsset === selected.result_video_url}
-                    onClick={() =>
-                      handleDownload(
-                        selected.result_video_url,
-                        `detection_${selected.id}_result.mp4`
-                      )
-                    }
-                  >
-                    {downloadingAsset === selected.result_video_url ? "下載中..." : "下載結果影片"}
-                  </button>
-                ) : null}
-              </div>
 
-              {selected.result_image_url ? (
-                <img
-                  className="result-image"
-                  src={buildAssetUrl(selected.result_image_url)}
-                  alt="Detection detail result"
-                />
-              ) : null}
-
-              {selected.objects?.length > 0 && (
-                <div className="table-wrapper">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th scope="col">#</th>
-                        <th scope="col">Class</th>
-                        <th scope="col">Confidence</th>
-                        <th scope="col">Bounding Box</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {selected.objects.map((obj) => (
-                        <tr key={obj.id}>
-                          <td>{obj.object_index}</td>
-                          <td>{obj.class_name}</td>
-                          <td>{obj.confidence.toFixed(3)}</td>
-                          <td>{obj.bbox.join(", ")}</td>
+                {selected.objects?.length > 0 && (
+                  <div className="table-wrapper">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th scope="col">#</th>
+                          <th scope="col">Class</th>
+                          <th scope="col">Confidence</th>
+                          <th scope="col">Bounding Box</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          ) : (
-            <p className="muted">請從左側選擇一筆紀錄。</p>
-          )}
+                      </thead>
+                      <tbody>
+                        {selected.objects.map((obj) => (
+                          <tr key={obj.id}>
+                            <td>{obj.object_index}</td>
+                            <td>{obj.class_name}</td>
+                            <td>{obj.confidence.toFixed(3)}</td>
+                            <td>{obj.bbox.join(", ")}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="muted">請從左側選擇一筆紀錄。</p>
+            )}
+          </div>
         </div>
       </section>
     </div>

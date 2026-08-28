@@ -77,3 +77,16 @@ def get_chat_conversation(
         current_user=current_user,
         conversation_id=conversation_id,
     )
+
+
+@router.delete("/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_chat_conversation(
+    conversation_id: str,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    chat_service.delete_chat_conversation(
+        db,
+        current_user=current_user,
+        conversation_id=conversation_id,
+    )

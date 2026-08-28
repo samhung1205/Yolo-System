@@ -17,10 +17,17 @@ from app.integrations.model_registry import (
     get_yolo_model,
 )
 from app.integrations.yolo_engine import YoloEngine
+from app.models.detection_batch import DetectionBatch
 from app.models.detection_task import DetectionTask
 from app.models.user import User
 from app.repositories import detection_repository
-from app.schemas.detection import DetectionObjectRead, DetectionTaskRead, DetectionTaskSummaryRead
+from app.schemas.detection import (
+    BatchDetailRead,
+    BatchRead,
+    DetectionObjectRead,
+    DetectionTaskRead,
+    DetectionTaskSummaryRead,
+)
 
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif", "image/bmp"}
 ALLOWED_VIDEO_TYPES = {
@@ -238,6 +245,257 @@ def process_video_detection_task(*, task_id: int, conf: float = 0.25, iou: float
         db.close()
 
 
+def create_image_batch(
+    db: Session,
+    *,
+    current_user: User,
+    files: list[UploadFile],
+    conf: float = 0.25,
+    iou: float = 0.45,
+    model_key: str | None = None,
+    name: str | None = None,
+) -> BatchDetailRead:
+    """Store every valid image in ``files`` as a pending task under one batch.
+
+    Non-image files are skipped (recorded in ``skipped_files``) rather than
+    failing the whole request, since folder uploads often contain stray
+    files (e.g. ``.DS_Store``). Per-file storage errors (e.g. oversized image)
+    only fail that one task; the rest of the batch still proceeds.
+    Inference itself is NOT run here — the caller schedules
+    :func:`process_image_batch_task` as a background task.
+    """
+    if not files:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="At least one file is required")
+    if len(files) > settings.DETECTION_BATCH_MAX_FILES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Batch upload is limited to {settings.DETECTION_BATCH_MAX_FILES} files per request",
+        )
+
+    model_spec = _resolve_model(model_key)
+
+    valid_files: list[UploadFile] = []
+    skipped_files: list[str] = []
+    for upload in files:
+        if upload.content_type in ALLOWED_IMAGE_TYPES:
+            valid_files.append(upload)
+        else:
+            skipped_files.append(upload.filename or "unknown")
+
+    if not valid_files:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No valid image files found in the upload",
+        )
+
+    batch = detection_repository.create_batch(
+        db,
+        user_id=current_user.id,
+        name=name,
+        model_name=model_spec.checkpoint_path.name,
+        model_key=model_spec.key,
+        model_sha256=model_spec.current_sha256(),
+        confidence_threshold=conf,
+        iou_threshold=iou,
+        total_files=len(valid_files),
+        skipped_files=skipped_files,
+        status="processing",
+    )
+
+    upload_failed_count = 0
+    for upload in valid_files:
+        task = detection_repository.create_task(
+            db,
+            user_id=current_user.id,
+            source_type="image",
+            source_filename=upload.filename or "uploaded_image",
+            model_name=model_spec.checkpoint_path.name,
+            model_key=model_spec.key,
+            model_sha256=model_spec.current_sha256(),
+            model_class_map_json=model_spec.provenance_snapshot(),
+            confidence_threshold=conf,
+            iou_threshold=iou,
+            status="pending",
+            batch_id=batch.id,
+        )
+        try:
+            source_fs_path, source_rel_path = _store_original_image(task.id, upload)
+            detection_repository.update_task(db, task, source_image_path=source_rel_path)
+        except HTTPException as exc:
+            upload_failed_count += 1
+            detection_repository.update_task(db, task, status="failed", error_message=exc.detail)
+        except Exception as exc:  # pragma: no cover - defensive
+            upload_failed_count += 1
+            detection_repository.update_task(db, task, status="failed", error_message=str(exc))
+
+    if upload_failed_count >= len(valid_files):
+        detection_repository.update_batch(
+            db,
+            batch,
+            status="failed",
+            failed_count=upload_failed_count,
+            error_message="All files failed to upload",
+        )
+    elif upload_failed_count:
+        detection_repository.update_batch(db, batch, failed_count=upload_failed_count)
+
+    batch = detection_repository.get_batch(db, batch.id)
+    assert batch is not None
+    return _serialize_batch_detail(batch)
+
+
+def process_image_batch_task(*, batch_id: int, conf: float = 0.25, iou: float = 0.45) -> None:
+    """Background task: run YOLO inference sequentially for every pending
+    task in the batch, updating batch progress after each image so
+    ``GET /api/detections/batches/{id}`` polling reflects real-time status.
+    """
+    db = SessionLocal()
+    try:
+        batch = detection_repository.get_batch(db, batch_id)
+        if batch is None or batch.status == "failed":
+            return
+
+        pending_tasks = detection_repository.get_pending_batch_tasks(db, batch_id)
+        if not pending_tasks:
+            _finalize_batch_status(db, batch)
+            return
+
+        try:
+            engine = YoloEngine(model_key=batch.model_key)
+        except Exception as exc:
+            detection_repository.update_batch(
+                db,
+                batch,
+                status="failed",
+                error_message=f"Failed to load model for batch: {exc}",
+            )
+            for task in pending_tasks:
+                detection_repository.update_task(db, task, status="failed", error_message="Batch model load failed")
+            return
+
+        processed_count = batch.processed_count or 0
+        failed_count = batch.failed_count or 0
+
+        for task in pending_tasks:
+            result_fs_path: Path | None = None
+            task_ok = True
+            try:
+                source_fs_path = _static_root() / task.source_image_path if task.source_image_path else None
+                if source_fs_path is None or not source_fs_path.exists():
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail="Source image not found for batch task",
+                    )
+
+                detection_result = engine.detect_image(source_fs_path, conf=conf, iou=iou)
+                result_fs_path, result_rel_path = _store_result_image(task.id, detection_result.annotated_image)
+
+                detection_repository.update_task(
+                    db,
+                    task,
+                    result_image_path=result_rel_path,
+                    model_name=detection_result.model_name,
+                    model_key=detection_result.model_key,
+                    model_sha256=detection_result.model_sha256,
+                    model_class_map_json=detection_result.model_class_map,
+                    status="completed",
+                    inference_ms=detection_result.inference_ms,
+                    image_width=detection_result.image_width,
+                    image_height=detection_result.image_height,
+                    error_message=None,
+                )
+
+                object_rows = [
+                    {
+                        "object_index": obj["object_index"],
+                        "class_id": obj["class_id"],
+                        "class_name": obj["class_name"],
+                        "confidence": obj["confidence"],
+                        "bbox_x1": obj["bbox"][0],
+                        "bbox_y1": obj["bbox"][1],
+                        "bbox_x2": obj["bbox"][2],
+                        "bbox_y2": obj["bbox"][3],
+                    }
+                    for obj in detection_result.objects
+                ]
+                detection_repository.replace_task_objects(db, task, object_rows)
+            except HTTPException as exc:
+                task_ok = False
+                _cleanup_files(result_fs_path)
+                detection_repository.update_task(db, task, status="failed", error_message=exc.detail)
+            except Exception as exc:  # pragma: no cover - defensive
+                task_ok = False
+                _cleanup_files(result_fs_path)
+                detection_repository.update_task(db, task, status="failed", error_message=str(exc))
+
+            processed_count += 1
+            if not task_ok:
+                failed_count += 1
+            batch = detection_repository.update_batch(
+                db,
+                batch,
+                processed_count=processed_count,
+                failed_count=failed_count,
+            )
+
+        _finalize_batch_status(db, batch)
+    finally:
+        db.close()
+
+
+def _finalize_batch_status(db: Session, batch: DetectionBatch) -> None:
+    if batch.failed_count and batch.failed_count >= batch.total_files:
+        detection_repository.update_batch(db, batch, status="failed")
+    elif batch.failed_count:
+        detection_repository.update_batch(db, batch, status="completed_with_errors")
+    else:
+        detection_repository.update_batch(db, batch, status="completed")
+
+
+def list_batches(
+    db: Session,
+    *,
+    current_user: User,
+    status: str | None = None,
+    limit: int = 20,
+    page: int = 1,
+) -> tuple[int, list[BatchRead]]:
+    user_id = None if current_user.is_admin else current_user.id
+    offset = (max(1, page) - 1) * limit
+    total = detection_repository.count_batches(db, user_id=user_id, status=status or None)
+    batches = detection_repository.list_batches(
+        db,
+        user_id=user_id,
+        status=status or None,
+        limit=limit,
+        offset=offset,
+    )
+    return total, [_serialize_batch(batch) for batch in batches]
+
+
+def get_batch(db: Session, *, current_user: User, batch_id: int) -> BatchDetailRead:
+    batch = _get_owned_batch(db, current_user=current_user, batch_id=batch_id)
+    return _serialize_batch_detail(batch)
+
+
+def delete_batch(db: Session, *, current_user: User, batch_id: int) -> None:
+    batch = _get_owned_batch(db, current_user=current_user, batch_id=batch_id)
+    for task in batch.tasks:
+        source_fs_path = _static_root() / task.source_image_path if task.source_image_path else None
+        result_fs_path = _static_root() / task.result_image_path if task.result_image_path else None
+        _cleanup_files(source_fs_path, result_fs_path)
+    detection_repository.delete_batch(db, batch)
+
+
+def _get_owned_batch(db: Session, *, current_user: User, batch_id: int) -> DetectionBatch:
+    batch = detection_repository.get_batch(db, batch_id)
+    if batch is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Batch not found")
+    if not current_user.is_admin and batch.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed to access this batch")
+    return batch
+
+
 def list_detections(
     db: Session,
     *,
@@ -452,6 +710,34 @@ def _serialize_task_summary(task: DetectionTask) -> DetectionTaskSummaryRead:
         object_count=len(task.objects),
         created_at=task.created_at,
         updated_at=task.updated_at,
+    )
+
+
+def _serialize_batch(batch: DetectionBatch) -> BatchRead:
+    return BatchRead(
+        id=batch.id,
+        user_id=batch.user_id,
+        name=batch.name,
+        model_name=batch.model_name,
+        model_key=batch.model_key,
+        model_sha256=batch.model_sha256,
+        confidence_threshold=batch.confidence_threshold,
+        iou_threshold=batch.iou_threshold,
+        status=batch.status,
+        total_files=batch.total_files,
+        processed_count=batch.processed_count,
+        failed_count=batch.failed_count,
+        skipped_files=batch.skipped_files or [],
+        error_message=batch.error_message,
+        created_at=batch.created_at,
+        updated_at=batch.updated_at,
+    )
+
+
+def _serialize_batch_detail(batch: DetectionBatch) -> BatchDetailRead:
+    return BatchDetailRead(
+        **_serialize_batch(batch).model_dump(),
+        tasks=[_serialize_task_summary(task) for task in batch.tasks],
     )
 
 

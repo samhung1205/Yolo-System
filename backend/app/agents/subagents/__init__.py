@@ -13,6 +13,7 @@ subagents themselves do not call the LLM directly.
 from __future__ import annotations
 
 from .admin_assistant import build_admin_assistant_messages, run_admin_assistant
+from .batch_analyst import build_batch_analyst_messages, run_batch_analyst
 from .detection_history_analyst import (
     build_history_analyst_messages,
     run_history_analyst,
@@ -25,10 +26,12 @@ from .yolo_result_explainer import (
 
 __all__ = [
     "build_admin_assistant_messages",
+    "build_batch_analyst_messages",
     "build_history_analyst_messages",
     "build_report_agent_messages",
     "build_yolo_explainer_messages",
     "run_admin_assistant",
+    "run_batch_analyst",
     "run_history_analyst",
     "run_report_agent",
     "run_yolo_explainer",

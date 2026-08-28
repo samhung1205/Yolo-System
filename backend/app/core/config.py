@@ -54,6 +54,15 @@ class Settings(BaseSettings):
     AGENT_ENABLE_DEEPAGENTS: bool = False
     AGENT_MAX_HISTORY_TURNS: int = 10
     AGENT_RECURSION_LIMIT: int = 25
+    # When true, explain_detection / report modes attach the annotated result
+    # image (base64) to the LLM call so vision-capable models (e.g. OpenAI
+    # gpt-4o/gpt-4.1, Ollama llava/qwen2-vl) can describe what they actually
+    # see, in addition to the structured bbox/class data. Only enable this
+    # with a provider+model that supports image inputs — non-vision models
+    # will fail the call and the agent falls back to its "model unavailable"
+    # message (no crash, but no answer either).
+    AGENT_ENABLE_VISION: bool = False
+    AGENT_VISION_MAX_IMAGE_BYTES: int = 6 * 1024 * 1024
     AGENT_SYSTEM_PROMPT: str = (
         "You are the YOLO System assistant. You help users understand YOLO detection "
         "results, analyse their detection history, and produce concise reports. "
@@ -71,6 +80,10 @@ class Settings(BaseSettings):
     DETECTION_VIDEO_SOURCE_DIR: str = "static/detections/videos/originals"
     DETECTION_VIDEO_RESULT_DIR: str = "static/detections/videos/results"
     DETECTION_PREVIEW_DIR: str = "static/detections/previews"
+    # Phase 1 batch image analysis. Kept at 100 for the initial rollout;
+    # raise once background processing throughput has been validated in
+    # production (README/AGENTS.md tracks this as a follow-up).
+    DETECTION_BATCH_MAX_FILES: int = 100
 
     # App
     APP_ENV: str = "development"

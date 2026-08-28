@@ -232,6 +232,24 @@ def get_chat_conversation(
     )
 
 
+def delete_chat_conversation(
+    db: Session,
+    *,
+    current_user: User,
+    conversation_id: str,
+) -> None:
+    deleted_count = chat_repository.delete_conversation(
+        db,
+        user_id=current_user.id,
+        conversation_id=conversation_id,
+    )
+    if deleted_count == 0:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Chat conversation not found",
+        )
+
+
 def _get_provider(
     provider_name: str | None = None,
     model_name_override: str | None = None,

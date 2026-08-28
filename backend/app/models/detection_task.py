@@ -15,6 +15,9 @@ class DetectionTask(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    batch_id: Mapped[int | None] = mapped_column(
+        ForeignKey("detection_batches.id", ondelete="CASCADE"), nullable=True, index=True
+    )
     source_type: Mapped[str] = mapped_column(String(20), nullable=False, default="image")
     source_filename: Mapped[str] = mapped_column(String(255), nullable=False)
     source_image_path: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -48,6 +51,7 @@ class DetectionTask(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+    batch = relationship("DetectionBatch", back_populates="tasks")
 
     def __repr__(self) -> str:
         return f"<DetectionTask id={self.id} user_id={self.user_id} status={self.status}>"

@@ -5,6 +5,7 @@ import authService from "../services/authService";
 const NAV_ITEMS = [
   { to: "/", label: "Dashboard", end: true },
   { to: "/detections", label: "Object Detection", end: true },
+  { to: "/detections/batch", label: "Batch Analysis", end: true },
   { to: "/detections/history", label: "Detection Records", end: true },
   { to: "/chat", label: "AI Chat", end: true },
   { to: "/agent", label: "Detection Analyst", end: true },

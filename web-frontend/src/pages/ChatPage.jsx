@@ -5,6 +5,8 @@ import modelService from "../services/modelService";
 import ModelPicker from "../components/ModelPicker";
 import { normalizeApiError } from "../services/api";
 
+const CONVERSATION_LIMIT = 100;
+
 export default function ChatPage() {
   const [conversations, setConversations] = useState([]);
   const [activeConversationId, setActiveConversationId] = useState(null);
@@ -13,6 +15,8 @@ export default function ChatPage() {
   const [loading, setLoading] = useState(false);
   const [initLoading, setInitLoading] = useState(true);
   const [error, setError] = useState("");
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [deletingConversationId, setDeletingConversationId] = useState(null);
 
   // Mirrors activeConversationId so async handlers can check the *current*
   // selection after an await (avoids races with user navigation).
@@ -22,6 +26,12 @@ export default function ChatPage() {
   const userNavigatedRef = useRef(false);
   // Sequence number so out-of-order getConversation responses are dropped.
   const openSeqRef = useRef(0);
+  // True while an IME (e.g. Chinese/Japanese/Korean input method) composition
+  // is in progress, so the confirm-selection Enter key doesn't submit the form.
+  const isComposingRef = useRef(false);
+  // Scrollable thread container — the CSS caps its height, so we auto-scroll
+  // to the latest message instead of letting the page grow unbounded.
+  const threadRef = useRef(null);
 
   // Model selector state
   const [providerGroups, setProviderGroups] = useState([]);
@@ -48,6 +58,12 @@ export default function ChatPage() {
 
   const currentModels = providerGroups.find((g) => g.provider === selectedProvider)?.models || [];
 
+  useEffect(() => {
+    if (threadRef.current) {
+      threadRef.current.scrollTop = threadRef.current.scrollHeight;
+    }
+  }, [messages]);
+
   function handleProviderChange(provider) {
     setSelectedProvider(provider);
     const group = providerGroups.find((g) => g.provider === provider);
@@ -59,7 +75,7 @@ export default function ChatPage() {
 
     async function loadConversations() {
       try {
-        const rows = await chatService.listConversations();
+        const rows = await chatService.listConversations(CONVERSATION_LIMIT);
         if (!mounted) {
           return;
         }
@@ -89,6 +105,7 @@ export default function ChatPage() {
     if (!auto) {
       userNavigatedRef.current = true;
     }
+    setConfirmDeleteId(null);
     const seq = ++openSeqRef.current;
     try {
       const detail = await chatService.getConversation(conversationId);
@@ -109,8 +126,33 @@ export default function ChatPage() {
   }
 
   async function refreshConversations() {
-    const rows = await chatService.listConversations();
+    const rows = await chatService.listConversations(CONVERSATION_LIMIT);
     setConversations(rows);
+  }
+
+  async function handleDeleteConversation(conversationId) {
+    if (!conversationId || deletingConversationId) return;
+
+    setDeletingConversationId(conversationId);
+    setError("");
+    try {
+      await chatService.deleteConversation(conversationId);
+      openSeqRef.current += 1;
+      setConversations((prev) =>
+        prev.filter((item) => item.conversation_id !== conversationId)
+      );
+      if (activeIdRef.current === conversationId) {
+        activeIdRef.current = null;
+        setActiveConversationId(null);
+        setMessages([]);
+        setQuestion("");
+      }
+      setConfirmDeleteId(null);
+    } catch (err) {
+      setError(normalizeApiError(err, "刪除對話失敗"));
+    } finally {
+      setDeletingConversationId(null);
+    }
   }
 
   async function handleSubmit(event) {
@@ -152,6 +194,7 @@ export default function ChatPage() {
     setActiveConversationId(null);
     setMessages([]);
     setQuestion("");
+    setConfirmDeleteId(null);
   }
 
   return (
@@ -168,38 +211,87 @@ export default function ChatPage() {
 
       <section className="chat-layout">
         <aside className="panel chat-sidebar">
-          <div className="section-title">
-            <h2>Conversations</h2>
+          <div className="section-title chat-sidebar-header">
+            <div>
+              <h2>Conversations</h2>
+              <span className="muted small">
+                {conversations.length} conversations · latest {CONVERSATION_LIMIT}
+              </span>
+            </div>
             <button type="button" className="button button-secondary" onClick={handleNewConversation}>
               New
             </button>
           </div>
 
-          <div className="list-stack">
-            {initLoading ? (
-              <p className="muted small">載入聊天紀錄...</p>
-            ) : (
-              <>
+          <div className="chat-conversation-scroll">
+            <div className="list-stack chat-conversation-list">
+              {initLoading ? (
+                <p className="muted small">載入聊天紀錄...</p>
+              ) : (
+                <>
                 {conversations.map((item) => (
-                  <button
+                  <div
                     key={item.conversation_id}
-                    type="button"
                     className={
                       activeConversationId === item.conversation_id
-                        ? "list-item list-item-active"
-                        : "list-item"
+                        ? "chat-conversation-item chat-conversation-item-active"
+                        : "chat-conversation-item"
                     }
-                    onClick={() => handleOpenConversation(item.conversation_id)}
                   >
-                    <div className="list-item-title">{item.title}</div>
-                    <div className="muted small">
-                      {item.provider} · {item.turn_count} turns
-                    </div>
-                  </button>
+                    <button
+                      type="button"
+                      className="chat-conversation-open"
+                      onClick={() => handleOpenConversation(item.conversation_id)}
+                      aria-current={activeConversationId === item.conversation_id ? "true" : undefined}
+                    >
+                      <span className="chat-conversation-title" title={item.title}>{item.title}</span>
+                      <span className="chat-conversation-meta">
+                        {item.provider} · {item.turn_count} turns
+                      </span>
+                    </button>
+
+                    {confirmDeleteId === item.conversation_id ? (
+                      <div className="chat-delete-confirm" role="group" aria-label={`確認刪除 ${item.title}`}>
+                        <span>確定刪除？</span>
+                        <button
+                          type="button"
+                          className="chat-delete-confirm-button"
+                          disabled={deletingConversationId === item.conversation_id || loading}
+                          onClick={() => handleDeleteConversation(item.conversation_id)}
+                        >
+                          {deletingConversationId === item.conversation_id ? "刪除中..." : "刪除"}
+                        </button>
+                        <button
+                          type="button"
+                          className="chat-delete-cancel-button"
+                          disabled={deletingConversationId === item.conversation_id}
+                          onClick={() => setConfirmDeleteId(null)}
+                        >
+                          取消
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        className="chat-conversation-delete"
+                        disabled={Boolean(deletingConversationId) || loading}
+                        onClick={() => setConfirmDeleteId(item.conversation_id)}
+                        aria-label={`刪除對話 ${item.title}`}
+                        title="刪除對話"
+                      >
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <polyline points="3 6 5 6 21 6" />
+                          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                          <path d="M10 11v6M14 11v6M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
                 ))}
                 {!conversations.length ? <p className="muted">尚無聊天紀錄。</p> : null}
-              </>
-            )}
+                </>
+              )}
+            </div>
           </div>
         </aside>
 
@@ -211,7 +303,7 @@ export default function ChatPage() {
             </span>
           </div>
 
-          <div className="chat-thread">
+          <div ref={threadRef} className="chat-thread">
             {messages.length ? (
               messages.map((item) => (
                 <div key={item.id} className="chat-turn">
@@ -241,11 +333,22 @@ export default function ChatPage() {
                 onChange={(event) => setQuestion(event.target.value)}
                 placeholder="請輸入想問 AI 的問題"
                 disabled={loading}
+                onCompositionStart={() => {
+                  isComposingRef.current = true;
+                }}
+                onCompositionEnd={() => {
+                  isComposingRef.current = false;
+                }}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    if (!loading && question.trim()) handleSubmit(e);
+                  if (e.key !== "Enter" || e.shiftKey) return;
+                  // isComposing / keyCode 229 guards the Enter keystroke used
+                  // to confirm an IME candidate (Chinese/Japanese/Korean input)
+                  // so it doesn't also submit the message.
+                  if (isComposingRef.current || e.nativeEvent?.isComposing || e.keyCode === 229) {
+                    return;
                   }
+                  e.preventDefault();
+                  if (!loading && question.trim()) handleSubmit(e);
                 }}
               />
               <div className="chat-input-bar">

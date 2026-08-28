@@ -16,6 +16,10 @@ subagents, tests) can serialise the value as the tool message body.
 """
 from __future__ import annotations
 
+from .batch_tools import (
+    list_batch_images_by_class_tool,
+    summarize_batch_tool,
+)
 from .detection_tools import (
     aggregate_detection_stats,
     compare_detection_results_tool,
@@ -37,6 +41,8 @@ from .user_tools import (
 )
 
 __all__ = [
+    "list_batch_images_by_class_tool",
+    "summarize_batch_tool",
     "aggregate_detection_stats",
     "compare_detection_results_tool",
     "explain_detection_objects_tool",
