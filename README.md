@@ -545,7 +545,7 @@ curl -X POST "http://127.0.0.1:8000/api/agent/chat" \
 
 #### Phase 6A-1 已知限制
 
-- 尚未提供 agent streaming（`/api/agent/chat/stream`）。
+- 此階段當時尚未提供 agent streaming；`/api/agent/chat/stream` 已於 Phase 6A-3 完成。
 - DeepAgents flag 目前僅做 import readiness，沒有實際使用 deepagents.subagents。
 
 ---
@@ -589,7 +589,7 @@ npm run build    # 生產版本 build 檢查
 #### Desktop 整合狀態
 
 `desktop-app/api_client.py` 已包含 `agent_chat()` / `list_agent_modes()`（Phase 6A-1 完成）。
-Desktop PySide6 完整 Agent 對話 UI 為下一階段。
+Desktop PySide6 的獨立 `AgentWindow.py` 已於 Phase 6A-3b 完成。
 
 #### Phase 6A-3 — Agent Streaming（SSE）
 
