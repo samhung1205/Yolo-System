@@ -31,6 +31,10 @@ class DetectionTask(Base):
     model_class_map_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     confidence_threshold: Mapped[float | None] = mapped_column(Float, nullable=True)
     iou_threshold: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # Per-class overrides, keyed by class id as a string:
+    # {"0": {"conf": 0.2, "iou": 0.4}}. Classes absent here fall back to the
+    # scalar thresholds above.
+    class_thresholds_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="processing", index=True)
     inference_ms: Mapped[float | None] = mapped_column(Float, nullable=True)
     image_width: Mapped[int | None] = mapped_column(Integer, nullable=True)

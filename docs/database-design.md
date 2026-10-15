@@ -2,7 +2,7 @@
 
 > **版本**: v0.9 (批次影像分析 Phase 1)  
 > **Database**: MySQL 8.0, database name: `yolo`  
-> **最後更新**: 2026-07-23
+> **最後更新**: 2026-09-04
 
 ---
 
@@ -63,6 +63,7 @@ CREATE TABLE detection_tasks (
     model_class_map_json JSON      NULL,       -- migration 0009
     confidence_threshold FLOAT     NULL,        -- migration 0009
     iou_threshold     FLOAT        NULL,        -- migration 0009
+    class_thresholds_json JSON     NULL,        -- migration 0011, per-class conf/IOU
     status            VARCHAR(20)  NOT NULL,   -- pending / processing / completed / failed
     inference_ms      FLOAT        NULL,
     image_width       INT          NULL,
@@ -108,6 +109,7 @@ CREATE TABLE detection_batches (
     model_sha256          VARCHAR(64)  NULL,
     confidence_threshold  FLOAT        NULL,
     iou_threshold         FLOAT        NULL,
+    class_thresholds_json JSON         NULL,   -- migration 0011, per-class conf/IOU
     status                VARCHAR(30)  NOT NULL DEFAULT 'pending',
     -- pending / processing / completed / completed_with_errors / failed
     total_files           INT          NOT NULL DEFAULT 0,
@@ -225,6 +227,7 @@ users (1) ──────< chat_logs (M)
 - `0008`: `chat_logs.user_id` FK 改為 `ON DELETE CASCADE`（修復刪除使用者時的 FK 衝突）
 - `0009`: `detection_tasks` 新增 `model_key` / `model_sha256` / `model_class_map_json` / `confidence_threshold` / `iou_threshold`（YOLO checkpoint provenance）
 - `0010`: 建立 `detection_batches` 表，並在 `detection_tasks` 新增 `batch_id`（nullable FK，`ON DELETE CASCADE`）— 批次影像分析 Phase 1
+- `0011`: `detection_tasks` 與 `detection_batches` 各新增 `class_thresholds_json`（各類別自訂 conf/IOU）
 
 ### 執行指令
 ```bash
@@ -257,6 +260,7 @@ alembic upgrade head
 - chat 目前以 `chat_logs` 聚合多輪上下文，但尚未拆成獨立 `chat_conversations` table
 - 批次影像分析（`detection_batches`）目前以 `BackgroundTasks` 依序（非併發）處理，單次上限 `DETECTION_BATCH_MAX_FILES`（預設 100）；尚未支援影片批次或跨批次併發，屬 Phase 6 job queue 待辦範圍
 - `summarize_batch_tool` 目前只做「每個類別的總數」聚合，不做 bbox 空間關係判斷（例如「船上有沒有飛機」），屬後續 Phase 待辦
+- `class_thresholds_json` 只記錄請求時採用的各類別閾值，屬 provenance 性質；未建立索引，也不支援按閾值查詢。影片偵測（`source_type='video'`）目前不會寫入此欄位
 
 ---
 
@@ -273,3 +277,4 @@ alembic upgrade head
 | v0.7 | 2026-07-12 | migration `0008`：`chat_logs.user_id` FK 改為 `ON DELETE CASCADE`；刪除 user 時同步清理 detection / avatar 靜態檔案 |
 | v0.8 | 2026-07-14 | migration `0009`：`detection_tasks` 新增 YOLO checkpoint provenance 欄位（`model_key`/`model_sha256`/`model_class_map_json`/`confidence_threshold`/`iou_threshold`） |
 | v0.9 | 2026-07-23 | migration `0010`：新增 `detection_batches` 表 + `detection_tasks.batch_id`，支援批次影像分析（Phase 1：多圖上傳 + 每類別總數聚合 + Agent `batch_analysis` 模式） |
+| v1.0 | 2026-09-04 | migration `0011`：`detection_tasks` / `detection_batches` 新增 `class_thresholds_json`，支援各類別獨立 conf/IOU 閾值（image + batch） |

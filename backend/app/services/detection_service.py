@@ -1,11 +1,15 @@
 """
 Detection business logic for media inference.
 """
+import io
+import json
 import os
+import zipfile
 from pathlib import Path
 from uuid import uuid4
 
 from fastapi import HTTPException, UploadFile, status
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -16,7 +20,7 @@ from app.integrations.model_registry import (
     YoloModelSpec,
     get_yolo_model,
 )
-from app.integrations.yolo_engine import YoloEngine
+from app.integrations.yolo_engine import ClassThreshold, YoloEngine
 from app.models.detection_batch import DetectionBatch
 from app.models.detection_task import DetectionTask
 from app.models.user import User
@@ -24,6 +28,7 @@ from app.repositories import detection_repository
 from app.schemas.detection import (
     BatchDetailRead,
     BatchRead,
+    ClassThreshold as ClassThresholdSchema,
     DetectionObjectRead,
     DetectionTaskRead,
     DetectionTaskSummaryRead,
@@ -42,6 +47,97 @@ MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10 MB
 MAX_VIDEO_SIZE = 200 * 1024 * 1024  # 200 MB
 
 
+def parse_class_thresholds(
+    raw: str | None,
+    model_spec: YoloModelSpec,
+) -> dict[int, ClassThreshold] | None:
+    """Validate a per-class threshold JSON payload against a model's classes.
+
+    Expected shape, keyed by class id:
+    ``{"0": {"conf": 0.2, "iou": 0.4}, "4": {"conf": 0.5, "iou": 0.35}}``
+
+    Returns ``None`` for a missing/blank/empty payload so callers fall back to
+    the scalar thresholds. Class ids are checked against the *selected* model
+    so a stale UI (or a model switch) can't silently apply thresholds to the
+    wrong classes.
+    """
+    if raw is None:
+        return None
+    raw = raw.strip()
+    if not raw:
+        return None
+
+    try:
+        decoded = json.loads(raw)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"class_thresholds must be valid JSON: {exc}",
+        ) from exc
+
+    if not isinstance(decoded, dict):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail='class_thresholds must be a JSON object keyed by class id, e.g. {"0": {"conf": 0.2, "iou": 0.4}}',
+        )
+    if not decoded:
+        return None
+
+    valid_class_ids = set(model_spec.canonical_class_names)
+    parsed: dict[int, ClassThreshold] = {}
+    for raw_class_id, raw_threshold in decoded.items():
+        try:
+            class_id = int(raw_class_id)
+        except (TypeError, ValueError) as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"class_thresholds keys must be class ids: got {raw_class_id!r}",
+            ) from exc
+
+        if class_id not in valid_class_ids:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    f"class id {class_id} is not part of model '{model_spec.key}' "
+                    f"(valid ids: {sorted(valid_class_ids)})"
+                ),
+            )
+
+        try:
+            validated = ClassThresholdSchema.model_validate(raw_threshold)
+        except ValidationError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"invalid threshold for class {class_id}: {exc.errors()}",
+            ) from exc
+
+        parsed[class_id] = ClassThreshold(conf=validated.conf, iou=validated.iou)
+
+    return parsed
+
+
+def _class_thresholds_to_json(
+    class_thresholds: dict[int, ClassThreshold] | None,
+) -> dict | None:
+    """Serialize per-class thresholds for storage / API responses."""
+    if not class_thresholds:
+        return None
+    return {
+        str(class_id): {"conf": threshold.conf, "iou": threshold.iou}
+        for class_id, threshold in sorted(class_thresholds.items())
+    }
+
+
+def _class_thresholds_from_json(payload: dict | None) -> dict[int, ClassThreshold] | None:
+    """Rebuild per-class thresholds from a stored JSON column."""
+    if not payload:
+        return None
+    return {
+        int(class_id): ClassThreshold(conf=float(values["conf"]), iou=float(values["iou"]))
+        for class_id, values in payload.items()
+    }
+
+
 def create_image_detection(
     db: Session,
     *,
@@ -50,9 +146,10 @@ def create_image_detection(
     conf: float = 0.25,
     iou: float = 0.45,
     model_key: str | None = None,
+    class_thresholds: dict[int, ClassThreshold] | None = None,
 ) -> DetectionTaskRead:
     _validate_upload(file)
-    model_spec = _resolve_model(model_key)
+    model_spec = resolve_model(model_key)
 
     task = detection_repository.create_task(
         db,
@@ -65,6 +162,7 @@ def create_image_detection(
         model_class_map_json=model_spec.provenance_snapshot(),
         confidence_threshold=conf,
         iou_threshold=iou,
+        class_thresholds_json=_class_thresholds_to_json(class_thresholds),
         status="processing",
     )
 
@@ -76,7 +174,12 @@ def create_image_detection(
         detection_repository.update_task(db, task, source_image_path=source_rel_path)
 
         engine = YoloEngine(model_key=model_spec.key)
-        detection_result = engine.detect_image(source_fs_path, conf=conf, iou=iou)
+        detection_result = engine.detect_image(
+            source_fs_path,
+            conf=conf,
+            iou=iou,
+            class_thresholds=class_thresholds,
+        )
 
         result_fs_path, result_rel_path = _store_result_image(task.id, detection_result.annotated_image)
 
@@ -136,7 +239,7 @@ def create_video_detection_task(
     model_key: str | None = None,
 ) -> DetectionTaskRead:
     _validate_video_upload(file)
-    model_spec = _resolve_model(model_key)
+    model_spec = resolve_model(model_key)
 
     task = detection_repository.create_task(
         db,
@@ -254,6 +357,7 @@ def create_image_batch(
     iou: float = 0.45,
     model_key: str | None = None,
     name: str | None = None,
+    class_thresholds: dict[int, ClassThreshold] | None = None,
 ) -> BatchDetailRead:
     """Store every valid image in ``files`` as a pending task under one batch.
 
@@ -272,7 +376,7 @@ def create_image_batch(
             detail=f"Batch upload is limited to {settings.DETECTION_BATCH_MAX_FILES} files per request",
         )
 
-    model_spec = _resolve_model(model_key)
+    model_spec = resolve_model(model_key)
 
     valid_files: list[UploadFile] = []
     skipped_files: list[str] = []
@@ -288,6 +392,7 @@ def create_image_batch(
             detail="No valid image files found in the upload",
         )
 
+    class_thresholds_json = _class_thresholds_to_json(class_thresholds)
     batch = detection_repository.create_batch(
         db,
         user_id=current_user.id,
@@ -297,6 +402,7 @@ def create_image_batch(
         model_sha256=model_spec.current_sha256(),
         confidence_threshold=conf,
         iou_threshold=iou,
+        class_thresholds_json=class_thresholds_json,
         total_files=len(valid_files),
         skipped_files=skipped_files,
         status="processing",
@@ -315,6 +421,7 @@ def create_image_batch(
             model_class_map_json=model_spec.provenance_snapshot(),
             confidence_threshold=conf,
             iou_threshold=iou,
+            class_thresholds_json=class_thresholds_json,
             status="pending",
             batch_id=batch.id,
         )
@@ -355,6 +462,10 @@ def process_image_batch_task(*, batch_id: int, conf: float = 0.25, iou: float = 
         if batch is None or batch.status == "failed":
             return
 
+        # Read per-class thresholds from the batch row rather than the task
+        # arguments so a resumed batch keeps the settings it was created with.
+        class_thresholds = _class_thresholds_from_json(batch.class_thresholds_json)
+
         pending_tasks = detection_repository.get_pending_batch_tasks(db, batch_id)
         if not pending_tasks:
             _finalize_batch_status(db, batch)
@@ -387,7 +498,12 @@ def process_image_batch_task(*, batch_id: int, conf: float = 0.25, iou: float = 
                         detail="Source image not found for batch task",
                     )
 
-                detection_result = engine.detect_image(source_fs_path, conf=conf, iou=iou)
+                detection_result = engine.detect_image(
+                    source_fs_path,
+                    conf=conf,
+                    iou=iou,
+                    class_thresholds=class_thresholds,
+                )
                 result_fs_path, result_rel_path = _store_result_image(task.id, detection_result.annotated_image)
 
                 detection_repository.update_task(
@@ -478,6 +594,51 @@ def get_batch(db: Session, *, current_user: User, batch_id: int) -> BatchDetailR
     return _serialize_batch_detail(batch)
 
 
+def build_batch_results_zip(db: Session, *, current_user: User, batch_id: int) -> tuple[bytes, str]:
+    """Zip every completed result image in a batch for a single download.
+
+    Returns (zip_bytes, suggested_filename). Raises HTTPException(404) if the
+    batch has no result images yet (e.g. still processing or every task
+    failed), so the route can surface a clear error instead of an empty file.
+    """
+    batch = _get_owned_batch(db, current_user=current_user, batch_id=batch_id)
+
+    entries: list[tuple[str, Path]] = []
+    used_names: set[str] = set()
+    for task in batch.tasks:
+        if not task.result_image_path:
+            continue
+        fs_path = _static_root() / task.result_image_path
+        if not fs_path.is_file():
+            continue
+        arcname = _unique_zip_arcname(task, used_names)
+        used_names.add(arcname)
+        entries.append((arcname, fs_path))
+
+    if not entries:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="This batch has no completed result images to download yet",
+        )
+
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for arcname, fs_path in entries:
+            archive.write(fs_path, arcname=arcname)
+
+    filename = f"batch_{batch.id}_results.zip"
+    return buffer.getvalue(), filename
+
+
+def _unique_zip_arcname(task: DetectionTask, used_names: set[str]) -> str:
+    stem = Path(task.source_filename or f"task_{task.id}").stem or f"task_{task.id}"
+    safe_stem = "".join(char if char.isalnum() or char in "-_." else "_" for char in stem) or f"task_{task.id}"
+    candidate = f"{safe_stem}.jpg"
+    if candidate not in used_names:
+        return candidate
+    return f"{safe_stem}_task{task.id}.jpg"
+
+
 def delete_batch(db: Session, *, current_user: User, batch_id: int) -> None:
     batch = _get_owned_batch(db, current_user=current_user, batch_id=batch_id)
     for task in batch.tasks:
@@ -558,7 +719,12 @@ def _validate_upload(file: UploadFile) -> None:
         )
 
 
-def _resolve_model(model_key: str | None) -> YoloModelSpec:
+def resolve_model(model_key: str | None) -> YoloModelSpec:
+    """Look up a registered model, as an HTTP 400 if the key is unknown.
+
+    Public because routes resolve the model before the service call in order
+    to validate per-class thresholds against that model's class ids.
+    """
     try:
         return get_yolo_model(model_key)
     except YoloModelRegistryError as exc:
@@ -702,6 +868,7 @@ def _serialize_task_summary(task: DetectionTask) -> DetectionTaskSummaryRead:
         model_class_map=task.model_class_map_json,
         confidence_threshold=task.confidence_threshold,
         iou_threshold=task.iou_threshold,
+        class_thresholds=task.class_thresholds_json,
         status=task.status,
         inference_ms=task.inference_ms,
         image_width=task.image_width,
@@ -723,6 +890,7 @@ def _serialize_batch(batch: DetectionBatch) -> BatchRead:
         model_sha256=batch.model_sha256,
         confidence_threshold=batch.confidence_threshold,
         iou_threshold=batch.iou_threshold,
+        class_thresholds=batch.class_thresholds_json,
         status=batch.status,
         total_files=batch.total_files,
         processed_count=batch.processed_count,

@@ -209,6 +209,8 @@ Python module path，由
 | Phase 6A-5 | 品質修復與 Agent / 下載強化 | ✅ **已完成**（Agent prompt 捷徑修正、Web 下載結果圖/影片、chat_logs FK cascade、desktop session/執行緒修復） |
 | Phase 6A-6 | IME 輸入修復 + 對話滾動 + Agent Vision | ✅ **已完成**（中文輸入法送出誤判修復、對話 thread 滾動修復、`AGENT_ENABLE_VISION` 唯讀圖片附加） |
 | 批次影像分析 Phase 1 | 多圖 / 資料夾批次上傳 + 類別總數聚合 + Agent `batch_analysis` | ✅ **已完成**（`POST /api/detections/batch`、`detection_batches` 表、Web `/detections/batch` 頁面、Agent 新模式） |
+| 各類別閾值 Phase 1 | 各類別獨立 conf / IOU 閾值（image + batch） | ✅ **已完成**（migration `0011`、`class_thresholds` Form 欄位、Web `ClassThresholdEditor`；影片與 Desktop 未支援） |
+| 批次上限 1000 張 | 分片上傳 + 輪詢瘦身 + 中斷復原 | ⏳ 待辦（已完成瓶頸分析，見 AGENTS.md） |
 | Phase 6 | Docker、測試、部署文件完善 | ⏳ 待辦 |
 
 ---
@@ -340,6 +342,8 @@ Python module path，由
   - `admin/UserManagementPage`
 - `DetectionHistoryPage` 已針對大量紀錄優化：Web 寬螢幕使用固定高度雙欄與獨立捲動，分頁固定於列表底部；900px 以下改為 Task List / Detail 單面板切換
 - `ChatPage` 已統一 Conversations / Chat 面板高度；歷史對話清單獨立捲動、最多載入最近 100 組，並可透過 `DELETE /api/chat/{conversation_id}` 二次確認後刪除
+- Detection 影像預覽已共用 `ZoomableImage`：Object Detection、Detection Records 與 Batch Analysis 的結果圖可點擊開啟 modal，支援按鈕/滾輪縮放、放大後拖曳、重設與 `Esc` 關閉
+- Batch Analysis 的 Recent Batches / Batch Detail、Object Detection 的 Original / Result，以及 Detection Analyst 的 Settings / Chat panel 已統一高度與內容起點；結果圖下載按鈕統一顯示 `Download`
 - 已串接 backend API：
   - `/api/auth/login`
   - `/api/auth/register`
@@ -649,6 +653,55 @@ Desktop `AICSMain.py` 新增 `AgentApiThread` + `enable_agent_mode()` / `disable
 
 ---
 
+## 各類別閾值（per-class conf / IOU，2026-09-04）
+
+同一個模型的不同類別可以各自設定信心閾值與 NMS IOU，例如「ship 放寬到 conf 0.20 / IOU 0.40，
+airplane 收緊到 conf 0.50 / IOU 0.35」。適用於單張影像偵測與批次偵測。
+
+**為什麼可行**
+Ultralytics 的 `predict()` 只接受純量 `conf`/`iou`，所以後端改為「單次推論 + 分類別後處理」：
+以所有門檻的最小 `conf` 搭配 `iou=1.0`（等於關閉抑制）取得原始候選框，再依各類別自己的門檻
+過濾並重跑 class-aware NMS。這在數學上與「各類別分別用自己門檻推論」**等價而非近似**，兩個
+理由都有回歸測試（`backend/tests/test_per_class_thresholds.py`，21 項）：
+- 貪婪 NMS 依信心遞減處理，低於門檻的候選框不可能改變門檻以上框的存留結果
+- Ultralytics 預設的 NMS 本來就是分類別進行的，不同類別的框不會互相抑制
+
+**Backend**
+- migration `0011`：`detection_tasks` / `detection_batches` 新增 `class_thresholds_json`；原本的純量
+  `confidence_threshold` / `iou_threshold` 保留為未列出類別的預設值，既有紀錄與單一閾值請求不受影響
+- `class_thresholds` 以 multipart Form 欄位（JSON 字串）傳入，key 為 class id：
+  `{"0": {"conf": 0.20, "iou": 0.40}, "4": {"conf": 0.50, "iou": 0.35}}`
+- class id 會對照所選模型的 `canonical_class_names` 驗證，不符即回 400
+- 批次的背景任務從批次紀錄讀取設定，因此重啟續跑仍沿用同一組閾值
+- `DETECTION_PERCLASS_MAX_DET`（預設 3000）：關閉抑制後候選框變多，而 `max_det` 是在 NMS 之後
+  才套用，維持預設 300 會讓密集影像在自行抑制前就被截斷
+
+**Web**
+- 新元件 `ClassThresholdEditor`：類別清單直接取自 `/api/yolo-models` 既有的 `canonical_class_names`，
+  切換模型時自動重建並清掉失效的覆寫
+- `DetectionPage` / `BatchDetectionPage`：保留原本兩支全域滑桿當預設，新增「各類別自訂閾值」開關
+  與表格；結果區會顯示實際採用的 per-class 閾值
+
+**實測結果**（7 類模型、同一張密集影像）
+| 設定 | airplane | small-vehicle |
+|------|----------|---------------|
+| 全域 conf 0.20 | 20 | 113 |
+| 全域 conf 0.50 | 18 | 9 |
+| per-class（airplane 0.20 / small-vehicle 0.50） | **20** | **9** |
+
+per-class 同時保住了全域 0.50 會漏掉的 2 架 airplane，又把 small-vehicle 收到與全域 0.50 相同的
+9 個，這正是這個功能的用途。
+
+**已知限制**
+- 僅支援 image 與 batch；影片偵測仍只吃純量 conf/iou
+- Desktop PySide6 尚未提供對應 UI
+- 只改變後處理、不改變模型，因此無法找回信心低於所有門檻最小值的物件
+
+**驗證**：`alembic upgrade head`（含 downgrade 往返）通過、backend 47 項測試全數通過、
+`npm run build` 通過、並以真實模型與影像完成端到端實測（含權限與 400 錯誤路徑）。
+
+---
+
 ## Phase 3 手動驗證方式
 
 1. 啟 backend：
@@ -669,4 +722,4 @@ conda run -n yolo-backend python Login.py
 
 ---
 
-*最後更新: 批次影像分析 Phase 1 完成 — 2026-07-23*
+*最後更新: Web detection / analyst UI 對齊與可縮放影像檢視器 — 2026-09-04*

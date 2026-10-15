@@ -24,6 +24,10 @@ class DetectionBatch(Base):
     model_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
     confidence_threshold: Mapped[float | None] = mapped_column(Float, nullable=True)
     iou_threshold: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # Per-class overrides, keyed by class id as a string:
+    # {"0": {"conf": 0.2, "iou": 0.4}}. Classes absent here fall back to the
+    # scalar thresholds above.
+    class_thresholds_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     status: Mapped[str] = mapped_column(String(30), nullable=False, default="pending", index=True)
     total_files: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     processed_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

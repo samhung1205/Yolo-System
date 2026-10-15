@@ -116,6 +116,12 @@ def generate_detection_report_markdown_tool(
     lines.append(
         "- Bounding boxes describe model output; they do not segment the object."
     )
+    lines.append(
+        "- For oriented bounding box (OBB) models, the stored bbox is the "
+        "axis-aligned rectangle enclosing the rotated detection — the "
+        "rotation angle itself is not persisted (the annotated result image "
+        "still shows the true rotated box)."
+    )
     lines.append("")
 
     lines.append("## 7. Suggested Next Steps")

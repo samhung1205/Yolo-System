@@ -451,8 +451,9 @@ export default function AgentPage() {
           </label>
 
           <label className="field">
-            <span>
-              Detection ID{requiresDetectionId ? "" : "（一般模式可留空）"}
+            <span className="field-label-row">
+              <span>Detection ID</span>
+              <span className="field-requirement">{requiresDetectionId ? "Required" : "Optional"}</span>
             </span>
             <input
               type="number"
@@ -464,20 +465,19 @@ export default function AgentPage() {
             />
             {detectionIdMissingWarning ? (
               <span className="field-hint field-hint-warning">
-                {mode === "report" ? "Generate Report" : "Explain Detection"}{" "}
-                模式需要填入 Detection ID，才能讀取這筆偵測的圖片與 bounding box 資料。
+                Required for {mode === "report" ? "Generate Report" : "Explain Detection"}.
               </span>
             ) : autoModeMissingDetectionId ? (
               <span className="field-hint">
-                提示：若要問「這張圖有沒有 XXX」之類的問題，請先填入該筆偵測的 Detection ID，
-                否則 Agent 會當作一般聊天回答、讀不到任何偵測資料。
+                Add an ID to analyze a saved detection; otherwise Auto mode uses general chat.
               </span>
             ) : null}
           </label>
 
           <label className="field">
-            <span>
-              Batch ID{requiresBatchId ? "" : "（僅批次分析模式需要）"}
+            <span className="field-label-row">
+              <span>Batch ID</span>
+              <span className="field-requirement">{requiresBatchId ? "Required" : "Optional"}</span>
             </span>
             <input
               type="number"
@@ -489,8 +489,7 @@ export default function AgentPage() {
             />
             {batchIdMissingWarning ? (
               <span className="field-hint field-hint-warning">
-                Batch Analysis 模式需要填入 Batch ID，才能統計該批影像的偵測結果。
-                可到「Batch Analysis」頁面上傳影像後取得 Batch ID。
+                Required for Batch Analysis. Find the ID on the Batch Analysis page.
               </span>
             ) : null}
           </label>

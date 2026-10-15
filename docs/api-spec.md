@@ -2,7 +2,7 @@
 
 > **版本**: v0.9 (Chat conversation delete)
 > **Base URL**: `http://localhost:8000`  
-> **最後更新**: 2026-07-24
+> **最後更新**: 2026-09-04
 
 ---
 
@@ -400,9 +400,12 @@ data: {"type":"error","message":"錯誤訊息"}
 **Query Params**
 - `conf` (float, default `0.25`)
 - `iou` (float, default `0.45`)
+- `model_key` (string, optional)
 
 **Request Body**
 - `file`: 圖片檔案
+- `class_thresholds` (string, optional)：各類別自訂閾值，JSON 字串，以 class id 為 key。
+  未列出的類別沿用上面的 `conf` / `iou`。詳見「各類別閾值」一節。
 
 **Response 201**
 ```json
@@ -422,6 +425,9 @@ data: {"type":"error","message":"錯誤訊息"}
   "preview_image_path": null,
   "preview_image_url": null,
   "model_name": "yolo11n.pt",
+  "confidence_threshold": 0.25,
+  "iou_threshold": 0.45,
+  "class_thresholds": null,
   "status": "completed",
   "inference_ms": 123.45,
   "image_width": 1280,
@@ -443,6 +449,38 @@ data: {"type":"error","message":"錯誤訊息"}
   ]
 }
 ```
+
+#### 各類別閾值（per-class conf / IOU）
+
+適用於 `POST /api/detections/image` 與 `POST /api/detections/batch`（影片尚未支援）。
+
+`class_thresholds` 是 multipart body 中的一個 JSON 字串欄位（不是 query param，因為它是
+會隨類別數成長的結構化資料）：
+
+```json
+{"0": {"conf": 0.20, "iou": 0.40}, "4": {"conf": 0.50, "iou": 0.35}}
+```
+
+- key 是 class id（字串），必須屬於 `model_key` 所指模型的 `canonical_class_names`，
+  否則回 400。可用的 class id 由 `GET /api/yolo-models` 提供。
+- `conf` / `iou` 皆須介於 0.0 與 1.0 之間。
+- 未列出的類別沿用 query param 的 `conf` / `iou`。
+- 省略此欄位（或傳空物件 `{}`）時，行為與過去完全相同。
+- 回應與資料庫都會回填實際採用的 `class_thresholds`，作為 provenance 記錄。
+
+**實作方式**：仍然只推論一次。後端以所有門檻的最小 `conf` 搭配 `iou=1.0`（等於關閉抑制）
+取得原始候選框，再依各類別自己的 `conf` 過濾、各自的 `iou` 重跑 class-aware NMS。這在數學上
+與「各類別分別用自己的門檻推論」等價，而非近似：貪婪 NMS 依信心遞減處理，較低信心的候選框
+不可能改變較高信心框的存留結果；而 Ultralytics 預設的 NMS 本來就是分類別進行的。
+`backend/tests/test_per_class_thresholds.py` 對此等價性有回歸測試。
+
+**限制**：這只改變後處理，不改變模型，因此無法找回信心低於所有門檻最小值的物件。
+候選框上限由 `DETECTION_PERCLASS_MAX_DET`（預設 3000）控制。
+
+**錯誤**
+| 狀態碼 | 說明 |
+|--------|------|
+| 400 | JSON 格式錯誤、不是物件、class id 不屬於該模型、或 conf/iou 超出 0–1 |
 
 ### POST /api/detections/video
 > 單支影片 YOLO 偵測，建立 task 後以背景任務執行
@@ -549,6 +587,9 @@ data: {"type":"error","message":"錯誤訊息"}
 **Request Body**
 - `files`: 多個圖片檔案（multipart，欄位名 `files`），單次最多 `DETECTION_BATCH_MAX_FILES`（預設 100，可透過 `.env` 調整，未來規劃提高到 500）
 - 非圖片格式的檔案會被略過（記錄在 `skipped_files`），不會中斷整批請求
+- `class_thresholds` (string, optional)：整批共用的各類別自訂閾值，格式與
+  `POST /api/detections/image` 相同（見「各類別閾值」一節）。會同時記錄在批次與每個 task 上，
+  背景任務從批次紀錄讀取，因此重啟後續跑仍沿用同一組設定。
 
 **Response 202**
 ```json
@@ -561,6 +602,7 @@ data: {"type":"error","message":"錯誤訊息"}
   "model_sha256": "530e4cd5...",
   "confidence_threshold": 0.25,
   "iou_threshold": 0.45,
+  "class_thresholds": { "6": { "conf": 0.5, "iou": 0.35 } },
   "status": "processing",
   "total_files": 42,
   "processed_count": 0,
@@ -792,3 +834,5 @@ Desktop 端使用 `DesktopApiClient.stream_agent_chat()`（`AICSMain.py → Agen
 - video detection 目前只保存 preview frame 的 detection objects，不保存每一幀結果
 - webcam / RTSP / 串流尚未 backend 化
 - Chat `/api/chat` streaming（`/api/chat/stream`）Web 前端尚未接入 SSE
+- `class_thresholds` 目前僅支援 image 與 batch；`POST /api/detections/video` 仍只吃純量 conf/iou
+- Desktop PySide6 尚未提供各類別閾值 UI（僅 Web 支援）

@@ -75,7 +75,81 @@
 
 ## 當前 Phase
 
-> **目前已完成至「批次影像分析 Phase 1」（多圖/資料夾批次上傳 + 類別總數聚合 + Agent `batch_analysis` 模式）。下一步：批次分析 Phase 2（空間關係推論）或 Phase 6（Docker、測試、部署文件完善），視優先順序決定。**
+> **目前已完成至「各類別閾值 Phase 1」（per-class conf/IOU，image + batch，Web UI）。下一步：批次上限提高（輪詢瘦身 → 分片上傳 → 1000 張）、批次分析 Phase 2（空間關係推論），或 Phase 6（Docker、測試、部署文件完善），視優先順序決定。**
+
+**各類別閾值（per-class conf / IOU）— ✅ 完成（2026-09-04）**
+
+*背景與可行性驗證*
+Ultralytics 的 `predict()` 只接受純量 `conf`/`iou`，因此 per-class 必須自行後處理。實作前已用
+`pt/7classes/yolo11n_base.pt` 與真實影像實測兩個等價性假設（各 6/6 通過），確認可做到**精確**
+而非近似：
+- **conf**：以最小門檻推論後再按類別過濾，結果與「該類別直接用自己門檻推論」完全相同。原因是
+  貪婪 NMS 依信心遞減處理，低於門檻的候選框不可能改變門檻以上框的存留。
+- **IOU**：以 `iou=1.0`（等於關閉抑制）取得原始候選框後自行重跑 class-aware NMS，可完整重現
+  Ultralytics 自己在該 IOU 下的輸出。成立前提是 Ultralytics 預設 NMS 本來就是分類別進行的。
+
+*Backend*
+- [x] migration `0011`：`detection_tasks` / `detection_batches` 新增 `class_thresholds_json`（純量欄位保留為未列出類別的預設值，既有紀錄不受影響）
+- [x] `app/integrations/yolo_engine.py`：新增 `ClassThreshold` dataclass、`detect_image(..., class_thresholds=)`、`_apply_per_class_thresholds()`。**仍然只推論一次**；過濾後把結果寫回 `result.boxes`，因此 `result.plot()` 標註圖與物件抽取都沿用既有邏輯，不必自寫繪圖
+- [x] `app/services/detection_service.py`：`parse_class_thresholds()`（JSON 解析 + 對照所選模型的 class id 驗證 + conf/iou 範圍檢查，全部回 400）、`_class_thresholds_to_json()` / `_class_thresholds_from_json()`；`resolve_model()` 由 `_resolve_model` 改為公開，供 route 先解析模型再驗證閾值
+- [x] `app/api/routes/detections.py`：`class_thresholds` 以 multipart **Form 欄位**（JSON 字串）接收，而非 query param，因為它是隨類別數成長的結構化資料
+- [x] `process_image_batch_task()`：從**批次紀錄**讀取 per-class 設定（而非任務參數），所以重啟續跑仍沿用同一組閾值
+- [x] `core/config.py` / `.env.example`：`DETECTION_PERCLASS_MAX_DET=3000`（關閉抑制後候選框變多，而 `max_det` 是在 NMS 之後才套用，維持預設 300 會讓密集影像被提前截斷）
+- [x] `tests/test_per_class_thresholds.py`：21 項測試，涵蓋兩個等價性性質、類別間不互相干擾、輸出排序、以及所有驗證錯誤路徑
+
+*Web*
+- [x] 新元件 `components/ClassThresholdEditor.jsx`：類別清單直接取自 `/api/yolo-models` 既有的 `canonical_class_names`（**無需新增端點**）；切換模型時自動清掉不存在的類別覆寫，避免送出後端會拒絕的 class id
+- [x] `DetectionPage.jsx` / `BatchDetectionPage.jsx`：保留原本兩支全域滑桿作為預設，新增「各類別自訂閾值」開關與表格；結果區顯示實際採用的 per-class 閾值
+- [x] `detectionService.js`：`_appendClassThresholds()` 共用 helper，空選擇時完全不送該欄位
+- [x] `styles.css`：`.class-threshold-editor` / `.class-threshold-toggle` / `.class-threshold-table` / `.class-threshold-reset`
+
+*已知限制（記錄為後續待辦）*
+- [ ] 僅支援 image 與 batch；`POST /api/detections/video` 仍只吃純量 conf/iou
+- [ ] Desktop PySide6 尚未提供各類別閾值 UI（僅 Web）
+- [ ] 這只改變後處理，不改變模型，無法找回信心低於所有門檻最小值的物件
+
+**批次上限提高到 1000 張 — 尚未實作（已完成瓶頸分析）**
+
+實測本機單張推論約 88ms（CPU；`torch.backends.mps.is_available()` 為 False），1000 張純推論僅約
+1.5 分鐘，**運算不是瓶頸**。真正需要先處理的依嚴重度排序：
+- [ ] **輪詢 API**（最先出問題）：`GET /api/detections/batches/{id}` 會回傳整批每一張的 task，且
+  `get_batch()` 以 `selectinload` 連所有 `detection_objects` 一起載入。1000 張約 4 萬個 ORM 物件、
+  約 5000 次 `_to_static_url` HMAC 簽章，而前端每 2 秒輪詢一次。應拆成「輕量進度端點」+
+  「分頁的 tasks 端點」，且 `object_count` 改用 SQL `GROUP BY` 而非 `len(task.objects)`
+- [ ] **單一上傳請求**：1000 檔在一個 multipart 請求內同步落地，最壞達 10GB，且全有全無。應改為
+  分片上傳（先建批次 → 每 20–50 張一片 → start）
+- [ ] **中斷復原**：`BackgroundTasks` 在行程重啟後會讓 task 永久卡在 `pending`。`get_pending_batch_tasks`
+  只挑 `pending`，所以 `process_image_batch_task` 本來就是可重入的，加一支 resume 端點與啟動時的
+  孤兒批次掃描即可，不需要導入 job queue
+- [ ] **前端渲染**：批次結果目前每張都渲染縮圖卡片，1000 張需分頁 / 虛擬化 + `loading="lazy"`
+
+**維運小工具**
+- [x] `backend/scripts/update_model_hash.py`：重新訓練 / 置換 `pt/**/*.pt` checkpoint 後，用來重新計算並回填 `app/integrations/model_registry.py` 裡 `expected_sha256` 的工具。每個 checkpoint 都有 SHA-256 指紋校驗（防止任意置換模型檔案），置換檔案後若沒同步更新指紋，該模型會在 UI 上被判定為「不可用」（`Checkpoint fingerprint changed`）。此工具會先用 ultralytics 實際載入新檔案，驗證 `task` 與 class mapping 是否仍跟 registry 一致，驗證失敗才會拒絕更新（避免誤解鎖架構或類別不同的檔案）。
+  用法（於 `backend/` 目錄，建議在 `yolo-backend` conda 環境下執行）：
+  - `python scripts/update_model_hash.py --list`：列出所有模型目前的指紋狀態
+  - `python scripts/update_model_hash.py <model_key>`：更新單一模型（key 可從 `--list` 查到）
+  - `python scripts/update_model_hash.py --all`：掃描並更新所有指紋不符的模型
+  - 任何指令加 `--dry-run`：只顯示會發生什麼，不寫入檔案
+  - 詳細行為見 `backend/tests/test_update_model_hash_script.py`
+  - **注意**：此工具只會更新「已存在於 registry 的 key」的指紋，**不能**用來新增全新的 checkpoint 條目，也不能翻轉 `selectable` 這種架構層級開關——這兩種情境需要實際改 `model_registry.py`（見下方 OBB / COCO 模型開放紀錄）。
+
+**新增可用模型：`pt/yolo11n.pt`（官方 COCO 預訓練）+ 開放 OBB 模型（2026-09-04）**
+- [x] `model_registry.py`：新增 `coco80_base`（`pt/yolo11n.pt`，官方 YOLO11n、COCO 80 類別、`input_size=640`），可獨立於自訂海事資料集之外使用泛用物件偵測
+- [x] `model_registry.py`：`four_class_obb`（`pt/yolo11n_obb.pt`）從 `selectable=False` 改為可選——原本因為「OBB 輸出跟 axis-aligned bbox pipeline 不相容」被停用
+- [x] `yolo_engine.py`：新增 `_detection_source()`，統一從 `result.boxes`（一般 detect/track 模型）或 `result.obb`（OBB 模型）取出偵測結果；OBB 模型存入 `detection_objects` 的 bbox 是「涵蓋旋轉框的 axis-aligned 外接矩形」（`obb.xyxy`），**不保留旋轉角度**，但標註結果圖（`result.plot()`）仍會畫出真正的旋轉框（ultralytics 原生支援）
+- [x] `yolo_engine.py`：OBB 模型 + `class_thresholds`（單類別信心門檻）組合會直接回 400 錯誤（該功能目前只支援 axis-aligned 模型，避免靜默套用錯誤的過濾邏輯）
+- [x] `report_tools.py`：報告「Limitations」區塊補充 OBB bbox 為外接矩形近似值的說明
+- [x] `tests/test_yolo_model_registry.py`：新增 OBB 結果解析、`coco80_base` 類別數量的測試
+- **已知限制**：OBB 旋轉角度不會存進資料庫（僅存外接矩形），未來若要做旋轉框空間推論需要幫 `detection_objects` 加欄位（migration）
+
+**新增 `pt/7classes-pre/` 三個模型 + 補齊原本 7-class 指紋（2026-09-07）**
+- [x] `pt/7classes/*.pt`（base/asff/dysample）三個檔案已被置換但指紋尚未同步 → 用 `scripts/update_model_hash.py --all` 驗證後統一更新
+- [x] 新增 `pt/7classes-pre/` 資料夾（3 個全新 checkpoint，跟 `pt/7classes/` 內容不同、非重複檔案，已用 sha256 比對確認）→ 註冊 3 個新 key：`seven_class_base_pre` / `seven_class_asff_pre` / `seven_class_dysample_pre`，display name 加註「Pre」字樣（沿用資料夾命名，class mapping 與現有 7-class 完全相同）
+  - display name 的「Pre」只是暫時沿用資料夾名稱，若需要更貼切的說法（例如「訓練前基準」「第二批實驗」等），跟我說一聲即可快速改名，不影響其他邏輯
+- [x] `legacy_checkpoint_compat.py`：`_MODEL_MODULES` 補上 `seven_class_asff_pre` → `ASFFHead`、`seven_class_dysample_pre` → `SCAM_DySample`（沿用既有自訂模組原始碼，跟非 pre 版本共用同一份 `.py`）
+- [x] 三個新模型都已用 `ultralytics.YOLO` 實際載入驗證 task/類別對應，並跑過 `YoloEngine.detect_image()` 端到端煙霧測試（含畫框、存物件清單）
+- [x] `tests/test_yolo_model_registry.py`：更新可用模型集合、新增 pre vs 主要 7-class 指紋各自獨立的測試
+- 目前完整可用模型（12 個）：4-class base/ASFF/DySample/EfficientViM、7-class base/ASFF/DySample（含各自 pre 版本共 3 個）、OBB、COCO-80
 
 **批次影像分析 Phase 1 — ✅ 完成（2026-07-23 多圖/資料夾批次上傳 + 確定性聚合統計）**
 
@@ -304,6 +378,8 @@ cd backend && uvicorn main:app --reload
 - [x] 建立 `DetectionPage`
 - [x] 建立 `DetectionHistoryPage`（含篩選 / 分頁 / 刪除）
 - [x] `DetectionHistoryPage` 大量紀錄 UX：固定高度雙欄、Task List / Detail 獨立捲動、固定分頁列、900px 以下單面板切換
+- [x] Detection 影像檢視 UX：新增共用 `ZoomableImage`，Object Detection / Detection Records / Batch Analysis 結果圖可在 modal 內縮放、拖曳與重設；下載按鈕統一為 `Download`
+- [x] Detection 頁面對齊：Batch 的 Recent/Detail、Object Detection 的 Original/Result、Detection Analyst 的 Settings/Chat panel 等高，且 ID 欄位改為短標籤 + Required/Optional badge
 - [x] 建立 `ProfilePage`（含 nickname / password 自我更新）
 - [x] 建立 `ChatPage`
 - [x] `ChatPage` 大量對話 UX：左右面板同高、Conversations 獨立捲動、最近 100 組紀錄、conversation 級二次確認刪除
@@ -424,4 +500,4 @@ cd backend && uvicorn main:app --reload --port 8000
 
 ---
 
-*最後更新: AI Chat Conversations UX 與刪除功能 — 2026-07-24*
+*最後更新: Web detection / analyst UI 對齊與可縮放影像檢視器 — 2026-09-04*

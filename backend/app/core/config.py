@@ -84,6 +84,12 @@ class Settings(BaseSettings):
     # raise once background processing throughput has been validated in
     # production (README/AGENTS.md tracks this as a follow-up).
     DETECTION_BATCH_MAX_FILES: int = 100
+    # Per-class threshold detection disables Ultralytics' own NMS (iou=1.0) so
+    # the raw candidate boxes can be re-suppressed with each class's own IoU.
+    # Ultralytics applies `max_det` *after* NMS, so with suppression disabled
+    # the default (300) would truncate dense images before we ever run our own
+    # NMS. This ceiling only applies to per-class requests.
+    DETECTION_PERCLASS_MAX_DET: int = 3000
 
     # App
     APP_ENV: str = "development"

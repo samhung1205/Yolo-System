@@ -40,6 +40,18 @@ async function _describeBlobError(error) {
   return normalizeApiError(error, "下載失敗");
 }
 
+/** Trigger a browser "Save As" for an in-memory blob via a throwaway anchor. */
+function _saveBlob(blob, filename) {
+  const blobUrl = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = blobUrl;
+  anchor.download = filename || "download";
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(blobUrl);
+}
+
 // Image detection is a synchronous request: the backend blocks on YOLO
 // model load (cold start) + inference + result-image save before replying.
 // The shared axios instance's default timeout (30s) is tuned for fast JSON
@@ -48,10 +60,23 @@ async function _describeBlobError(error) {
 // 180s mirrors the desktop client's INFERENCE_TIMEOUT for consistency.
 const INFERENCE_TIMEOUT_MS = 180000;
 
+/**
+ * Serialize per-class thresholds for the `class_thresholds` form field.
+ *
+ * The backend expects a JSON object keyed by class id — `{"0": {"conf": 0.2,
+ * "iou": 0.4}}` — and treats an absent field as "use the scalar conf/iou for
+ * every class", so an empty selection is omitted entirely.
+ */
+function _appendClassThresholds(formData, classThresholds) {
+  if (!classThresholds || Object.keys(classThresholds).length === 0) return;
+  formData.append("class_thresholds", JSON.stringify(classThresholds));
+}
+
 const detectionService = {
   async detectImage(file, options = {}) {
     const formData = new FormData();
     formData.append("file", file);
+    _appendClassThresholds(formData, options.classThresholds);
 
     const params = new URLSearchParams();
     params.set("conf", String(options.conf ?? 0.25));
@@ -85,6 +110,7 @@ const detectionService = {
     for (const file of files) {
       formData.append("files", file);
     }
+    _appendClassThresholds(formData, options.classThresholds);
 
     const params = new URLSearchParams();
     params.set("conf", String(options.conf ?? 0.25));
@@ -173,15 +199,33 @@ const detectionService = {
       throw new Error(await _describeBlobError(err));
     }
 
-    const blobUrl = URL.createObjectURL(response.data);
-    const anchor = document.createElement("a");
-    anchor.href = blobUrl;
-    anchor.download =
-      filename || decodeURIComponent(String(pathOrUrl).split("/").pop().split("?")[0] || "detection-result");
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    URL.revokeObjectURL(blobUrl);
+    _saveBlob(
+      response.data,
+      filename || decodeURIComponent(String(pathOrUrl).split("/").pop().split("?")[0] || "detection-result")
+    );
+  },
+
+  /**
+   * Download every completed result image in a batch as a single .zip.
+   * The backend builds the archive on demand (`GET
+   * /api/detections/batches/{id}/download`), so this is one authenticated
+   * request rather than one per image — avoids browsers blocking/prompting
+   * on a burst of simultaneous single-file downloads.
+   */
+  async downloadBatchZip(batchId, filename) {
+    if (!batchId) return;
+
+    let response;
+    try {
+      response = await api.get(`/api/detections/batches/${batchId}/download`, {
+        responseType: "blob",
+        timeout: INFERENCE_TIMEOUT_MS,
+      });
+    } catch (err) {
+      throw new Error(await _describeBlobError(err));
+    }
+
+    _saveBlob(response.data, filename || `batch_${batchId}_results.zip`);
   },
 };
 

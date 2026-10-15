@@ -6,7 +6,18 @@ Phase 3 補完 adds filter + pagination to GET /api/detections.
 import math
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Query, Response, UploadFile, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    Form,
+    Query,
+    Response,
+    UploadFile,
+    status,
+)
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_user, get_db
@@ -15,6 +26,19 @@ from app.schemas.detection import BatchDetailRead, BatchRead, DetectionTaskRead,
 from app.services import detection_service
 
 router = APIRouter()
+
+# Per-class thresholds arrive as a JSON string in the multipart body rather
+# than as a query param: it is structured data that grows with class count,
+# and the request is already multipart because of the file upload.
+# The default is supplied at each call site with `= None`; FastAPI rejects a
+# default set inside an `Annotated` Form().
+CLASS_THRESHOLDS_FORM = Form(
+    description=(
+        'Optional per-class threshold overrides as JSON keyed by class id, e.g. '
+        '{"0": {"conf": 0.2, "iou": 0.4}, "4": {"conf": 0.5, "iou": 0.35}}. '
+        "Classes not listed fall back to the scalar conf/iou."
+    ),
+)
 
 
 # NOTE: the /batch(es) routes are registered before "/{detection_id}" so the
@@ -30,7 +54,12 @@ def detect_image_batch(
     iou: float = Query(default=0.45, ge=0.0, le=1.0),
     model_key: str | None = Query(default=None, min_length=1, max_length=100),
     name: str | None = Query(default=None, max_length=255),
+    class_thresholds: Annotated[str | None, CLASS_THRESHOLDS_FORM] = None,
 ):
+    parsed_thresholds = detection_service.parse_class_thresholds(
+        class_thresholds,
+        detection_service.resolve_model(model_key),
+    )
     batch = detection_service.create_image_batch(
         db,
         current_user=current_user,
@@ -39,6 +68,7 @@ def detect_image_batch(
         iou=iou,
         model_key=model_key,
         name=name,
+        class_thresholds=parsed_thresholds,
     )
     background_tasks.add_task(
         detection_service.process_image_batch_task,
@@ -80,6 +110,25 @@ def get_detection_batch(
     return detection_service.get_batch(db, current_user=current_user, batch_id=batch_id)
 
 
+@router.get("/batches/{batch_id}/download")
+def download_detection_batch_results(
+    batch_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """Zip every completed result image in the batch for a single download."""
+    zip_bytes, filename = detection_service.build_batch_results_zip(
+        db,
+        current_user=current_user,
+        batch_id=batch_id,
+    )
+    return StreamingResponse(
+        iter([zip_bytes]),
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @router.delete("/batches/{batch_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_detection_batch(
     batch_id: int,
@@ -97,7 +146,12 @@ def detect_image(
     conf: float = Query(default=0.25, ge=0.0, le=1.0),
     iou: float = Query(default=0.45, ge=0.0, le=1.0),
     model_key: str | None = Query(default=None, min_length=1, max_length=100),
+    class_thresholds: Annotated[str | None, CLASS_THRESHOLDS_FORM] = None,
 ):
+    parsed_thresholds = detection_service.parse_class_thresholds(
+        class_thresholds,
+        detection_service.resolve_model(model_key),
+    )
     return detection_service.create_image_detection(
         db,
         current_user=current_user,
@@ -105,6 +159,7 @@ def detect_image(
         conf=conf,
         iou=iou,
         model_key=model_key,
+        class_thresholds=parsed_thresholds,
     )
 
 

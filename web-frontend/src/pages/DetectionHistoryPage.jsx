@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import ZoomableImage from "../components/ZoomableImage";
 import detectionService from "../services/detectionService";
 import { buildAssetUrl, normalizeApiError } from "../services/api";
 
@@ -405,7 +406,7 @@ export default function DetectionHistoryPage() {
                         )
                       }
                     >
-                      {downloadingAsset === selected.result_image_url ? "下載中..." : "下載結果圖"}
+                      {downloadingAsset === selected.result_image_url ? "Downloading..." : "Download"}
                     </button>
                   ) : null}
                   {selected.result_video_url ? (
@@ -426,10 +427,10 @@ export default function DetectionHistoryPage() {
                 </div>
 
                 {selected.result_image_url ? (
-                  <img
-                    className="result-image"
+                  <ZoomableImage
                     src={buildAssetUrl(selected.result_image_url)}
                     alt="Detection detail result"
+                    title={`Detection #${selected.id}`}
                   />
                 ) : null}
 

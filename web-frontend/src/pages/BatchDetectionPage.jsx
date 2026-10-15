@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import ClassThresholdEditor from "../components/ClassThresholdEditor";
+import ZoomableImage from "../components/ZoomableImage";
 import detectionService from "../services/detectionService";
 import { buildAssetUrl, normalizeApiError } from "../services/api";
 
@@ -13,6 +15,8 @@ export default function BatchDetectionPage() {
   const [files, setFiles] = useState([]);
   const [conf, setConf] = useState(0.25);
   const [iou, setIou] = useState(0.45);
+  const [perClassEnabled, setPerClassEnabled] = useState(false);
+  const [classThresholds, setClassThresholds] = useState({});
   const [yoloModels, setYoloModels] = useState([]);
   const [modelKey, setModelKey] = useState("");
   const [modelsLoading, setModelsLoading] = useState(true);
@@ -24,11 +28,18 @@ export default function BatchDetectionPage() {
   const [selectedBatch, setSelectedBatch] = useState(null);
   const [deleteError, setDeleteError] = useState("");
   const [deleting, setDeleting] = useState(false);
+  const [downloadingAsset, setDownloadingAsset] = useState("");
+  const [downloadError, setDownloadError] = useState("");
 
   const pollTimerRef = useRef(null);
   const fileInputRef = useRef(null);
 
   const maxFiles = 100;
+
+  const selectedModel = useMemo(
+    () => yoloModels.find((model) => model.key === modelKey),
+    [yoloModels, modelKey]
+  );
 
   const loadBatches = useCallback(async () => {
     setBatchesLoading(true);
@@ -110,6 +121,7 @@ export default function BatchDetectionPage() {
         conf,
         iou,
         modelKey,
+        classThresholds: perClassEnabled ? classThresholds : null,
       });
       setSelectedBatch(batch);
       setFiles([]);
@@ -129,6 +141,39 @@ export default function BatchDetectionPage() {
       setDeleteError("");
     } catch (err) {
       setError(normalizeApiError(err, "無法載入批次詳情"));
+    }
+  }
+
+  async function handleDownloadTaskImage(task) {
+    if (!task.result_image_url) return;
+    const key = `task-${task.id}`;
+    setDownloadingAsset(key);
+    setDownloadError("");
+    try {
+      await detectionService.downloadAsset(
+        task.result_image_url,
+        `${task.source_filename?.replace(/\.[^.]+$/, "") || `task_${task.id}`}_result.jpg`
+      );
+    } catch (err) {
+      setDownloadError(normalizeApiError(err, "下載失敗"));
+    } finally {
+      setDownloadingAsset("");
+    }
+  }
+
+  async function handleDownloadBatchZip() {
+    if (!selectedBatch) return;
+    setDownloadingAsset("batch-zip");
+    setDownloadError("");
+    try {
+      await detectionService.downloadBatchZip(
+        selectedBatch.id,
+        `batch_${selectedBatch.id}_results.zip`
+      );
+    } catch (err) {
+      setDownloadError(normalizeApiError(err, "整批下載失敗"));
+    } finally {
+      setDownloadingAsset("");
     }
   }
 
@@ -229,6 +274,17 @@ export default function BatchDetectionPage() {
             </label>
           </div>
 
+          <ClassThresholdEditor
+            classNames={selectedModel?.canonical_class_names}
+            enabled={perClassEnabled}
+            onToggle={setPerClassEnabled}
+            values={classThresholds}
+            onChange={setClassThresholds}
+            defaultConf={conf}
+            defaultIou={iou}
+            disabled={uploading}
+          />
+
           {error ? <div className="alert alert-error" role="alert" aria-live="assertive">{error}</div> : null}
 
           <button type="submit" className="button" disabled={!files.length || !modelKey || uploading}>
@@ -237,39 +293,43 @@ export default function BatchDetectionPage() {
         </form>
       </section>
 
-      <section className="history-layout">
-        <div className="panel">
-          <h2>Recent Batches</h2>
-          {batchesLoading ? (
-            <p className="muted">載入中...</p>
-          ) : (
-            <div className="list-stack">
-              {batches.map((batch) => (
-                <button
-                  type="button"
-                  key={batch.id}
-                  className={
-                    selectedBatch?.id === batch.id ? "list-item list-item-active" : "list-item"
-                  }
-                  onClick={() => handleSelectBatch(batch.id)}
-                >
-                  <div className="list-item-title">
-                    #{batch.id} · {batch.name || "batch upload"}
-                  </div>
-                  <div className="muted small">
-                    <span className={`status-badge status-${batch.status}`}>{batch.status}</span>{" "}
-                    {batch.processed_count}/{batch.total_files} 張
-                    {batch.failed_count ? ` · ${batch.failed_count} 失敗` : ""}
-                  </div>
-                </button>
-              ))}
-              {!batches.length ? <p className="muted">尚無批次紀錄。</p> : null}
-            </div>
-          )}
+      <section className="batch-review-layout">
+        <div className="panel batch-review-panel">
+          <div className="panel-header-row batch-review-header">
+            <h2>Recent Batches</h2>
+          </div>
+          <div className="batch-review-scroll">
+            {batchesLoading ? (
+              <p className="muted">載入中...</p>
+            ) : (
+              <div className="list-stack">
+                {batches.map((batch) => (
+                  <button
+                    type="button"
+                    key={batch.id}
+                    className={
+                      selectedBatch?.id === batch.id ? "list-item list-item-active" : "list-item"
+                    }
+                    onClick={() => handleSelectBatch(batch.id)}
+                  >
+                    <div className="list-item-title">
+                      #{batch.id} · {batch.name || "batch upload"}
+                    </div>
+                    <div className="muted small">
+                      <span className={`status-badge status-${batch.status}`}>{batch.status}</span>{" "}
+                      {batch.processed_count}/{batch.total_files} 張
+                      {batch.failed_count ? ` · ${batch.failed_count} 失敗` : ""}
+                    </div>
+                  </button>
+                ))}
+                {!batches.length ? <p className="muted">尚無批次紀錄。</p> : null}
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className="panel">
-          <div className="panel-header-row">
+        <div className="panel batch-review-panel">
+          <div className="panel-header-row batch-review-header">
             <h2>Batch Detail</h2>
             {selectedBatch ? (
               <button
@@ -283,84 +343,127 @@ export default function BatchDetectionPage() {
             ) : null}
           </div>
 
-          {deleteError ? <div className="alert alert-error" role="alert">{deleteError}</div> : null}
+          <div className="batch-review-scroll">
+            {deleteError ? <div className="alert alert-error" role="alert">{deleteError}</div> : null}
 
-          {selectedBatch ? (
-            <div className="detail-stack">
-              <div className="detail-grid">
-                <div>
-                  <span className="detail-label">Batch ID</span>
-                  <strong>{selectedBatch.id}</strong>
-                </div>
-                <div>
-                  <span className="detail-label">Status</span>
-                  <span className={`status-badge status-${selectedBatch.status}`}>
-                    {selectedBatch.status}
-                  </span>
-                </div>
-                <div>
-                  <span className="detail-label">Model</span>
-                  <strong>{selectedBatch.model_key || selectedBatch.model_name}</strong>
-                </div>
-                <div>
-                  <span className="detail-label">Progress</span>
-                  <strong>
-                    {selectedBatch.processed_count}/{selectedBatch.total_files}
-                  </strong>
-                </div>
-              </div>
-
-              {ACTIVE_STATUSES.has(selectedBatch.status) ? (
-                <div className="batch-progress-bar" role="progressbar" aria-valuenow={progressPercent}>
-                  <div className="batch-progress-fill" style={{ width: `${progressPercent}%` }} />
-                </div>
-              ) : null}
-
-              {selectedBatch.skipped_files?.length ? (
-                <p className="muted small">
-                  已略過 {selectedBatch.skipped_files.length} 個非圖片檔案：
-                  {selectedBatch.skipped_files.join(", ")}
-                </p>
-              ) : null}
-
-              <div className="agent-shortcut-row">
-                <button
-                  type="button"
-                  className="button button-secondary"
-                  onClick={() =>
-                    navigate(`/agent?mode=batch_analysis&batch_id=${selectedBatch.id}`)
-                  }
-                >
-                  用 Agent 分析這批
-                </button>
-              </div>
-
-              <div className="batch-task-grid">
-                {(selectedBatch.tasks || []).map((task) => (
-                  <div key={task.id} className="batch-task-card">
-                    {task.result_image_url ? (
-                      <img
-                        className="batch-task-thumb"
-                        src={buildAssetUrl(task.result_image_url)}
-                        alt={task.source_filename}
-                      />
-                    ) : (
-                      <div className="batch-task-thumb batch-task-thumb-placeholder">
-                        {task.status === "failed" ? "失敗" : "處理中..."}
-                      </div>
-                    )}
-                    <div className="batch-task-meta">
-                      <span className="muted small">{task.source_filename}</span>
-                      <span className={`status-badge status-${task.status}`}>{task.status}</span>
-                      <span className="muted small">{task.object_count} 個物件</span>
-                    </div>
+            {selectedBatch ? (
+              <div className="detail-stack">
+                <div className="detail-grid">
+                  <div>
+                    <span className="detail-label">Batch ID</span>
+                    <strong>{selectedBatch.id}</strong>
                   </div>
-                ))}
+                  <div>
+                    <span className="detail-label">Status</span>
+                    <span className={`status-badge status-${selectedBatch.status}`}>
+                      {selectedBatch.status}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="detail-label">Model</span>
+                    <strong>{selectedBatch.model_key || selectedBatch.model_name}</strong>
+                  </div>
+                  <div>
+                    <span className="detail-label">Progress</span>
+                    <strong>
+                      {selectedBatch.processed_count}/{selectedBatch.total_files}
+                    </strong>
+                  </div>
+                </div>
+
+                {ACTIVE_STATUSES.has(selectedBatch.status) ? (
+                  <div className="batch-progress-bar" role="progressbar" aria-valuenow={progressPercent}>
+                    <div className="batch-progress-fill" style={{ width: `${progressPercent}%` }} />
+                  </div>
+                ) : null}
+
+                {selectedBatch.class_thresholds ? (
+                  <div className="model-provenance">
+                    <span>各類別自訂閾值</span>
+                    {Object.entries(selectedBatch.class_thresholds).map(([classId, threshold]) => (
+                      <span key={classId}>
+                        {selectedModel?.canonical_class_names?.[classId] || `#${classId}`}: conf{" "}
+                        {threshold.conf} / IoU {threshold.iou}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+
+                {selectedBatch.skipped_files?.length ? (
+                  <p className="muted small">
+                    已略過 {selectedBatch.skipped_files.length} 個非圖片檔案：
+                    {selectedBatch.skipped_files.join(", ")}
+                  </p>
+                ) : null}
+
+                <div className="agent-shortcut-row">
+                  <button
+                    type="button"
+                    className="button button-secondary"
+                    onClick={() =>
+                      navigate(`/agent?mode=batch_analysis&batch_id=${selectedBatch.id}`)
+                    }
+                  >
+                    用 Agent 分析這批
+                  </button>
+                  <button
+                    type="button"
+                    className="button button-secondary"
+                    disabled={
+                      downloadingAsset === "batch-zip" ||
+                      !(selectedBatch.tasks || []).some((task) => task.result_image_url)
+                    }
+                    onClick={handleDownloadBatchZip}
+                  >
+                    {downloadingAsset === "batch-zip" ? "打包中..." : "整批下載（ZIP）"}
+                  </button>
+                </div>
+
+                {downloadError ? (
+                  <div className="alert alert-error" role="alert" aria-live="assertive">
+                    {downloadError}
+                  </div>
+                ) : null}
+
+                <div className="batch-task-grid">
+                  {(selectedBatch.tasks || []).map((task) => (
+                    <div key={task.id} className="batch-task-card">
+                      {task.result_image_url ? (
+                        <ZoomableImage
+                          src={buildAssetUrl(task.result_image_url)}
+                          alt={task.source_filename}
+                          title={task.source_filename || `Detection ${task.id}`}
+                          imageClassName="batch-task-thumb"
+                          triggerClassName="batch-task-image-trigger"
+                        />
+                      ) : (
+                        <div className="batch-task-thumb batch-task-thumb-placeholder">
+                          {task.status === "failed" ? "失敗" : "處理中..."}
+                        </div>
+                      )}
+                      <div className="batch-task-meta">
+                        <span className="muted small">{task.source_filename}</span>
+                        <span className={`status-badge status-${task.status}`}>{task.status}</span>
+                        <span className="muted small">{task.object_count} 個物件</span>
+                        {task.result_image_url ? (
+                          <button
+                            type="button"
+                            className="button-ghost batch-task-download"
+                            disabled={downloadingAsset === `task-${task.id}`}
+                            onClick={() => handleDownloadTaskImage(task)}
+                          >
+                            {downloadingAsset === `task-${task.id}` ? "下載中..." : "下載"}
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          ) : (
-            <p className="muted">請從左側選擇一個批次，或上傳新的一批影像。</p>
-          )}
+            ) : (
+              <p className="muted">請從左側選擇一個批次，或上傳新的一批影像。</p>
+            )}
+          </div>
         </div>
       </section>
     </div>

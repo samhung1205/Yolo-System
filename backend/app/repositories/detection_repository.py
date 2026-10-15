@@ -21,6 +21,7 @@ def create_task(
     model_class_map_json: dict | None = None,
     confidence_threshold: float | None = None,
     iou_threshold: float | None = None,
+    class_thresholds_json: dict | None = None,
     status: str = "processing",
     batch_id: int | None = None,
 ) -> DetectionTask:
@@ -34,6 +35,7 @@ def create_task(
         model_class_map_json=model_class_map_json,
         confidence_threshold=confidence_threshold,
         iou_threshold=iou_threshold,
+        class_thresholds_json=class_thresholds_json,
         status=status,
         batch_id=batch_id,
     )
@@ -125,6 +127,7 @@ def create_batch(
     confidence_threshold: float | None,
     iou_threshold: float | None,
     total_files: int,
+    class_thresholds_json: dict | None = None,
     skipped_files: list[str] | None = None,
     status: str = "processing",
 ) -> DetectionBatch:
@@ -136,6 +139,7 @@ def create_batch(
         model_sha256=model_sha256,
         confidence_threshold=confidence_threshold,
         iou_threshold=iou_threshold,
+        class_thresholds_json=class_thresholds_json,
         total_files=total_files,
         skipped_files=skipped_files or [],
         status=status,

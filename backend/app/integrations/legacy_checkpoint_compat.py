@@ -47,8 +47,10 @@ _EFFICIENT_VIM = LegacyModuleSpec(
 _MODEL_MODULES: dict[str, tuple[LegacyModuleSpec, ...]] = {
     "four_class_asff": (_ASFF,),
     "seven_class_asff": (_ASFF,),
+    "seven_class_asff_pre": (_ASFF,),
     "four_class_dysample": (_DYSAMPLE,),
     "seven_class_dysample": (_DYSAMPLE,),
+    "seven_class_dysample_pre": (_DYSAMPLE,),
     "four_class_evmblock": (_EFFICIENT_VIM,),
 }
 

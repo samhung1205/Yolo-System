@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import ClassThresholdEditor from "../components/ClassThresholdEditor";
+import ZoomableImage from "../components/ZoomableImage";
 import detectionService from "../services/detectionService";
 import { buildAssetUrl, normalizeApiError } from "../services/api";
 
@@ -12,6 +14,8 @@ export default function DetectionPage() {
   const [error, setError] = useState("");
   const [conf, setConf] = useState(0.25);
   const [iou, setIou] = useState(0.45);
+  const [perClassEnabled, setPerClassEnabled] = useState(false);
+  const [classThresholds, setClassThresholds] = useState({});
   const [downloading, setDownloading] = useState(false);
   const [yoloModels, setYoloModels] = useState([]);
   const [modelKey, setModelKey] = useState("");
@@ -21,6 +25,11 @@ export default function DetectionPage() {
   const unavailableModels = useMemo(
     () => yoloModels.filter((model) => !model.available),
     [yoloModels]
+  );
+
+  const selectedModel = useMemo(
+    () => yoloModels.find((model) => model.key === modelKey),
+    [yoloModels, modelKey]
   );
 
   const previewUrl = useMemo(() => {
@@ -95,6 +104,7 @@ export default function DetectionPage() {
         conf,
         iou,
         modelKey,
+        classThresholds: perClassEnabled ? classThresholds : null,
       });
       setResult(detection);
     } catch (err) {
@@ -199,6 +209,17 @@ export default function DetectionPage() {
             </label>
           </div>
 
+          <ClassThresholdEditor
+            classNames={selectedModel?.canonical_class_names}
+            enabled={perClassEnabled}
+            onToggle={setPerClassEnabled}
+            values={classThresholds}
+            onChange={setClassThresholds}
+            defaultConf={conf}
+            defaultIou={iou}
+            disabled={loading}
+          />
+
           {error ? <div className="alert alert-error" role="alert" aria-live="assertive">{error}</div> : null}
 
           <button type="submit" className="button" disabled={!file || !modelKey || loading}>
@@ -207,18 +228,26 @@ export default function DetectionPage() {
         </form>
       </section>
 
-      <section className="two-column-grid">
-        <div className="panel">
-          <h2>Original Image</h2>
-          {previewUrl ? (
-            <img className="result-image" src={previewUrl} alt="Original preview" />
-          ) : (
-            <p className="muted">尚未選擇圖片。</p>
-          )}
+      <section className="two-column-grid detection-media-grid">
+        <div className="panel detection-media-panel">
+          <div className="section-title detection-media-header">
+            <h2>Original Image</h2>
+          </div>
+          <div className="detection-media-body">
+            {previewUrl ? (
+              <ZoomableImage
+                src={previewUrl}
+                alt="Original preview"
+                title="Original Image"
+              />
+            ) : (
+              <p className="muted">尚未選擇圖片。</p>
+            )}
+          </div>
         </div>
 
-        <div className="panel">
-          <div className="section-title">
+        <div className="panel detection-media-panel">
+          <div className="section-title detection-media-header">
             <h2>Detection Result</h2>
             {result?.result_image_url ? (
               <button
@@ -227,19 +256,21 @@ export default function DetectionPage() {
                 onClick={handleDownloadResult}
                 disabled={downloading}
               >
-                {downloading ? "下載中..." : "下載結果圖"}
+                {downloading ? "Downloading..." : "Download"}
               </button>
             ) : null}
           </div>
-          {result?.result_image_url ? (
-            <img
-              className="result-image"
-              src={buildAssetUrl(result.result_image_url)}
-              alt={`${file?.name ?? "圖片"} — YOLO 偵測結果`}
-            />
-          ) : (
-            <p className="muted">尚未取得 detection 結果。</p>
-          )}
+          <div className="detection-media-body">
+            {result?.result_image_url ? (
+              <ZoomableImage
+                src={buildAssetUrl(result.result_image_url)}
+                alt={`${file?.name ?? "圖片"} — YOLO 偵測結果`}
+                title="Detection Result"
+              />
+            ) : (
+              <p className="muted">尚未取得 detection 結果。</p>
+            )}
+          </div>
         </div>
       </section>
 
@@ -288,6 +319,17 @@ export default function DetectionPage() {
               <code>sha256:{result.model_sha256.slice(0, 12)}</code>
             ) : null}
           </div>
+          {result.class_thresholds ? (
+            <div className="model-provenance result-provenance">
+              <span>各類別自訂閾值</span>
+              {Object.entries(result.class_thresholds).map(([classId, threshold]) => (
+                <span key={classId}>
+                  {result.model_class_map?.canonical?.[classId] || `#${classId}`}: conf{" "}
+                  {threshold.conf} / IoU {threshold.iou}
+                </span>
+              ))}
+            </div>
+          ) : null}
           <div className="table-wrapper">
             <table>
               <thead>

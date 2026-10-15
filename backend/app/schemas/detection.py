@@ -23,6 +23,18 @@ class YoloModelRead(BaseModel):
     unavailable_reason: str | None
 
 
+class ClassThreshold(BaseModel):
+    """Per-class confidence / NMS IoU override.
+
+    Used both for request validation and for echoing back what a task ran
+    with. Classes omitted from the map fall back to the scalar
+    ``conf``/``iou`` of the request.
+    """
+
+    conf: float = Field(ge=0.0, le=1.0)
+    iou: float = Field(ge=0.0, le=1.0)
+
+
 class DetectionObjectRead(BaseModel):
     id: int
     object_index: int
@@ -53,6 +65,7 @@ class DetectionTaskSummaryRead(BaseModel):
     model_class_map: dict[str, dict[str, str]] | None
     confidence_threshold: float | None
     iou_threshold: float | None
+    class_thresholds: dict[str, ClassThreshold] | None = None
     status: str
     inference_ms: float | None
     image_width: int | None
@@ -77,6 +90,7 @@ class BatchRead(BaseModel):
     model_sha256: str | None
     confidence_threshold: float | None
     iou_threshold: float | None
+    class_thresholds: dict[str, ClassThreshold] | None = None
     status: str
     total_files: int
     processed_count: int
