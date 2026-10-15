@@ -46,14 +46,6 @@ function ChatIcon() {
   );
 }
 
-function AgentIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M8.25 3v1.5M4.5 8.25H3m18 0h-1.5M4.5 12H3m18 0h-1.5m-15 3.75H3m18 0h-1.5M8.25 19.5V21M12 3v1.5m0 15V21m3.75-18v1.5m0 15V21m-9-1.5h10.5a2.25 2.25 0 002.25-2.25V6.75a2.25 2.25 0 00-2.25-2.25H6.75A2.25 2.25 0 004.5 6.75v10.5a2.25 2.25 0 002.25 2.25zm.75-12h9v9h-9v-9z" />
-    </svg>
-  );
-}
-
 function UsersIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -86,14 +78,8 @@ const NAV_LINKS = [
   {
     to: "/chat",
     icon: <ChatIcon />,
-    title: "AI 聊天",
-    description: "與 AI 進行多輪對話，適合一般問題諮詢與知識查詢。",
-  },
-  {
-    to: "/agent",
-    icon: <AgentIcon />,
-    title: "偵測分析助理",
-    description: "深度分析偵測結果與歷史趨勢，並自動產出偵測報告。",
+    title: "AI 助理",
+    description: "進行一般對話，或根據已保存結果分析偵測資料。",
   },
   {
     to: "/profile",

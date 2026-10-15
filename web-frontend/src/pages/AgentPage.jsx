@@ -8,6 +8,7 @@ import agentService from "../services/agentService";
 import authService from "../services/authService";
 import modelService from "../services/modelService";
 import ModelPicker from "../components/ModelPicker";
+import { useAssistantState } from "../state/assistantState";
 import SavedResultPicker from "../components/SavedResultPicker";
 import AnalysisEvidence from "../components/AnalysisEvidence";
 
@@ -52,20 +53,21 @@ export default function AgentPage() {
   const initialBatchId = searchParams.get("batch_id") || "";
 
   const [artifactReady, setArtifactReady] = useState(false);
-  const [contextKind, setContextKind] = useState(initialBatchId ? "batch" : "detection");
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [selectedArtifact, setSelectedArtifact] = useState(null);
+  const [contextKind, setContextKind] = useAssistantState("agent", "contextKind", initialBatchId ? "batch" : "detection");
+  const [settingsOpen, setSettingsOpen] = useAssistantState("agent", "settingsOpen", false);
   const [modes, setModes] = useState(BUILTIN_MODES);
-  const [mode, setMode] = useState(initialMode);
-  const [detectionId, setDetectionId] = useState(initialDetectionId);
-  const [batchId, setBatchId] = useState(initialBatchId);
-  const [message, setMessage] = useState(
+  const [mode, setMode] = useAssistantState("agent", "mode", initialMode);
+  const [detectionId, setDetectionId] = useAssistantState("agent", "detectionId", initialDetectionId);
+  const [batchId, setBatchId] = useAssistantState("agent", "batchId", initialBatchId);
+  const [message, setMessage] = useAssistantState("agent", "message", () =>
     getDefaultMessage(initialMode, initialDetectionId, initialBatchId)
   );
-  const [messages, setMessages] = useState([]);
-  const [conversationId, setConversationId] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [streaming, setStreaming] = useState(true);
-  const [error, setError] = useState("");
+  const [messages, setMessages] = useAssistantState("agent", "messages", []);
+  const [conversationId, setConversationId] = useAssistantState("agent", "conversationId", null);
+  const [loading, setLoading] = useAssistantState("agent", "loading", false);
+  const [streaming, setStreaming] = useAssistantState("agent", "streaming", true);
+  const [error, setError] = useAssistantState("agent", "error", "");
   const [reportDownloading, setReportDownloading] = useState("");
   const threadRef = useRef(null);
   const abortRef = useRef(null);
@@ -74,9 +76,10 @@ export default function AgentPage() {
   const isComposingRef = useRef(false);
   // Tracks the last message we auto-filled, so we can safely replace it when
   // the mode / detection id / batch id changes without clobbering user-typed text.
-  const autoFilledRef = useRef(
+  const [lastDefaultMessage, setLastDefaultMessage] = useAssistantState("agent", "lastDefaultMessage", () =>
     getDefaultMessage(initialMode, initialDetectionId, initialBatchId)
   );
+  const autoFilledRef = useRef(lastDefaultMessage);
 
   function applyDefaultMessage(nextMode, nextDetectionId, nextBatchId, currentMessage) {
     const wasAutoFilled =
@@ -84,6 +87,7 @@ export default function AgentPage() {
     if (wasAutoFilled) {
       const next = getDefaultMessage(nextMode, nextDetectionId, nextBatchId);
       autoFilledRef.current = next;
+      setLastDefaultMessage(next);
       setMessage(next);
     }
   }
@@ -103,22 +107,18 @@ export default function AgentPage() {
     setContextKind(resolvedBatchId ? "batch" : "detection");
     setDetectionId(resolvedDetectionId);
     setBatchId(resolvedBatchId);
-    setMessage((current) => {
-      const wasAutoFilled = !current || current === autoFilledRef.current;
-      if (wasAutoFilled) {
-        const next = getDefaultMessage(resolvedMode, resolvedDetectionId, resolvedBatchId);
-        autoFilledRef.current = next;
-        return next;
-      }
-      return current;
-    });
+    const previousDefault = autoFilledRef.current;
+    const nextDefault = getDefaultMessage(resolvedMode, resolvedDetectionId, resolvedBatchId);
+    setMessage((current) => !current || current === previousDefault ? nextDefault : current);
+    autoFilledRef.current = nextDefault;
+    setLastDefaultMessage(nextDefault);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
   // Model selector state
   const [providerGroups, setProviderGroups] = useState([]);
-  const [selectedProvider, setSelectedProvider] = useState(null);
-  const [selectedModel, setSelectedModel] = useState(null);
+  const [selectedProvider, setSelectedProvider] = useAssistantState("agent", "selectedProvider", null);
+  const [selectedModel, setSelectedModel] = useAssistantState("agent", "selectedModel", null);
 
   useEffect(() => {
     let active = true;
@@ -151,8 +151,8 @@ export default function AgentPage() {
         // Prefer the first provider that is actually usable (API key set /
         // local daemon); unavailable ones are only display placeholders.
         const usable = groups.find((g) => g.available !== false) || groups[0];
-        setSelectedProvider(usable.provider);
-        setSelectedModel(usable.models[0] || null);
+        setSelectedProvider((current) => current || usable.provider);
+        setSelectedModel((current) => current || usable.models[0] || null);
       }
     }).catch(() => {});
     return () => {
@@ -170,9 +170,12 @@ export default function AgentPage() {
   // Cleanup abort controller on unmount
   useEffect(() => {
     return () => {
-      abortRef.current?.abort();
+      if (abortRef.current) {
+        abortRef.current.abort();
+        setError("切換分頁已停止接收回覆；目前對話已保留，後端作業可能仍在進行。");
+      }
     };
-  }, []);
+  }, [setError]);
 
   const isAdminOnlyMode = mode === "admin_help" && !user?.is_admin;
   const detectionModes = ["explain_detection", "report"];
@@ -312,7 +315,7 @@ export default function AgentPage() {
         const updated = [...prev];
         const last = updated[updated.length - 1];
         if (last?.isStreaming) {
-          updated[updated.length - 1] = { ...last, isStreaming: false, content: last.content || (controller.signal.aborted ? "已停止接收回覆。" : "未收到完整回覆，請重試。") };
+          updated[updated.length - 1] = { ...last, isStreaming: false, interrupted: controller.signal.aborted, content: last.content || (controller.signal.aborted ? "已停止接收回覆。" : "未收到完整回覆，請重試。") };
         }
         return updated;
       });
@@ -368,7 +371,8 @@ export default function AgentPage() {
       });
       setMessage(trimmed);
     } finally {
-      setMessages((previous) => previous.map((item) => item.isStreaming ? { ...item, isStreaming: false, content: item.content || "已停止接收回覆。" } : item));
+      abortRef.current = null;
+      setMessages((previous) => previous.map((item) => item.isStreaming ? { ...item, isStreaming: false, interrupted: controller.signal.aborted, content: item.content || "已停止接收回覆。" } : item));
       setLoading(false);
     }
   }
@@ -416,14 +420,11 @@ export default function AgentPage() {
 
   return (
     <div className="page-stack agent-page">
-      <section className="page-header">
-        <div>
-          <h1>偵測分析助理</h1>
-          <p className="muted">
-            選擇已保存的結果，解釋偵測物件、分析歷史趨勢或產生報告。
-          </p>
-        </div>
+      <div className="assistant-actions">
         <div className="page-header-actions">
+          <button type="button" className="button button-secondary agent-settings-toggle"
+            aria-expanded={settingsOpen} aria-controls="analysis-settings"
+            onClick={() => setSettingsOpen((open) => !open)}>{settingsOpen ? "收合分析設定" : "分析設定"}</button>
           <label className="field-checkbox">
             <input
               type="checkbox"
@@ -431,7 +432,7 @@ export default function AgentPage() {
               onChange={(e) => setStreaming(e.target.checked)}
               disabled={loading}
             />
-            <span>Streaming</span>
+            <span>逐字顯示回覆</span>
           </label>
           <button
             type="button"
@@ -439,10 +440,10 @@ export default function AgentPage() {
             onClick={handleNewConversation}
             disabled={loading}
           >
-            New Conversation
+            新對話
           </button>
         </div>
-      </section>
+      </div>
 
       {error ? <div className="alert alert-error" role="alert" aria-live="assertive">{error}</div> : null}
 
@@ -452,9 +453,15 @@ export default function AgentPage() {
         </div>
       ) : null}
 
-      <button type="button" className="button button-secondary agent-settings-toggle"
-        aria-expanded={settingsOpen} aria-controls="analysis-settings"
-        onClick={() => setSettingsOpen((open) => !open)}>{settingsOpen ? "收合分析設定" : "分析設定"}</button>
+      {needsArtifact && <div className="analysis-current-context" role="status">
+        <span>分析依據</span>
+        <strong>{selectedArtifact
+          ? selectedArtifact.source_filename || selectedArtifact.name || `批次 #${batchId}`
+          : detectionId || batchId ? "正在確認所選資料…" : "尚未選擇資料"}</strong>
+        {(detectionId || batchId) && <span>{batchId ? "批次" : "偵測"} #{batchId || detectionId}</span>}
+        {(detectionId || batchId) && !artifactReady && <span>資料尚未確認可用，請在分析設定檢查。</span>}
+      </div>}
+
       <p className="sr-only" role="status">{loading ? "分析助理正在回覆" : messages.length ? "分析回覆已更新" : "輸入訊息開始分析"}</p>
       <div className={`agent-layout${settingsOpen ? " settings-open" : ""}`}>
 
@@ -488,7 +495,7 @@ export default function AgentPage() {
             <SavedResultPicker kind={requiresBatchId ? "batch" : requiresDetectionId ? "detection" : contextKind}
               value={requiresBatchId || (mode === "auto" && contextKind === "batch") ? batchId : detectionId}
               onChange={requiresBatchId || (mode === "auto" && contextKind === "batch") ? handleBatchIdChange : handleDetectionIdChange}
-              onAvailabilityChange={setArtifactReady} disabled={loading} />
+              onAvailabilityChange={setArtifactReady} onSelectionChange={setSelectedArtifact} disabled={loading} />
             {missingContext && <p className="field-hint field-hint-warning" role="status">請先選擇已完成的結果，再送出分析。</p>}
             {autoModeMissingDetectionId && <p className="muted small">未選資料時，自動模式使用一般聊天；影像分析請先選擇結果。</p>}
           </>}
@@ -549,6 +556,7 @@ export default function AgentPage() {
                       </ReactMarkdown>
                     </div>
 
+                    {msg.interrupted && <p className="muted small">已停止接收，此回覆可能不完整。</p>}
                     {!msg.isStreaming && <AnalysisEvidence references={msg.references} tools={msg.tool_calls} />}
 
                   </div>

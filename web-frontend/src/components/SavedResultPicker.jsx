@@ -3,7 +3,7 @@ import detectionService from "../services/detectionService";
 import { buildAssetUrl, normalizeApiError } from "../services/api";
 
 /** Read saved artifacts only; selecting a result never starts inference. */
-export default function SavedResultPicker({ kind, value, onChange, disabled, onAvailabilityChange }) {
+export default function SavedResultPicker({ kind, value, onChange, disabled, onAvailabilityChange, onSelectionChange }) {
   const [page, setPage] = useState(1);
   const [items, setItems] = useState([]);
   const [pages, setPages] = useState(1);
@@ -26,6 +26,7 @@ export default function SavedResultPicker({ kind, value, onChange, disabled, onA
   useEffect(() => {
     let active = true;
     setSelected(null);
+    onSelectionChange?.(null);
     setDetailError("");
     onAvailabilityChange(false);
     if (!value) return () => { active = false; };
@@ -33,11 +34,12 @@ export default function SavedResultPicker({ kind, value, onChange, disabled, onA
     read(value).then((result) => {
       if (active) {
         setSelected(result);
+        onSelectionChange?.(result);
         onAvailabilityChange(["completed", "completed_with_errors"].includes(result.status));
       }
     }).catch((err) => { if (active) setDetailError(normalizeApiError(err, "無法讀取這筆結果，請重新選擇")); });
     return () => { active = false; };
-  }, [kind, value, revision, onAvailabilityChange]);
+  }, [kind, value, revision, onAvailabilityChange, onSelectionChange]);
   const isBatch = kind === "batch";
   const image = selected?.result_image_url || selected?.preview_image_url;
   return (

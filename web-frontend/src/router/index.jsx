@@ -2,6 +2,7 @@ import { lazy } from "react";
 import { Navigate, createBrowserRouter } from "react-router-dom";
 
 import Layout from "../components/Layout";
+import AssistantWorkspace from "../components/AssistantWorkspace";
 import ProtectedRoute from "../components/ProtectedRoute";
 const AgentPage = lazy(() => import("../pages/AgentPage"));
 const BatchDetectionPage = lazy(() => import("../pages/BatchDetectionPage"));
@@ -50,12 +51,11 @@ const router = createBrowserRouter([
             element: <ProfilePage />,
           },
           {
-            path: "/chat",
-            element: <ChatPage />,
-          },
-          {
-            path: "/agent",
-            element: <AgentPage />,
+            element: <AssistantWorkspace />,
+            children: [
+              { path: "/chat", element: <ChatPage /> },
+              { path: "/agent", element: <AgentPage /> },
+            ],
           },
           {
             element: <ProtectedRoute requireAdmin />,

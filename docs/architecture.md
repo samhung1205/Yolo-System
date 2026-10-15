@@ -1,7 +1,7 @@
 # 架構設計文件
 
-> **版本**: v0.9 (Chat conversation delete + Web UX)
-> **最後更新**: 2026-07-24
+> **版本**: v0.10 (AI 助理共用入口、獨立分頁與服務)
+> **最後更新**: 2026-10-15
 
 ---
 
@@ -46,6 +46,10 @@ PySide6 Desktop  ──HTTP──>  FastAPI Backend  ──> MySQL
   - Desktop 只保留 chat bubble UI 與背景 thread 包裝，不再直接呼叫外部模型 API
 
 ### Web Frontend
+- `AssistantWorkspace.jsx`
+  - `/chat`、`/agent` 共用的路由父層與「AI 助理」分頁導覽；兩個子頁面與 service 維持獨立。
+  - 以分開的 chat / agent 記憶體狀態保存草稿、目前對話、模型與選定分析結果；不把對話寫入 localStorage / sessionStorage。
+  - 工作區內切換保留狀態；離開工作區、重新整理與登出時清除。生成中切換中止前端接收，保留已收內容並顯示不完整提示，後端可能仍在執行。
 - `LoginPage.jsx`
   - 呼叫 `/api/auth/login`
   - 支援 username 或 email 登入
@@ -64,6 +68,7 @@ PySide6 Desktop  ──HTTP──>  FastAPI Backend  ──> MySQL
   - 呼叫 `POST /api/chat` / `GET /api/chat` / `GET/DELETE /api/chat/{conversation_id}`
   - 一般 provider-based chat（OpenAI / DeepSeek），不走 agent layer
   - Conversations 與聊天區共用固定高度；清單獨立捲動並支援 conversation 級刪除
+  - UI 清單排除 provider 為 `langgraph-agent` 的紀錄；既有 API 仍共用 chat_logs，未新增歷史端點。
 - `AgentPage.jsx` ← Phase 6A-2 新增
   - 路由：`/agent`
   - 呼叫 `POST /api/agent/chat`、`GET /api/agent/modes`

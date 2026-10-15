@@ -8,8 +8,7 @@ const NAV_ITEMS = [
   { to: "/detections", label: "物件偵測", end: true },
   { to: "/detections/batch", label: "批次分析", end: true },
   { to: "/detections/history", label: "偵測紀錄", end: true },
-  { to: "/chat", label: "AI 聊天", end: true },
-  { to: "/agent", label: "偵測分析助理", end: true },
+  { to: "/chat", label: "AI 助理", end: true, assistant: true },
 ];
 
 export default function Layout() {
@@ -52,10 +51,10 @@ export default function Layout() {
           {NAV_ITEMS.map((item) => (
             <NavLink
               key={item.to}
-              to={item.to}
+              to={item.assistant && pathname === "/agent" ? "/agent" : item.to}
               end={item.end}
               className={({ isActive }) =>
-                isActive ? "nav-link nav-link-active" : "nav-link"
+                isActive || (item.assistant && pathname === "/agent") ? "nav-link nav-link-active" : "nav-link"
               }
             >
               {item.label}

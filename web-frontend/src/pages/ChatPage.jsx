@@ -3,32 +3,35 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import chatService from "../services/chatService";
 import modelService from "../services/modelService";
 import ModelPicker from "../components/ModelPicker";
+import { useAssistantState } from "../state/assistantState";
 import { normalizeApiError } from "../services/api";
 
 const CONVERSATION_LIMIT = 100;
 
 export default function ChatPage() {
-  const [showConversations, setShowConversations] = useState(false);
-  const [conversations, setConversations] = useState([]);
-  const [activeConversationId, setActiveConversationId] = useState(null);
-  const [messages, setMessages] = useState([]);
+  const [showConversations, setShowConversations] = useAssistantState("chat", "showConversations", false);
+  const [conversations, setConversations] = useAssistantState("chat", "conversations", []);
+  const [activeConversationId, setActiveConversationId] = useAssistantState("chat", "activeConversationId", null);
+  const [messages, setMessages] = useAssistantState("chat", "messages", []);
   const [pendingQuestion, setPendingQuestion] = useState("");
+  const [initialized, setInitialized] = useAssistantState("chat", "initialized", false);
   const requestRef = useRef(null);
-  const [question, setQuestion] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [question, setQuestion] = useAssistantState("chat", "question", "");
+  const [loading, setLoading] = useAssistantState("chat", "loading", false);
   const [initLoading, setInitLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [error, setError] = useAssistantState("chat", "error", "");
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [deletingConversationId, setDeletingConversationId] = useState(null);
 
   // Mirrors activeConversationId so async handlers can check the *current*
   // selection after an await (avoids races with user navigation).
-  const activeIdRef = useRef(null);
+  const activeIdRef = useRef(activeConversationId);
   // Set once the user manually opens/creates a conversation; blocks the
   // initial auto-open from overriding their choice.
-  const userNavigatedRef = useRef(false);
+  const userNavigatedRef = useRef(initialized);
   // Sequence number so out-of-order getConversation responses are dropped.
   const openSeqRef = useRef(0);
+  const pageActiveRef = useRef(true);
   // True while an IME (e.g. Chinese/Japanese/Korean input method) composition
   // is in progress, so the confirm-selection Enter key doesn't submit the form.
   const isComposingRef = useRef(false);
@@ -38,8 +41,8 @@ export default function ChatPage() {
 
   // Model selector state
   const [providerGroups, setProviderGroups] = useState([]);
-  const [selectedProvider, setSelectedProvider] = useState(null);
-  const [selectedModel, setSelectedModel] = useState(null);
+  const [selectedProvider, setSelectedProvider] = useAssistantState("chat", "selectedProvider", null);
+  const [selectedModel, setSelectedModel] = useAssistantState("chat", "selectedModel", null);
 
   const activeConversation = useMemo(
     () => conversations.find((item) => item.conversation_id === activeConversationId) || null,
@@ -47,16 +50,19 @@ export default function ChatPage() {
   );
 
   useEffect(() => {
+    let active = true;
     modelService.listModels().then((groups) => {
+      if (!active) return;
       if (Array.isArray(groups) && groups.length > 0) {
         setProviderGroups(groups);
         // Prefer the first provider that is actually usable (API key set /
         // local daemon); unavailable ones are only display placeholders.
         const usable = groups.find((g) => g.available !== false) || groups[0];
-        setSelectedProvider(usable.provider);
-        setSelectedModel(usable.models[0] || null);
+        setSelectedProvider((current) => current || usable.provider);
+        setSelectedModel((current) => current || usable.models[0] || null);
       }
     }).catch(() => {});
+    return () => { active = false; };
   }, []);
 
 
@@ -66,14 +72,25 @@ export default function ChatPage() {
     }
   }, [messages]);
 
-  useEffect(() => () => requestRef.current?.abort(), []);
+  useEffect(() => {
+    pageActiveRef.current = true;
+    return () => {
+      pageActiveRef.current = false;
+      openSeqRef.current += 1;
+      if (requestRef.current) {
+        requestRef.current.abort();
+        setError("切換分頁已停止接收回覆；草稿已保留，後端作業可能仍在進行。");
+      }
+    };
+  }, [setError]);
 
   useEffect(() => {
     let mounted = true;
 
     async function loadConversations() {
       try {
-        const rows = await chatService.listConversations(CONVERSATION_LIMIT);
+        const rows = (await chatService.listConversations(CONVERSATION_LIMIT))
+          .filter((item) => item.provider !== "langgraph-agent");
         if (!mounted) {
           return;
         }
@@ -88,7 +105,7 @@ export default function ChatPage() {
           setError(normalizeApiError(err, "無法載入聊天紀錄"));
         }
       } finally {
-        if (mounted) setInitLoading(false);
+        if (mounted) { setInitLoading(false); setInitialized(true); }
       }
     }
 
@@ -102,13 +119,14 @@ export default function ChatPage() {
   async function handleOpenConversation(conversationId, mounted = true, { auto = false } = {}) {
     if (!auto) {
       userNavigatedRef.current = true;
+      setInitialized(true);
       setShowConversations(false);
     }
     setConfirmDeleteId(null);
     const seq = ++openSeqRef.current;
     try {
       const detail = await chatService.getConversation(conversationId);
-      if (!mounted || seq !== openSeqRef.current) {
+      if (!mounted || !pageActiveRef.current || seq !== openSeqRef.current) {
         return;
       }
       if (auto && userNavigatedRef.current) {
@@ -125,7 +143,8 @@ export default function ChatPage() {
   }
 
   async function refreshConversations() {
-    const rows = await chatService.listConversations(CONVERSATION_LIMIT);
+    const rows = (await chatService.listConversations(CONVERSATION_LIMIT))
+      .filter((item) => item.provider !== "langgraph-agent");
     setConversations(rows);
   }
 
@@ -176,7 +195,7 @@ export default function ChatPage() {
       );
       // Only apply the response if the user hasn't switched conversation
       // while the request was in flight.
-      if (activeIdRef.current === sentInConversationId) {
+      if (!controller.signal.aborted && activeIdRef.current === sentInConversationId) {
         activeIdRef.current = response.conversation_id;
         setActiveConversationId(response.conversation_id);
         setMessages((prev) => [...prev, response]);
@@ -186,6 +205,7 @@ export default function ChatPage() {
     } catch (err) {
       if (!controller.signal.aborted) setError(normalizeApiError(err, "聊天請求失敗"));
     } finally {
+      requestRef.current = null;
       setPendingQuestion("");
       setLoading(false);
     }
@@ -194,6 +214,7 @@ export default function ChatPage() {
   function handleNewConversation() {
     setShowConversations(false);
     userNavigatedRef.current = true;
+    setInitialized(true);
     openSeqRef.current += 1; // invalidate in-flight opens
     activeIdRef.current = null;
     setActiveConversationId(null);
@@ -204,13 +225,6 @@ export default function ChatPage() {
 
   return (
     <div className="page-stack chat-page">
-      <section className="page-header">
-        <div>
-          <h1>AI 聊天</h1>
-          <p className="muted">一般問題可在這裡對話；影像結果請使用偵測分析助理。</p>
-        </div>
-      </section>
-
       {error ? <div className="alert alert-error" role="alert" aria-live="assertive">{error}</div> : null}
 
       <button type="button" className="button button-secondary chat-mobile-switch"
