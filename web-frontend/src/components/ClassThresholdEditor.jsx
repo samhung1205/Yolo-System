@@ -118,6 +118,7 @@ export default function ClassThresholdEditor({
                           max="1"
                           step="0.05"
                           disabled={disabled}
+                          aria-label={`${name} 信心閾值`}
                           value={override ? override.conf : defaultConf}
                           onChange={(event) => updateClass(id, "conf", event.target.value)}
                         />
@@ -129,6 +130,7 @@ export default function ClassThresholdEditor({
                           max="1"
                           step="0.05"
                           disabled={disabled}
+                          aria-label={`${name} IOU 閾值`}
                           value={override ? override.iou : defaultIou}
                           onChange={(event) => updateClass(id, "iou", event.target.value)}
                         />
@@ -137,6 +139,7 @@ export default function ClassThresholdEditor({
                         <button
                           type="button"
                           className="button button-secondary class-threshold-reset"
+                          aria-label={`重設 ${name} 閾值`}
                           disabled={disabled || !isCustom}
                           onClick={() => resetClass(id)}
                         >

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 
+import Modal from "../../components/Modal";
 import userService from "../../services/userService";
 import { normalizeApiError } from "../../services/api";
 
@@ -127,11 +128,11 @@ export default function UserManagementPage() {
 
       {/* Edit Modal */}
       {editTarget ? (
-        <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="edit-modal-title" onClick={() => setEditTarget(null)}>
+        <Modal aria-labelledby="edit-modal-title" onClose={() => { if (!editSaving) setEditTarget(null); }}>
           <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2 id="edit-modal-title">編輯使用者 — {editTarget.username}</h2>
-              <button type="button" className="button-ghost" aria-label="關閉" onClick={() => setEditTarget(null)}>✕</button>
+              <button autoFocus disabled={editSaving} type="button" className="button-ghost" aria-label="關閉" onClick={() => setEditTarget(null)}>✕</button>
             </div>
 
             {editError ? <div className="alert alert-error" role="alert" aria-live="assertive">{editError}</div> : null}
@@ -190,13 +191,13 @@ export default function UserManagementPage() {
                 <button type="submit" className="button" disabled={editSaving}>
                   {editSaving ? "儲存中..." : "儲存"}
                 </button>
-                <button type="button" className="button button-ghost" onClick={() => setEditTarget(null)}>
+                <button type="button" className="button button-ghost" disabled={editSaving} onClick={() => setEditTarget(null)}>
                   取消
                 </button>
               </div>
             </form>
           </div>
-        </div>
+        </Modal>
       ) : null}
 
       <section className="history-layout">
@@ -256,6 +257,8 @@ export default function UserManagementPage() {
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
+                aria-label="搜尋使用者名稱、Email 或暱稱"
+                onKeyDown={(event) => { if (event.key === "Enter") loadUsers(search); }}
                 placeholder="Search username / email / nickname"
               />
               <button

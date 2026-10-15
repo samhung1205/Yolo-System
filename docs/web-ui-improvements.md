@@ -1,0 +1,15 @@
+# Web UI 改善紀錄（2026-10-15）
+
+依全站 critique，按 A → B → C 分階段完成。保留 Desktop、既有 API、共用 Axios，以及獨立的 Chat / Agent 路由與 service。
+
+## A — 手機與鍵盤可及性
+
+- 1100px 以下使用可展開的精簡導覽；提供跳至主內容與 Escape 收合。
+- 900px 以下聊天清單與對話切換顯示；分析設定可收合。移除手機聊天清單的固定 500px 最小高度。
+- ModelPicker 改用原生 grouped select；圖片及管理員編輯共用原生 dialog，背景 inert、焦點隔離、Escape 與關閉後焦點還原。
+- 圖片放大後可用方向鍵平移；閾值、聊天輸入、搜尋補可存取名稱；回覆狀態採完成公告而非逐 token 播報。
+- 擴大常用觸控目標並補 reduced-motion 支援。
+
+驗證：`cd web-frontend && npm run build`。以 localhost 隔離示範資料在原生瀏覽器檢查 390×844 與桌面；手機聊天輸入起點由約 2250px 提前至約 737px，沒有文件水平溢出。圖片視窗 Tab 焦點保持於視窗，Escape 返回圖片；管理員編輯 Escape 返回原 Edit 按鈕。這些是 UI fixture 驗證，不代表真實 DB / YOLO / LLM 整合測試。
+
+人工回歸：手機開啟／關閉選單，切換歷史對話；鍵盤操作模型選單；開啟圖片後 Tab / Shift+Tab / Escape / + / - / 方向鍵；管理員編輯關閉後確認焦點還原。

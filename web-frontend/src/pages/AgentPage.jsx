@@ -49,6 +49,7 @@ export default function AgentPage() {
   const initialDetectionId = searchParams.get("detection_id") || "";
   const initialBatchId = searchParams.get("batch_id") || "";
 
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [modes, setModes] = useState(BUILTIN_MODES);
   const [mode, setMode] = useState(initialMode);
   const [detectionId, setDetectionId] = useState(initialDetectionId);
@@ -393,7 +394,7 @@ export default function AgentPage() {
   }
 
   return (
-    <div className="page-stack">
+    <div className="page-stack agent-page">
       <section className="page-header">
         <div>
           <div className="eyebrow">AI DETECTION ANALYST</div>
@@ -431,8 +432,13 @@ export default function AgentPage() {
         </div>
       ) : null}
 
-      <div className="agent-layout">
-        <aside className="panel agent-controls">
+      <button type="button" className="button button-secondary agent-settings-toggle"
+        aria-expanded={settingsOpen} aria-controls="analysis-settings"
+        onClick={() => setSettingsOpen((open) => !open)}>{settingsOpen ? "收合分析設定" : "分析設定"}</button>
+      <p className="sr-only" role="status">{loading ? "分析助理正在回覆" : messages.length ? "分析回覆已更新" : "輸入訊息開始分析"}</p>
+      <div className={`agent-layout${settingsOpen ? " settings-open" : ""}`}>
+
+        <aside id="analysis-settings" className="panel agent-controls">
           <h2>Analysis Settings</h2>
 
           <label className="field">
@@ -525,7 +531,7 @@ export default function AgentPage() {
         </aside>
 
         <div className="panel agent-main">
-          <div ref={threadRef} className="agent-thread">
+          <div ref={threadRef} className="agent-thread" role="region" aria-label="分析對話" tabIndex={0} aria-busy={loading}>
             {messages.length ? (
               messages.map((msg, index) =>
                 msg.role === "user" ? (
@@ -584,6 +590,7 @@ export default function AgentPage() {
           <form className="chat-form" onSubmit={handleSubmit}>
             <div className="chat-input-wrapper">
               <textarea
+                aria-label="傳送給分析助理的訊息"
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 placeholder="輸入要問 Agent 的問題"

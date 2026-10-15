@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 
 import authService from "../services/authService";
@@ -13,6 +14,7 @@ const NAV_ITEMS = [
 
 export default function Layout() {
   const navigate = useNavigate();
+  const [menuOpen, setMenuOpen] = useState(false);
   const user = authService.getCurrentUser();
 
   function handleLogout() {
@@ -21,8 +23,18 @@ export default function Layout() {
   }
 
   return (
-    <div className="app-layout">
-      <aside className="sidebar">
+    <div className={`app-layout${menuOpen ? " navigation-open" : ""}`}>
+      <a className="skip-link" href="#main-content">跳至主要內容</a>
+      <header className="mobile-topbar">
+        <NavLink to="/" onClick={() => setMenuOpen(false)}>YOLO System</NavLink>
+        <button type="button" className="button button-secondary" aria-expanded={menuOpen}
+          aria-controls="app-navigation" onClick={() => setMenuOpen((open) => !open)}>
+          {menuOpen ? "關閉選單" : "開啟選單"}
+        </button>
+      </header>
+      <aside id="app-navigation" className="sidebar" aria-label="網站導覽"
+        onKeyDown={(event) => { if (event.key === "Escape") { setMenuOpen(false); document.querySelector(".mobile-topbar button")?.focus(); } }}
+        onClick={(event) => { if (event.target.closest("a")) setMenuOpen(false); }}>
         <div className="brand-block">
           <div className="brand-kicker">YOLO System</div>
           <p className="brand-title">Web Console</p>
@@ -75,7 +87,7 @@ export default function Layout() {
         </div>
       </aside>
 
-      <main className="content-shell">
+      <main id="main-content" tabIndex={-1} className="content-shell">
         <Outlet />
       </main>
     </div>

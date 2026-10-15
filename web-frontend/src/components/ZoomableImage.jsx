@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import Modal from "./Modal";
 
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 4;
@@ -53,12 +54,13 @@ export default function ZoomableImage({
   useEffect(() => {
     if (!open) return undefined;
 
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    closeButtonRef.current?.focus();
 
     function handleKeyDown(event) {
-      if (event.key === "Escape") closeViewer();
+      if (zoom > 1 && ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) {
+        event.preventDefault();
+        setOffset((current) => ({ x: current.x + (event.key === "ArrowLeft" ? 40 : event.key === "ArrowRight" ? -40 : 0),
+          y: current.y + (event.key === "ArrowUp" ? 40 : event.key === "ArrowDown" ? -40 : 0) }));
+      }
       if (event.key === "+" || event.key === "=") changeZoom(ZOOM_STEP);
       if (event.key === "-") changeZoom(-ZOOM_STEP);
       if (event.key === "0") resetView();
@@ -66,10 +68,9 @@ export default function ZoomableImage({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => {
-      document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [open]);
+  }, [open, zoom]);
 
   function handlePointerDown(event) {
     if (zoom <= 1) return;
@@ -109,22 +110,14 @@ export default function ZoomableImage({
         onClick={openViewer}
         aria-label={`Open larger view: ${alt}`}
       >
-        <img className={imageClassName} src={src} alt={alt} />
+        <img className={imageClassName} src={src} alt={alt} loading="lazy" />
         <span className="zoomable-image-hint" aria-hidden="true">View</span>
       </button>
 
       {open ? (
-        <div
-          className="image-viewer-overlay"
-          onPointerDown={(event) => {
-            if (event.target === event.currentTarget) closeViewer();
-          }}
-        >
+        <Modal className="image-viewer-overlay" aria-label={title} onClose={closeViewer}>
           <section
             className="image-viewer-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-label={title}
           >
             <header className="image-viewer-toolbar">
               <strong>{title}</strong>
@@ -154,6 +147,7 @@ export default function ZoomableImage({
                   Reset
                 </button>
                 <button
+                  autoFocus
                   ref={closeButtonRef}
                   type="button"
                   className="button button-secondary"
@@ -188,10 +182,10 @@ export default function ZoomableImage({
             </div>
 
             <p className="image-viewer-help">
-              Use the controls or mouse wheel to zoom. Drag while zoomed in; double-click to reset.
+              使用按鈕或滾輪縮放；放大後可拖曳或按方向鍵平移。按 0 重設，Esc 關閉。
             </p>
           </section>
-        </div>
+        </Modal>
       ) : null}
     </>
   );

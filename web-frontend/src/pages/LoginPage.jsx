@@ -143,7 +143,6 @@ export default function LoginPage() {
                 className="password-toggle"
                 onClick={() => setShowPassword((v) => !v)}
                 aria-label={showPassword ? "隱藏密碼" : "顯示密碼"}
-                tabIndex={-1}
               >
                 {showPassword ? <EyeSlashIcon /> : <EyeIcon />}
               </button>

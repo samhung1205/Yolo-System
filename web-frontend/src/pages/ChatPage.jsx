@@ -8,6 +8,7 @@ import { normalizeApiError } from "../services/api";
 const CONVERSATION_LIMIT = 100;
 
 export default function ChatPage() {
+  const [showConversations, setShowConversations] = useState(false);
   const [conversations, setConversations] = useState([]);
   const [activeConversationId, setActiveConversationId] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -104,6 +105,7 @@ export default function ChatPage() {
   async function handleOpenConversation(conversationId, mounted = true, { auto = false } = {}) {
     if (!auto) {
       userNavigatedRef.current = true;
+      setShowConversations(false);
     }
     setConfirmDeleteId(null);
     const seq = ++openSeqRef.current;
@@ -188,6 +190,7 @@ export default function ChatPage() {
   }
 
   function handleNewConversation() {
+    setShowConversations(false);
     userNavigatedRef.current = true;
     openSeqRef.current += 1; // invalidate in-flight opens
     activeIdRef.current = null;
@@ -198,7 +201,7 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="page-stack">
+    <div className="page-stack chat-page">
       <section className="page-header">
         <div>
           <div className="eyebrow">CHAT</div>
@@ -209,8 +212,15 @@ export default function ChatPage() {
 
       {error ? <div className="alert alert-error" role="alert" aria-live="assertive">{error}</div> : null}
 
-      <section className="chat-layout">
-        <aside className="panel chat-sidebar">
+      <button type="button" className="button button-secondary chat-mobile-switch"
+        aria-expanded={showConversations} aria-controls="conversation-list"
+        onClick={() => setShowConversations((open) => !open)}>
+        {showConversations ? "返回對話" : "查看歷史對話"}
+      </button>
+      <p className="sr-only" role="status">{loading ? "AI 正在回覆" : messages.length ? "對話內容已更新" : "輸入訊息開始對話"}</p>
+      <section className={`chat-layout${showConversations ? " conversations-open" : ""}`}>
+
+        <aside id="conversation-list" className="panel chat-sidebar" aria-label="歷史對話">
           <div className="section-title chat-sidebar-header">
             <div>
               <h2>Conversations</h2>
@@ -303,7 +313,7 @@ export default function ChatPage() {
             </span>
           </div>
 
-          <div ref={threadRef} className="chat-thread">
+          <div ref={threadRef} className="chat-thread" role="region" aria-label="對話內容" tabIndex={0} aria-busy={loading}>
             {messages.length ? (
               messages.map((item) => (
                 <div key={item.id} className="chat-turn">
@@ -329,6 +339,7 @@ export default function ChatPage() {
           <form className="chat-form" onSubmit={handleSubmit}>
             <div className="chat-input-wrapper">
               <textarea
+                aria-label="傳送給 AI 的訊息"
                 value={question}
                 onChange={(event) => setQuestion(event.target.value)}
                 placeholder="請輸入想問 AI 的問題"
