@@ -139,7 +139,7 @@ export default function ProfilePage() {
                 <input
                   value={nickname}
                   onChange={(e) => setNickname(e.target.value)}
-                  placeholder="顯示名稱（留空保持不變）"
+                  placeholder="顯示名稱（留空會清除暱稱）"
                 />
               </label>
 

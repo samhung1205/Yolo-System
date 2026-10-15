@@ -1,12 +1,12 @@
 import api from "./api";
 
 const chatService = {
-  async sendMessage(question, conversationId = null, provider = null, model = null) {
+  async sendMessage(question, conversationId = null, provider = null, model = null, signal) {
     const payload = { question };
     if (conversationId) payload.conversation_id = conversationId;
     if (provider) payload.provider = provider;
     if (model) payload.model = model;
-    const response = await api.post("/api/chat", payload);
+    const response = await api.post("/api/chat", payload, { signal });
     return response.data;
   },
 

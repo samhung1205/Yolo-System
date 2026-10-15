@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 
 import ClassThresholdEditor from "../components/ClassThresholdEditor";
 import ZoomableImage from "../components/ZoomableImage";
+import Modal from "../components/Modal";
 import detectionService from "../services/detectionService";
 import { buildAssetUrl, normalizeApiError } from "../services/api";
 
@@ -12,6 +13,14 @@ const ACTIVE_STATUSES = new Set(["pending", "processing"]);
 export default function BatchDetectionPage() {
   const navigate = useNavigate();
 
+  const [modelsError, setModelsError] = useState("");
+  const [modelsRevision, setModelsRevision] = useState(0);
+  const [pollError, setPollError] = useState("");
+  const [pollRevision, setPollRevision] = useState(0);
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [batchPage, setBatchPage] = useState(1);
+  const [batchPages, setBatchPages] = useState(1);
   const [files, setFiles] = useState([]);
   const [conf, setConf] = useState(0.25);
   const [iou, setIou] = useState(0.45);
@@ -33,6 +42,8 @@ export default function BatchDetectionPage() {
 
   const pollTimerRef = useRef(null);
   const fileInputRef = useRef(null);
+  const folderInputRef = useRef(null);
+  const selectSequenceRef = useRef(0);
 
   const maxFiles = 100;
 
@@ -44,7 +55,8 @@ export default function BatchDetectionPage() {
   const loadBatches = useCallback(async () => {
     setBatchesLoading(true);
     try {
-      const { items } = await detectionService.listBatches({ limit: 20 });
+      const { items, totalPages } = await detectionService.listBatches({ limit: 20, page: batchPage });
+      setBatchPages(totalPages);
       setBatches(items);
       return items;
     } catch (err) {
@@ -53,52 +65,52 @@ export default function BatchDetectionPage() {
     } finally {
       setBatchesLoading(false);
     }
-  }, []);
+  }, [batchPage]);
 
   useEffect(() => {
+    let active = true;
+    setModelsLoading(true); setModelsError("");
     detectionService
       .listYoloModels()
       .then((models) => {
+        if (!active) return;
         setYoloModels(models);
         const defaultModel =
           models.find((model) => model.available && model.is_default) ||
           models.find((model) => model.available);
-        if (defaultModel) setModelKey(defaultModel.key);
+        if (defaultModel) setModelKey((current) => models.some((item) => item.key === current && item.available) ? current : defaultModel.key);
+        else { setModelKey(""); setModelsError("目前沒有可用的模型，請聯絡管理員或重試。"); }
       })
-      .catch(() => {})
-      .finally(() => setModelsLoading(false));
+      .catch((err) => { if (active) setModelsError(normalizeApiError(err, "無法載入模型，請重試")); })
+      .finally(() => { if (active) setModelsLoading(false); });
 
     loadBatches();
 
-    return () => {
-      if (pollTimerRef.current) clearInterval(pollTimerRef.current);
-    };
-  }, [loadBatches]);
+    return () => { active = false; };
+  }, [loadBatches, modelsRevision]);
 
-  // Poll the selected batch while it is still processing.
+  // Schedule after each response, so slow polls cannot overlap.
   useEffect(() => {
-    if (pollTimerRef.current) {
-      clearInterval(pollTimerRef.current);
-      pollTimerRef.current = null;
-    }
-    if (!selectedBatch || !ACTIVE_STATUSES.has(selectedBatch.status)) {
-      return;
-    }
-    pollTimerRef.current = setInterval(async () => {
+    let active = true;
+    let failures = 0;
+    setPollError("");
+    if (!selectedBatch || !ACTIVE_STATUSES.has(selectedBatch.status)) return undefined;
+    async function poll() {
       try {
         const detail = await detectionService.getBatch(selectedBatch.id);
-        setSelectedBatch(detail);
-        if (!ACTIVE_STATUSES.has(detail.status)) {
-          loadBatches();
-        }
+        if (!active) return;
+        failures = 0; setPollError(""); setLastUpdated(new Date()); setSelectedBatch(detail);
+        if (!ACTIVE_STATUSES.has(detail.status)) { loadBatches(); return; }
       } catch {
-        // transient polling errors are ignored; next tick retries
+        if (!active) return;
+        failures += 1;
+        if (failures >= 3) setPollError("暫時無法更新進度。已保留最後結果，正在嘗試重新連線。");
       }
-    }, POLL_INTERVAL_MS);
-    return () => {
-      if (pollTimerRef.current) clearInterval(pollTimerRef.current);
-    };
-  }, [selectedBatch?.id, selectedBatch?.status, loadBatches]);
+      if (active) pollTimerRef.current = setTimeout(poll, Math.min(POLL_INTERVAL_MS * Math.max(1, failures), 15000));
+    }
+    pollTimerRef.current = setTimeout(poll, POLL_INTERVAL_MS);
+    return () => { active = false; clearTimeout(pollTimerRef.current); };
+  }, [selectedBatch?.id, selectedBatch?.status, loadBatches, pollRevision]);
 
   function handleFilesChange(event) {
     const list = Array.from(event.target.files || []);
@@ -114,6 +126,9 @@ export default function BatchDetectionPage() {
       return;
     }
 
+    if (files.some((file) => file.size > 10 * 1024 * 1024)) {
+      setError("有檔案超過 10 MB，請縮小或移除後重新選擇。"); return;
+    }
     setUploading(true);
     setError("");
     try {
@@ -123,9 +138,13 @@ export default function BatchDetectionPage() {
         modelKey,
         classThresholds: perClassEnabled ? classThresholds : null,
       });
+      selectSequenceRef.current += 1;
       setSelectedBatch(batch);
+      setLastUpdated(new Date());
+      setConfirmDelete(false);
       setFiles([]);
       if (fileInputRef.current) fileInputRef.current.value = "";
+      if (folderInputRef.current) folderInputRef.current.value = "";
       await loadBatches();
     } catch (err) {
       setError(normalizeApiError(err, "批次上傳失敗"));
@@ -135,8 +154,12 @@ export default function BatchDetectionPage() {
   }
 
   async function handleSelectBatch(id) {
+    const sequence = ++selectSequenceRef.current;
+    setConfirmDelete(false);
     try {
       const detail = await detectionService.getBatch(id);
+      if (sequence !== selectSequenceRef.current) return;
+      setLastUpdated(new Date());
       setSelectedBatch(detail);
       setDeleteError("");
     } catch (err) {
@@ -182,6 +205,7 @@ export default function BatchDetectionPage() {
     setDeleteError("");
     try {
       await detectionService.deleteBatch(id);
+      setConfirmDelete(false);
       if (selectedBatch?.id === id) setSelectedBatch(null);
       await loadBatches();
     } catch (err) {
@@ -211,17 +235,13 @@ export default function BatchDetectionPage() {
       <section className="panel">
         <form className="form-grid" onSubmit={handleSubmit}>
           <label className="field">
-            <span>選擇多張影像（或整個資料夾）</span>
+            <span>選擇多張影像</span>
             <input
               ref={fileInputRef}
+              disabled={uploading}
               type="file"
               accept="image/*"
               multiple
-              // Non-standard attribute; lets Chromium browsers pick a whole
-              // folder while still degrading gracefully to multi-file select
-              // elsewhere.
-              webkitdirectory=""
-              directory=""
               onChange={handleFilesChange}
             />
             <p className="muted small" style={{ marginTop: 6 }}>
@@ -231,6 +251,12 @@ export default function BatchDetectionPage() {
             </p>
           </label>
 
+          <label className="field">
+            <span>或選擇整個資料夾</span>
+            <input ref={folderInputRef} type="file" accept="image/*" multiple webkitdirectory="" directory=""
+              disabled={uploading} onChange={handleFilesChange} />
+          </label>
+          <p className="muted small" role="status">已選擇 {files.length} 個檔案；重新選擇會取代目前清單。</p>
           <label className="field">
             <span>選擇推論模型</span>
             <select
@@ -249,6 +275,9 @@ export default function BatchDetectionPage() {
             </select>
           </label>
 
+          {modelsError && <div className="alert alert-error" role="alert">{modelsError}
+            <button type="button" className="button-ghost" onClick={() => setModelsRevision((value) => value + 1)}>重試模型載入</button>
+          </div>}
           <div className="threshold-controls">
             <label className="threshold-row">
               <span>信心閾值 <strong>(conf = {conf.toFixed(2)})</strong></span>
@@ -287,7 +316,7 @@ export default function BatchDetectionPage() {
 
           {error ? <div className="alert alert-error" role="alert" aria-live="assertive">{error}</div> : null}
 
-          <button type="submit" className="button" disabled={!files.length || !modelKey || uploading}>
+          <button type="submit" className="button" disabled={!files.length || !modelKey || uploading || modelsLoading || Boolean(modelsError)}>
             {uploading ? "上傳中..." : `開始批次偵測（${files.length || 0} 張）`}
           </button>
         </form>
@@ -296,7 +325,12 @@ export default function BatchDetectionPage() {
       <section className="batch-review-layout">
         <div className="panel batch-review-panel">
           <div className="panel-header-row batch-review-header">
-            <h2>Recent Batches</h2>
+            <h2>批次紀錄</h2>
+            <div className="pagination-controls" aria-label="批次紀錄分頁">
+              <button type="button" className="button-ghost" disabled={batchesLoading || batchPage <= 1} onClick={() => setBatchPage(batchPage - 1)}>上一頁</button>
+              <span>{batchPage} / {batchPages}</span>
+              <button type="button" className="button-ghost" disabled={batchesLoading || batchPage >= batchPages} onClick={() => setBatchPage(batchPage + 1)}>下一頁</button>
+            </div>
           </div>
           <div className="batch-review-scroll">
             {batchesLoading ? (
@@ -335,8 +369,8 @@ export default function BatchDetectionPage() {
               <button
                 type="button"
                 className="button button-danger"
-                disabled={deleting}
-                onClick={() => handleDeleteBatch(selectedBatch.id)}
+                disabled={deleting || ACTIVE_STATUSES.has(selectedBatch.status)}
+                onClick={() => setConfirmDelete(true)}
               >
                 {deleting ? "刪除中…" : "刪除批次"}
               </button>
@@ -344,6 +378,21 @@ export default function BatchDetectionPage() {
           </div>
 
           <div className="batch-review-scroll">
+            {confirmDelete && selectedBatch && <Modal aria-labelledby="batch-delete-title" onClose={() => { if (!deleting) setConfirmDelete(false); }}>
+              <div className="modal-panel">
+                <h2 id="batch-delete-title">刪除批次 #{selectedBatch.id}？</h2>
+                <p>此操作會刪除整批 {selectedBatch.total_files} 張影像的偵測紀錄與結果檔案，無法復原。</p>
+                <div className="action-row">
+                  <button autoFocus type="button" className="button button-secondary" disabled={deleting} onClick={() => setConfirmDelete(false)}>保留批次</button>
+                  <button type="button" className="button button-danger" disabled={deleting} onClick={() => handleDeleteBatch(selectedBatch.id)}>{deleting ? "刪除中…" : "確認刪除整批"}</button>
+                </div>
+                {deleteError && <p role="alert">{deleteError}</p>}
+              </div>
+            </Modal>}
+            {pollError && <div className="alert alert-error" role="status">{pollError}
+              {lastUpdated && <span>最後更新：{lastUpdated.toLocaleTimeString("zh-TW")}</span>}
+              <button type="button" className="button-ghost" onClick={() => setPollRevision((value) => value + 1)}>立即重新連線</button>
+            </div>}
             {deleteError ? <div className="alert alert-error" role="alert">{deleteError}</div> : null}
 
             {selectedBatch ? (
@@ -372,7 +421,7 @@ export default function BatchDetectionPage() {
                 </div>
 
                 {ACTIVE_STATUSES.has(selectedBatch.status) ? (
-                  <div className="batch-progress-bar" role="progressbar" aria-valuenow={progressPercent}>
+                  <div className="batch-progress-bar" role="progressbar" aria-label="批次偵測完成進度" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progressPercent}>
                     <div className="batch-progress-fill" style={{ width: `${progressPercent}%` }} />
                   </div>
                 ) : null}
@@ -445,6 +494,7 @@ export default function BatchDetectionPage() {
                         <span className="muted small">{task.source_filename}</span>
                         <span className={`status-badge status-${task.status}`}>{task.status}</span>
                         <span className="muted small">{task.object_count} 個物件</span>
+                        {task.status === "failed" && <p className="field-hint field-hint-warning">{task.error_message || "此影像偵測失敗，請檢查檔案後重新上傳。"}</p>}
                         {task.result_image_url ? (
                           <button
                             type="button"

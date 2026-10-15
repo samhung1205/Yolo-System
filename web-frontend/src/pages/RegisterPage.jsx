@@ -1,11 +1,10 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useState } from "react";
 
 import authService from "../services/authService";
 import { normalizeApiError } from "../services/api";
 
 export default function RegisterPage() {
-  const navigate = useNavigate();
   const [form, setForm] = useState({
     username: "",
     email: "",
@@ -25,7 +24,7 @@ export default function RegisterPage() {
     try {
       await authService.register(form);
       setSuccess("註冊成功，請回登入頁登入。");
-      setTimeout(() => navigate("/login", { replace: true }), 800);
+
     } catch (err) {
       setError(normalizeApiError(err, "註冊失敗"));
     } finally {
@@ -51,6 +50,7 @@ export default function RegisterPage() {
               onChange={(event) =>
                 setForm((prev) => ({ ...prev, email: event.target.value }))
               }
+              autoComplete="email"
               placeholder="name@example.com"
               required
             />
@@ -63,7 +63,8 @@ export default function RegisterPage() {
               onChange={(event) =>
                 setForm((prev) => ({ ...prev, username: event.target.value }))
               }
-              placeholder="3-32 位英數字"
+              autoComplete="username" minLength={3} maxLength={32} pattern="[A-Za-z0-9]{3,32}" aria-describedby="username-hint"
+              placeholder="例如 researcher01"
               required
             />
           </label>
@@ -75,6 +76,7 @@ export default function RegisterPage() {
               onChange={(event) =>
                 setForm((prev) => ({ ...prev, nickname: event.target.value }))
               }
+              autoComplete="nickname"
               placeholder="顯示名稱"
               required
             />
@@ -88,16 +90,19 @@ export default function RegisterPage() {
               onChange={(event) =>
                 setForm((prev) => ({ ...prev, password: event.target.value }))
               }
-              placeholder="至少 8 位，且需同時包含英文字母與數字"
+              autoComplete="new-password" minLength={8} pattern="(?=.*[A-Za-z])(?=.*[0-9]).{8,}" aria-describedby="password-hint"
+              placeholder="輸入新密碼"
               required
             />
           </label>
 
+          <p id="username-hint" className="muted small">使用者名稱需為 3–32 位英數字。</p>
+          <p id="password-hint" className="muted small">密碼至少 8 位，需同時包含英文字母與數字。</p>
           {error ? <div className="alert alert-error" role="alert" aria-live="assertive">{error}</div> : null}
           {success ? <div className="alert alert-success" role="status" aria-live="polite">{success}</div> : null}
 
-          <button type="submit" className="button" disabled={loading}>
-            {loading ? "註冊中..." : "註冊"}
+          <button type="submit" className="button" disabled={loading || Boolean(success)}>
+            {loading ? "註冊中..." : success ? "帳號已建立，請返回登入" : "註冊"}
           </button>
         </form>
 

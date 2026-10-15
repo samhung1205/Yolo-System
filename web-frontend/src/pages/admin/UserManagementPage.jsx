@@ -20,6 +20,9 @@ const DEFAULT_EDIT_FORM = {
 };
 
 export default function UserManagementPage() {
+  const [usersPage, setUsersPage] = useState(1);
+  const [usersPages, setUsersPages] = useState(1);
+  const [deletingUser, setDeletingUser] = useState(null);
   const [users, setUsers] = useState([]);
   const [form, setForm] = useState(DEFAULT_CREATE_FORM);
   const [search, setSearch] = useState("");
@@ -34,15 +37,18 @@ export default function UserManagementPage() {
   const [editSaving, setEditSaving] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
 
-  async function loadUsers(keyword = "") {
+  async function loadUsers(keyword = "", page = usersPage) {
     setLoading(true);
     setError("");
     try {
       const result = await userService.listUsers({
-        page: 1,
-        limit: 100,
+        page,
+        limit: 20,
         search: keyword || undefined,
       });
+      const pageCount = Math.max(1, Math.ceil(result.total / 20));
+      if (page > pageCount) { await loadUsers(keyword, pageCount); return; }
+      setUsersPage(page); setUsersPages(pageCount);
       setUsers(result.items || []);
     } catch (err) {
       setError(normalizeApiError(err, "無法載入使用者列表"));
@@ -72,13 +78,15 @@ export default function UserManagementPage() {
   }
 
   async function handleDelete(userId) {
+    if (deletingUser) return;
+    setDeletingUser(userId);
     try {
       await userService.deleteUser(userId);
       setConfirmDeleteId(null);
       await loadUsers(search);
     } catch (err) {
       setError(normalizeApiError(err, "刪除使用者失敗"));
-    }
+    } finally { setDeletingUser(null); }
   }
 
   function openEdit(user) {
@@ -258,19 +266,24 @@ export default function UserManagementPage() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 aria-label="搜尋使用者名稱、Email 或暱稱"
-                onKeyDown={(event) => { if (event.key === "Enter") loadUsers(search); }}
+                onKeyDown={(event) => { if (event.key === "Enter") loadUsers(search, 1); }}
                 placeholder="Search username / email / nickname"
               />
               <button
                 type="button"
                 className="button button-secondary"
-                onClick={() => loadUsers(search)}
+                disabled={loading} onClick={() => loadUsers(search, 1)}
               >
                 搜尋
               </button>
             </div>
           </div>
 
+          <nav className="pagination-controls" aria-label="使用者分頁">
+            <button type="button" className="button-ghost" disabled={loading || usersPage <= 1} onClick={() => loadUsers(search, usersPage - 1)}>上一頁</button>
+            <span>{usersPage} / {usersPages}</span>
+            <button type="button" className="button-ghost" disabled={loading || usersPage >= usersPages} onClick={() => loadUsers(search, usersPage + 1)}>下一頁</button>
+          </nav>
           {loading ? (
             <p className="muted">載入中...</p>
           ) : (
@@ -307,7 +320,7 @@ export default function UserManagementPage() {
                             <button
                               type="button"
                               className="button button-danger"
-                              onClick={() => handleDelete(user.id)}
+                              disabled={Boolean(deletingUser)} onClick={() => handleDelete(user.id)}
                             >
                               確認
                             </button>

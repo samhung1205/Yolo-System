@@ -8,6 +8,8 @@ import agentService from "../services/agentService";
 import authService from "../services/authService";
 import modelService from "../services/modelService";
 import ModelPicker from "../components/ModelPicker";
+import SavedResultPicker from "../components/SavedResultPicker";
+import AnalysisEvidence from "../components/AnalysisEvidence";
 
 const BUILTIN_MODES = [
   { key: "auto", label: "Auto Select" },
@@ -49,6 +51,8 @@ export default function AgentPage() {
   const initialDetectionId = searchParams.get("detection_id") || "";
   const initialBatchId = searchParams.get("batch_id") || "";
 
+  const [artifactReady, setArtifactReady] = useState(false);
+  const [contextKind, setContextKind] = useState(initialBatchId ? "batch" : "detection");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [modes, setModes] = useState(BUILTIN_MODES);
   const [mode, setMode] = useState(initialMode);
@@ -96,6 +100,7 @@ export default function AgentPage() {
     const resolvedDetectionId = nextDetectionId || "";
     const resolvedBatchId = nextBatchId || "";
     setMode(resolvedMode);
+    setContextKind(resolvedBatchId ? "batch" : "detection");
     setDetectionId(resolvedDetectionId);
     setBatchId(resolvedBatchId);
     setMessage((current) => {
@@ -180,10 +185,19 @@ export default function AgentPage() {
   // server-side, so questions about a specific image get no detection data.
   const autoModeMissingDetectionId = mode === "auto" && !detectionId && !batchId;
 
+  const needsArtifact = requiresDetectionId || requiresBatchId || (mode === "auto" && Boolean(detectionId || batchId));
+  const missingContext = needsArtifact && (!artifactReady || (requiresDetectionId && !detectionId) || (requiresBatchId && !batchId));
+
+  function handleStop() {
+    abortRef.current?.abort();
+    setError("已停止接收回覆；後端作業可能仍在進行。");
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
     const trimmed = message.trim();
-    if (!trimmed || isAdminOnlyMode) return;
+    if (!trimmed || isAdminOnlyMode || loading) return;
+    if (missingContext) { setSettingsOpen(true); setError("請先選擇一筆已完成的分析資料。"); return; }
 
     setLoading(true);
     setError("");
@@ -301,7 +315,7 @@ export default function AgentPage() {
         const updated = [...prev];
         const last = updated[updated.length - 1];
         if (last?.isStreaming) {
-          updated[updated.length - 1] = { ...last, isStreaming: false };
+          updated[updated.length - 1] = { ...last, isStreaming: false, content: last.content || (controller.signal.aborted ? "已停止接收回覆。" : "未收到完整回覆，請重試。") };
         }
         return updated;
       });
@@ -311,6 +325,8 @@ export default function AgentPage() {
   }
 
   async function handleBatchSubmit(trimmed) {
+    const controller = new AbortController();
+    abortRef.current = controller;
     try {
       const response = await agentService.sendAgentMessage(trimmed, {
         conversationId,
@@ -319,6 +335,7 @@ export default function AgentPage() {
         batchId: batchId ? Number(batchId) : undefined,
         provider: selectedProvider || undefined,
         model: selectedModel || undefined,
+        signal: controller.signal,
       });
 
       if (response.success === false) {
@@ -344,6 +361,7 @@ export default function AgentPage() {
         return updated;
       });
     } catch (err) {
+      if (controller.signal.aborted) return;
       setError(normalizeApiError(err, "Agent 請求失敗"));
       setMessages((prev) => {
         const updated = [...prev];
@@ -353,6 +371,7 @@ export default function AgentPage() {
       });
       setMessage(trimmed);
     } finally {
+      setMessages((previous) => previous.map((item) => item.isStreaming ? { ...item, isStreaming: false, content: item.content || "已停止接收回覆。" } : item));
       setLoading(false);
     }
   }
@@ -367,6 +386,9 @@ export default function AgentPage() {
 
   function handleModeChange(nextMode) {
     setMode(nextMode);
+    if (nextMode === "batch_analysis") { setContextKind("batch"); setDetectionId(""); }
+    if (["explain_detection", "report"].includes(nextMode)) { setContextKind("detection"); setBatchId(""); }
+    if (["general_chat", "history_analysis", "admin_help"].includes(nextMode)) { setDetectionId(""); setBatchId(""); }
     applyDefaultMessage(nextMode, detectionId, batchId, message);
   }
 
@@ -449,56 +471,29 @@ export default function AgentPage() {
               disabled={loading}
             >
               {modes.map((m) => (
-                <option key={m.key} value={m.key}>
+                <option key={m.key} value={m.key} disabled={(m.admin_only || m.key === "admin_help") && !user?.is_admin}>
                   {m.label}
                 </option>
               ))}
             </select>
           </label>
 
-          <label className="field">
-            <span className="field-label-row">
-              <span>Detection ID</span>
-              <span className="field-requirement">{requiresDetectionId ? "Required" : "Optional"}</span>
-            </span>
-            <input
-              type="number"
-              min="1"
-              placeholder="例：123"
-              value={detectionId}
-              onChange={(e) => handleDetectionIdChange(e.target.value)}
-              disabled={loading}
-            />
-            {detectionIdMissingWarning ? (
-              <span className="field-hint field-hint-warning">
-                Required for {mode === "report" ? "Generate Report" : "Explain Detection"}.
-              </span>
-            ) : autoModeMissingDetectionId ? (
-              <span className="field-hint">
-                Add an ID to analyze a saved detection; otherwise Auto mode uses general chat.
-              </span>
-            ) : null}
-          </label>
-
-          <label className="field">
-            <span className="field-label-row">
-              <span>Batch ID</span>
-              <span className="field-requirement">{requiresBatchId ? "Required" : "Optional"}</span>
-            </span>
-            <input
-              type="number"
-              min="1"
-              placeholder="例：7"
-              value={batchId}
-              onChange={(e) => handleBatchIdChange(e.target.value)}
-              disabled={loading}
-            />
-            {batchIdMissingWarning ? (
-              <span className="field-hint field-hint-warning">
-                Required for Batch Analysis. Find the ID on the Batch Analysis page.
-              </span>
-            ) : null}
-          </label>
+          {mode === "auto" && <label className="field">
+            <span>分析資料類型</span>
+            <select value={contextKind} disabled={loading} onChange={(event) => {
+              setContextKind(event.target.value); setDetectionId(""); setBatchId("");
+            }}>
+              <option value="detection">單筆偵測</option><option value="batch">影像批次</option>
+            </select>
+          </label>}
+          {(requiresDetectionId || requiresBatchId || mode === "auto") && <>
+            <SavedResultPicker kind={requiresBatchId ? "batch" : requiresDetectionId ? "detection" : contextKind}
+              value={requiresBatchId || (mode === "auto" && contextKind === "batch") ? batchId : detectionId}
+              onChange={requiresBatchId || (mode === "auto" && contextKind === "batch") ? handleBatchIdChange : handleDetectionIdChange}
+              onAvailabilityChange={setArtifactReady} disabled={loading} />
+            {missingContext && <p className="field-hint field-hint-warning" role="status">請先選擇已完成的結果，再送出分析。</p>}
+            {autoModeMissingDetectionId && <p className="muted small">未選資料時，自動模式使用一般聊天；影像分析請先選擇結果。</p>}
+          </>}
 
           {mode === "report" && detectionId ? (
             <div className="report-download-actions">
@@ -556,27 +551,8 @@ export default function AgentPage() {
                       </ReactMarkdown>
                     </div>
 
-                    {!msg.isStreaming && msg.tool_calls?.length > 0 ? (
-                      <div className="agent-tool-calls">
-                        <div className="detail-label">Tool Calls</div>
-                        {msg.tool_calls.map((tc, ti) => (
-                          <pre key={ti} className="agent-tool-call-item">
-                            {JSON.stringify(tc, null, 2)}
-                          </pre>
-                        ))}
-                      </div>
-                    ) : null}
+                    {!msg.isStreaming && <AnalysisEvidence references={msg.references} tools={msg.tool_calls} />}
 
-                    {!msg.isStreaming && msg.references?.length > 0 ? (
-                      <div className="agent-reference-list">
-                        <div className="detail-label">References</div>
-                        {msg.references.map((ref, ri) => (
-                          <div key={ri} className="agent-reference-item">
-                            {JSON.stringify(ref)}
-                          </div>
-                        ))}
-                      </div>
-                    ) : null}
                   </div>
                 )
               )
@@ -627,10 +603,11 @@ export default function AgentPage() {
                   />
                 )}
                 <div className="chat-input-spacer" />
+                {loading && <button type="button" className="button-ghost" onClick={handleStop}>停止接收</button>}
                 <button
                   type="submit"
                   className="chat-send-btn"
-                  disabled={loading || !message.trim() || isAdminOnlyMode}
+                  disabled={loading || !message.trim() || isAdminOnlyMode || missingContext}
                   aria-label="送出訊息"
                 >
                   {loading ? (

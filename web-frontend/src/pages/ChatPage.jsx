@@ -12,6 +12,8 @@ export default function ChatPage() {
   const [conversations, setConversations] = useState([]);
   const [activeConversationId, setActiveConversationId] = useState(null);
   const [messages, setMessages] = useState([]);
+  const [pendingQuestion, setPendingQuestion] = useState("");
+  const requestRef = useRef(null);
   const [question, setQuestion] = useState("");
   const [loading, setLoading] = useState(false);
   const [initLoading, setInitLoading] = useState(true);
@@ -64,6 +66,8 @@ export default function ChatPage() {
       threadRef.current.scrollTop = threadRef.current.scrollHeight;
     }
   }, [messages]);
+
+  useEffect(() => () => requestRef.current?.abort(), []);
 
   function handleProviderChange(provider) {
     setSelectedProvider(provider);
@@ -159,11 +163,14 @@ export default function ChatPage() {
 
   async function handleSubmit(event) {
     event.preventDefault();
-    if (!question.trim()) {
+    if (!question.trim() || loading) {
       return;
     }
 
     const sentInConversationId = activeConversationId;
+    const controller = new AbortController();
+    requestRef.current = controller;
+    setPendingQuestion(question.trim());
     setLoading(true);
     setError("");
     try {
@@ -172,6 +179,7 @@ export default function ChatPage() {
         sentInConversationId,
         selectedProvider,
         selectedModel,
+        controller.signal,
       );
       // Only apply the response if the user hasn't switched conversation
       // while the request was in flight.
@@ -183,8 +191,9 @@ export default function ChatPage() {
       }
       await refreshConversations();
     } catch (err) {
-      setError(normalizeApiError(err, "聊天請求失敗"));
+      if (!controller.signal.aborted) setError(normalizeApiError(err, "聊天請求失敗"));
     } finally {
+      setPendingQuestion("");
       setLoading(false);
     }
   }
@@ -314,8 +323,8 @@ export default function ChatPage() {
           </div>
 
           <div ref={threadRef} className="chat-thread" role="region" aria-label="對話內容" tabIndex={0} aria-busy={loading}>
-            {messages.length ? (
-              messages.map((item) => (
+            {messages.length || pendingQuestion ? (
+              <>{messages.map((item) => (
                 <div key={item.id} className="chat-turn">
                   <div className="chat-bubble chat-bubble-user">
                     <span className="chat-role">You</span>
@@ -328,7 +337,9 @@ export default function ChatPage() {
                     <p>{item.answer}</p>
                   </div>
                 </div>
-              ))
+              ))}
+              {pendingQuestion && <div className="chat-turn"><div className="chat-bubble chat-bubble-user"><span className="chat-role">You</span><p>{pendingQuestion}</p></div><p role="status" className="muted">AI 正在回覆…</p></div>}
+              </>
             ) : (
               <div className="chat-empty">
                 <p className="muted">輸入第一則訊息開始新的對話。</p>
@@ -376,6 +387,7 @@ export default function ChatPage() {
                   />
                 )}
                 <div className="chat-input-spacer" />
+                {loading && <button type="button" className="button-ghost" onClick={() => { requestRef.current?.abort(); setError("已停止接收回覆；後端作業可能仍在進行。"); }}>停止接收</button>}
                 <button
                   type="submit"
                   className="chat-send-btn"

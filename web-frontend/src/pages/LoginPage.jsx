@@ -111,7 +111,7 @@ export default function LoginPage() {
         </div>
 
         {/* Form */}
-        <form className="form-grid" onSubmit={handleSubmit} noValidate>
+        <form className="form-grid" onSubmit={handleSubmit}>
           <label className="field">
             <span>使用者名稱 / Email</span>
             <input

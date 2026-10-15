@@ -8,7 +8,7 @@ const agentService = {
    * @param {{ conversationId?: string, mode?: string, detectionId?: number, stream?: boolean }} options
    */
   async sendAgentMessage(message, options = {}) {
-    const { conversationId, mode, detectionId, batchId, stream, provider, model } = options;
+    const { conversationId, mode, detectionId, batchId, stream, provider, model, signal } = options;
     const payload = {
       message,
       mode: mode || "auto",
@@ -19,7 +19,7 @@ const agentService = {
     if (stream != null) payload.stream = stream;
     if (provider) payload.provider = provider;
     if (model) payload.model = model;
-    const response = await api.post("/api/agent/chat", payload);
+    const response = await api.post("/api/agent/chat", payload, { signal });
     return response.data;
   },
 
