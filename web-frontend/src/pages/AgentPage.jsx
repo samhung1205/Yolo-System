@@ -12,13 +12,13 @@ import SavedResultPicker from "../components/SavedResultPicker";
 import AnalysisEvidence from "../components/AnalysisEvidence";
 
 const BUILTIN_MODES = [
-  { key: "auto", label: "Auto Select" },
-  { key: "general_chat", label: "General Chat" },
-  { key: "explain_detection", label: "Explain Detection" },
-  { key: "history_analysis", label: "History Analysis" },
-  { key: "report", label: "Generate Report" },
-  { key: "batch_analysis", label: "Batch Analysis" },
-  { key: "admin_help", label: "Admin Assistance" },
+  { key: "auto", label: "自動選擇" },
+  { key: "general_chat", label: "一般聊天" },
+  { key: "explain_detection", label: "解釋偵測結果" },
+  { key: "history_analysis", label: "歷史趨勢" },
+  { key: "report", label: "產生報告" },
+  { key: "batch_analysis", label: "批次分析" },
+  { key: "admin_help", label: "管理員協助" },
 ];
 const MARKDOWN_PLUGINS = [remarkGfm];
 
@@ -130,7 +130,7 @@ export default function AgentPage() {
           setModes(
             data.map((m) => ({
               key: m.key,
-              label: `${m.label}${m.admin_only ? " (Admin)" : ""}`,
+              label: `${BUILTIN_MODES.find((mode) => mode.key === m.key)?.label || m.label}${m.admin_only ? "（管理員）" : ""}`,
               admin_only: m.admin_only,
             }))
           );
@@ -160,7 +160,6 @@ export default function AgentPage() {
     };
   }, []);
 
-  const currentModels = providerGroups.find((g) => g.provider === selectedProvider)?.models || [];
 
   useEffect(() => {
     if (threadRef.current) {
@@ -178,9 +177,7 @@ export default function AgentPage() {
   const isAdminOnlyMode = mode === "admin_help" && !user?.is_admin;
   const detectionModes = ["explain_detection", "report"];
   const requiresDetectionId = detectionModes.includes(mode);
-  const detectionIdMissingWarning = requiresDetectionId && !detectionId;
   const requiresBatchId = mode === "batch_analysis";
-  const batchIdMissingWarning = requiresBatchId && !batchId;
   // "Auto Select" without a Detection ID silently falls back to General Chat
   // server-side, so questions about a specific image get no detection data.
   const autoModeMissingDetectionId = mode === "auto" && !detectionId && !batchId;
@@ -394,12 +391,14 @@ export default function AgentPage() {
 
   function handleDetectionIdChange(value) {
     setDetectionId(value);
-    applyDefaultMessage(mode, value, batchId, message);
+    setBatchId("");
+    applyDefaultMessage(mode, value, "", message);
   }
 
   function handleBatchIdChange(value) {
     setBatchId(value);
-    applyDefaultMessage(mode, detectionId, value, message);
+    setDetectionId("");
+    applyDefaultMessage(mode, "", value, message);
   }
 
   async function handleReportDownload(format) {
@@ -419,10 +418,9 @@ export default function AgentPage() {
     <div className="page-stack agent-page">
       <section className="page-header">
         <div>
-          <div className="eyebrow">AI DETECTION ANALYST</div>
-          <h1>Detection Analyst</h1>
+          <h1>偵測分析助理</h1>
           <p className="muted">
-            Explain detection results, analyze historical trends, and generate detection reports.
+            選擇已保存的結果，解釋偵測物件、分析歷史趨勢或產生報告。
           </p>
         </div>
         <div className="page-header-actions">
@@ -461,10 +459,10 @@ export default function AgentPage() {
       <div className={`agent-layout${settingsOpen ? " settings-open" : ""}`}>
 
         <aside id="analysis-settings" className="panel agent-controls">
-          <h2>Analysis Settings</h2>
+          <h2>分析設定</h2>
 
           <label className="field">
-            <span>Analysis Mode</span>
+            <span>分析模式</span>
             <select
               value={mode}
               onChange={(e) => handleModeChange(e.target.value)}
@@ -539,7 +537,7 @@ export default function AgentPage() {
                     <span className="chat-role">
                       Agent
                       {msg.mode ? (
-                        <span className="agent-mode-badge"> · {msg.mode}</span>
+                        <span className="agent-mode-badge"> · {BUILTIN_MODES.find((item) => item.key === msg.mode)?.label || msg.mode}</span>
                       ) : null}
                       {msg.isStreaming ? (
                         <span className="agent-streaming-indicator"> ▍</span>
@@ -558,7 +556,7 @@ export default function AgentPage() {
               )
             ) : (
               <div className="chat-empty">
-                <p className="muted">Choose an analysis mode and enter a message to start.</p>
+                <p className="muted">選擇分析資料，再輸入問題開始對話。</p>
               </div>
             )}
           </div>
@@ -611,9 +609,9 @@ export default function AgentPage() {
                   aria-label="送出訊息"
                 >
                   {loading ? (
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <svg className="loading-spinner" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                       <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2.5" strokeDasharray="31.4" strokeDashoffset="10" strokeLinecap="round">
-                        <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="0.8s" repeatCount="indefinite" />
+
                       </circle>
                     </svg>
                   ) : (

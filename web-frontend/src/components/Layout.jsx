@@ -1,19 +1,21 @@
-import { useState } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 
 import authService from "../services/authService";
 
 const NAV_ITEMS = [
-  { to: "/", label: "Dashboard", end: true },
-  { to: "/detections", label: "Object Detection", end: true },
-  { to: "/detections/batch", label: "Batch Analysis", end: true },
-  { to: "/detections/history", label: "Detection Records", end: true },
-  { to: "/chat", label: "AI Chat", end: true },
-  { to: "/agent", label: "Detection Analyst", end: true },
+  { to: "/", label: "工作台", end: true },
+  { to: "/detections", label: "物件偵測", end: true },
+  { to: "/detections/batch", label: "批次分析", end: true },
+  { to: "/detections/history", label: "偵測紀錄", end: true },
+  { to: "/chat", label: "AI 聊天", end: true },
+  { to: "/agent", label: "偵測分析助理", end: true },
 ];
 
 export default function Layout() {
   const navigate = useNavigate();
+  const { pathname } = useLocation();
+  useEffect(() => { document.getElementById("main-content")?.focus(); }, [pathname]);
   const [menuOpen, setMenuOpen] = useState(false);
   const user = authService.getCurrentUser();
 
@@ -23,7 +25,13 @@ export default function Layout() {
   }
 
   return (
-    <div className={`app-layout${menuOpen ? " navigation-open" : ""}`}>
+    <div className={`app-layout${menuOpen ? " navigation-open" : ""}`}
+      onKeyDown={(event) => {
+        if (event.key === "Escape" && menuOpen) {
+          setMenuOpen(false);
+          document.querySelector(".mobile-topbar button")?.focus();
+        }
+      }}>
       <a className="skip-link" href="#main-content">跳至主要內容</a>
       <header className="mobile-topbar">
         <NavLink to="/" onClick={() => setMenuOpen(false)}>YOLO System</NavLink>
@@ -33,7 +41,6 @@ export default function Layout() {
         </button>
       </header>
       <aside id="app-navigation" className="sidebar" aria-label="網站導覽"
-        onKeyDown={(event) => { if (event.key === "Escape") { setMenuOpen(false); document.querySelector(".mobile-topbar button")?.focus(); } }}
         onClick={(event) => { if (event.target.closest("a")) setMenuOpen(false); }}>
         <div className="brand-block">
           <div className="brand-kicker">YOLO System</div>
@@ -61,7 +68,7 @@ export default function Layout() {
                 isActive ? "nav-link nav-link-active" : "nav-link"
               }
             >
-              Admin Users
+              使用者管理
             </NavLink>
           ) : null}
         </nav>
@@ -70,7 +77,7 @@ export default function Layout() {
           <div className="user-chip">
             <div className="user-chip-title">{user?.nickname || user?.username}</div>
             <div className="muted small">
-              {user?.is_admin ? "Administrator" : "Standard User"}
+              {user?.is_admin ? "管理員" : "一般使用者"}
             </div>
           </div>
           <NavLink
@@ -79,10 +86,10 @@ export default function Layout() {
               isActive ? "nav-link nav-link-active" : "nav-link"
             }
           >
-            Profile
+            個人資料
           </NavLink>
           <button type="button" className="button button-secondary" onClick={handleLogout}>
-            Logout
+            登出
           </button>
         </div>
       </aside>

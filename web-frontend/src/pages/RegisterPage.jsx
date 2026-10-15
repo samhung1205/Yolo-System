@@ -36,7 +36,6 @@ export default function RegisterPage() {
     <div className="auth-shell">
       <div className="auth-panel">
         <div>
-          <div className="eyebrow">Registration</div>
           <h1>建立帳號</h1>
           <p className="muted">填寫以下資訊建立您的帳號。</p>
         </div>
@@ -67,6 +66,7 @@ export default function RegisterPage() {
               placeholder="例如 researcher01"
               required
             />
+            <small id="username-hint" className="muted">使用者名稱需為 3–32 位英數字。</small>
           </label>
 
           <label className="field">
@@ -94,10 +94,9 @@ export default function RegisterPage() {
               placeholder="輸入新密碼"
               required
             />
+            <small id="password-hint" className="muted">至少 8 位，需同時包含英文字母與數字。</small>
           </label>
 
-          <p id="username-hint" className="muted small">使用者名稱需為 3–32 位英數字。</p>
-          <p id="password-hint" className="muted small">密碼至少 8 位，需同時包含英文字母與數字。</p>
           {error ? <div className="alert alert-error" role="alert" aria-live="assertive">{error}</div> : null}
           {success ? <div className="alert alert-success" role="status" aria-live="polite">{success}</div> : null}
 

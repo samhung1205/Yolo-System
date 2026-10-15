@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+import detectionService from "../services/detectionService";
 import { Link } from "react-router-dom";
 
 import authService from "../services/authService";
@@ -60,138 +62,105 @@ function UsersIcon() {
   );
 }
 
-function ArrowRightIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="icon-card-arrow" aria-hidden="true">
-      <path d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-    </svg>
-  );
-}
-
 /* ─── Nav card definitions ───────────────────────────────────── */
 
 const NAV_LINKS = [
   {
     to: "/detections",
     icon: <ScanIcon />,
-    title: "Object Detection",
+    title: "物件偵測",
     description: "上傳圖片，即時辨識並標注畫面中的物件。",
   },
   {
     to: "/detections/batch",
     icon: <StackIcon />,
-    title: "Batch Analysis",
+    title: "批次分析",
     description: "一次上傳多張影像或整個資料夾，逐張偵測並彙總統計結果。",
   },
   {
     to: "/detections/history",
     icon: <ClockIcon />,
-    title: "Detection Records",
+    title: "偵測紀錄",
     description: "查詢歷史偵測紀錄，依狀態或類型篩選，查看物件詳情。",
   },
   {
     to: "/chat",
     icon: <ChatIcon />,
-    title: "AI Chat",
+    title: "AI 聊天",
     description: "與 AI 進行多輪對話，適合一般問題諮詢與知識查詢。",
   },
   {
     to: "/agent",
     icon: <AgentIcon />,
-    title: "Detection Analyst",
+    title: "偵測分析助理",
     description: "深度分析偵測結果與歷史趨勢，並自動產出偵測報告。",
   },
   {
     to: "/profile",
     icon: <UserIcon />,
-    title: "Profile",
+    title: "個人資料",
     description: "查看帳號資訊、角色與帳號狀態。",
   },
 ];
-
-/* ─── NavCard component ──────────────────────────────────────── */
-
-function NavCard({ to, icon, title, description }) {
-  return (
-    <Link to={to} className="panel panel-link">
-      <div className="icon-card">
-        <div className="icon-card-header">
-          <div className="icon-card-icon">{icon}</div>
-          <ArrowRightIcon />
-        </div>
-        <div>
-          <h2>{title}</h2>
-          <p className="muted small">{description}</p>
-        </div>
-      </div>
-    </Link>
-  );
-}
-
-/* ─── Page ───────────────────────────────────────────────────── */
 
 export default function DashboardPage() {
   const user = authService.getCurrentUser();
   const displayName = user?.nickname || user?.username || "—";
 
+  const [recent, setRecent] = useState([]);
+  const [recentLoading, setRecentLoading] = useState(true);
+  const [recentError, setRecentError] = useState(false);
+  const [revision, setRevision] = useState(0);
+  useEffect(() => {
+    const controller = new AbortController();
+    let active = true;
+    setRecentLoading(true); setRecentError(false);
+    Promise.allSettled([
+      detectionService.listDetections({ limit: 5, signal: controller.signal }),
+      detectionService.listBatches({ limit: 3, signal: controller.signal }),
+    ]).then((results) => {
+      if (!active) return;
+      setRecentError(results.some((result) => result.status === "rejected"));
+      setRecent(results.flatMap((result, index) => result.status === "fulfilled"
+        ? result.value.items.map((item) => ({ ...item, kind: index ? "batch" : "detection" })) : [])
+        .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at))).slice(0, 6));
+      setRecentLoading(false);
+    });
+    return () => { active = false; controller.abort(); };
+  }, [revision]);
   return (
-    <div className="page-stack">
-
-      {/* Hero */}
-      <section className="hero-panel">
-        <div>
-          <div className="eyebrow">Dashboard</div>
-          <h1>{displayName}</h1>
-          <p className="muted" style={{ maxWidth: "52ch" }}>
-            {user?.is_admin
-              ? "以管理員身分登入。可管理使用者帳號、執行偵測，並與 AI Agent 互動分析結果。"
-              : "以一般使用者身分登入。執行圖片偵測、查詢歷史紀錄，或透過 AI Agent 深入分析。"}
-          </p>
-        </div>
-
-        {/* Account stat cards */}
-        <div className="summary-grid summary-grid-compact">
-          <div className="stat-card">
-            <span className="stat-label">Role</span>
-            {user?.is_admin ? (
-              <span className="status-badge status-processing">Admin</span>
-            ) : (
-              <span className="status-badge status-completed">User</span>
-            )}
-          </div>
-          <div className="stat-card">
-            <span className="stat-label">Account Status</span>
-            {user?.is_active ? (
-              <span className="status-badge status-completed">Active</span>
-            ) : (
-              <span className="status-badge status-failed">Inactive</span>
-            )}
-          </div>
-          <div className="stat-card">
-            <span className="stat-label">Member Since</span>
-            <strong>{user?.register_time ? String(user.register_time).slice(0, 10) : "—"}</strong>
-          </div>
+    <div className="page-stack dashboard-page">
+      <header className="page-header">
+        <div><h1>影像偵測工作台</h1><p className="muted">{displayName}，從影像開始，讓偵測結果成為分析依據。</p></div>
+      </header>
+      <section className="dashboard-start" aria-label="開始偵測">
+        <div><ScanIcon /><h2>辨識一張影像</h2><p>上傳影像、選擇模型，對照原圖與標註結果。</p>
+          <Link className="button" to="/detections">開始單張偵測</Link></div>
+        <div className="dashboard-batch-entry"><StackIcon /><h2>分析一批影像</h2><p>選取多張影像或資料夾，逐張偵測並彙總結果。</p>
+          <Link className="button button-secondary" to="/detections/batch">開始批次偵測</Link></div>
+      </section>
+      <section className="recent-work" aria-labelledby="recent-work-title">
+        <div className="section-title-row"><h2 id="recent-work-title">繼續最近工作</h2><Link className="text-link" to="/detections/history">查看偵測紀錄</Link></div>
+        {recentLoading && <p role="status" className="muted">載入最近工作…</p>}
+        {recentError && <p role="alert">部分紀錄無法載入。<button type="button" className="button-ghost" onClick={() => setRevision(revision + 1)}>重試</button></p>}
+        {!recentLoading && !recent.length && !recentError && <p className="muted">尚無偵測紀錄。完成第一筆偵測後，可從這裡繼續分析。</p>}
+        <div className="recent-work-list">{recent.map((item) => {
+          const ready = ["completed", "completed_with_errors"].includes(item.status);
+          const destination = ready ? `/agent?mode=${item.kind === "batch" ? "batch_analysis&batch_id" : "explain_detection&detection_id"}=${item.id}`
+            : item.kind === "batch" ? "/detections/batch" : "/detections/history";
+          return <Link key={`${item.kind}-${item.id}`} className="recent-result-row" to={destination}>
+            <div><strong>{item.kind === "batch" ? item.name || `批次 #${item.id}` : item.source_filename}</strong>
+              <span className="muted small">{item.kind === "batch" ? `${item.total_files} 張影像` : `${item.object_count} 個物件`} · {String(item.created_at || "").slice(0, 10)}</span></div>
+            <span className="text-link">{ready ? "繼續分析" : "查看進度"}</span>
+          </Link>;
+        })}</div>
+      </section>
+      <section className="dashboard-tools" aria-label="其他功能">
+        <h2>其他功能</h2>
+        <div className="dashboard-tool-links">{NAV_LINKS.slice(2).map((item) => <Link key={item.to} to={item.to}>{item.icon}<span>{item.title}</span></Link>)}
+          {user?.is_admin && <Link to="/admin/users"><UsersIcon /><span>使用者管理</span></Link>}
         </div>
       </section>
-
-      {/* Feature navigation */}
-      <section aria-label="功能入口">
-        <p className="section-label">功能入口</p>
-        <div className="card-grid">
-          {NAV_LINKS.map((item) => (
-            <NavCard key={item.to} {...item} />
-          ))}
-          {user?.is_admin && (
-            <NavCard
-              to="/admin/users"
-              icon={<UsersIcon />}
-              title="User Management"
-              description="建立、搜尋與刪除使用者帳號；僅管理員可存取。"
-            />
-          )}
-        </div>
-      </section>
-
     </div>
   );
 }

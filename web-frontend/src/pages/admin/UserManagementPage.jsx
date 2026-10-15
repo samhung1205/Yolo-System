@@ -127,8 +127,7 @@ export default function UserManagementPage() {
     <div className="page-stack">
       <section className="page-header">
         <div>
-          <div className="eyebrow">Admin</div>
-          <h1>User Management</h1>
+          <h1>使用者管理</h1>
         </div>
       </section>
 
@@ -208,11 +207,9 @@ export default function UserManagementPage() {
         </Modal>
       ) : null}
 
-      <section className="history-layout">
-        <div className="panel">
-          <div className="section-title">
-            <h2>Create User</h2>
-          </div>
+      <section className="admin-workspace">
+        <details className="panel admin-create">
+          <summary>建立使用者</summary>
           <form className="form-grid" onSubmit={handleCreate}>
             <label className="field">
               <span>Email</span>
@@ -256,11 +253,11 @@ export default function UserManagementPage() {
               {submitting ? "建立中..." : "建立使用者"}
             </button>
           </form>
-        </div>
+        </details>
 
-        <div className="panel">
+        <div className="panel admin-user-list">
           <div className="section-title section-title-row">
-            <h2>User List</h2>
+            <h2>使用者清單</h2>
             <div className="inline-form">
               <input
                 value={search}

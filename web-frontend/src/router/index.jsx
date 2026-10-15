@@ -1,17 +1,18 @@
+import { lazy } from "react";
 import { Navigate, createBrowserRouter } from "react-router-dom";
 
 import Layout from "../components/Layout";
 import ProtectedRoute from "../components/ProtectedRoute";
-import AgentPage from "../pages/AgentPage";
-import BatchDetectionPage from "../pages/BatchDetectionPage";
-import ChatPage from "../pages/ChatPage";
-import DashboardPage from "../pages/DashboardPage";
-import DetectionHistoryPage from "../pages/DetectionHistoryPage";
-import DetectionPage from "../pages/DetectionPage";
-import LoginPage from "../pages/LoginPage";
-import ProfilePage from "../pages/ProfilePage";
-import RegisterPage from "../pages/RegisterPage";
-import UserManagementPage from "../pages/admin/UserManagementPage";
+const AgentPage = lazy(() => import("../pages/AgentPage"));
+const BatchDetectionPage = lazy(() => import("../pages/BatchDetectionPage"));
+const ChatPage = lazy(() => import("../pages/ChatPage"));
+const DashboardPage = lazy(() => import("../pages/DashboardPage"));
+const DetectionHistoryPage = lazy(() => import("../pages/DetectionHistoryPage"));
+const DetectionPage = lazy(() => import("../pages/DetectionPage"));
+const LoginPage = lazy(() => import("../pages/LoginPage"));
+const ProfilePage = lazy(() => import("../pages/ProfilePage"));
+const RegisterPage = lazy(() => import("../pages/RegisterPage"));
+const UserManagementPage = lazy(() => import("../pages/admin/UserManagementPage"));
 
 const router = createBrowserRouter([
   {

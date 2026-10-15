@@ -223,8 +223,7 @@ export default function BatchDetectionPage() {
     <div className="page-stack">
       <section className="page-header">
         <div>
-          <div className="eyebrow">BATCH DETECTION</div>
-          <h1>Batch Image Analysis</h1>
+          <h1>批次影像分析</h1>
           <p className="muted">
             一次上傳多張影像（或整個資料夾），逐張進行 YOLO 偵測，再用 Agent 針對整批結果進行彙總問答。
             單次最多 {maxFiles} 張。
@@ -278,6 +277,8 @@ export default function BatchDetectionPage() {
           {modelsError && <div className="alert alert-error" role="alert">{modelsError}
             <button type="button" className="button-ghost" onClick={() => setModelsRevision((value) => value + 1)}>重試模型載入</button>
           </div>}
+          <details className="advanced-settings">
+            <summary>進階閾值設定 · conf {conf.toFixed(2)} / IoU {iou.toFixed(2)}</summary>
           <div className="threshold-controls">
             <label className="threshold-row">
               <span>信心閾值 <strong>(conf = {conf.toFixed(2)})</strong></span>
@@ -313,6 +314,8 @@ export default function BatchDetectionPage() {
             defaultIou={iou}
             disabled={uploading}
           />
+
+          </details>
 
           {error ? <div className="alert alert-error" role="alert" aria-live="assertive">{error}</div> : null}
 
@@ -364,7 +367,7 @@ export default function BatchDetectionPage() {
 
         <div className="panel batch-review-panel">
           <div className="panel-header-row batch-review-header">
-            <h2>Batch Detail</h2>
+            <h2>批次詳情</h2>
             {selectedBatch ? (
               <button
                 type="button"

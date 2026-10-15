@@ -103,7 +103,6 @@ export default function LoginPage() {
 
         {/* Header */}
         <div>
-          <div className="eyebrow">Authentication</div>
           <h1>歡迎回來</h1>
           <p className="muted" style={{ maxWidth: "46ch" }}>
             登入後可執行物件偵測、查詢歷史紀錄，並使用 AI Agent 分析結果。

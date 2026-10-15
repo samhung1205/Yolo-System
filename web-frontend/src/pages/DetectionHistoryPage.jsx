@@ -174,8 +174,7 @@ export default function DetectionHistoryPage() {
     <div className="page-stack">
       <section className="page-header">
         <div>
-          <div className="eyebrow">DETECTION RECORDS</div>
-          <h1>Detection Records</h1>
+          <h1>偵測紀錄</h1>
           <p className="muted">
             Review past detection tasks, object counts, statuses, and available analysis actions.{" "}
             <strong>{total}</strong> records total.
@@ -236,7 +235,7 @@ export default function DetectionHistoryPage() {
         <div className="panel history-panel history-list-panel">
           <div className="panel-header-row history-panel-header">
             <div>
-              <h2>Task List</h2>
+              <h2>偵測清單</h2>
               <span className="muted small">
                 顯示 {rangeStart}-{rangeEnd}，共 {total} 筆
               </span>
@@ -312,7 +311,7 @@ export default function DetectionHistoryPage() {
               >
                 ← Task List
               </button>
-              <h2>Selected Detail</h2>
+              <h2>結果詳情</h2>
             </div>
             {selected && !confirmDelete && (
               <button
@@ -406,7 +405,7 @@ export default function DetectionHistoryPage() {
                         )
                       }
                     >
-                      {downloadingAsset === selected.result_image_url ? "Downloading..." : "Download"}
+                      {downloadingAsset === selected.result_image_url ? "Downloading..." : "下載"}
                     </button>
                   ) : null}
                   {selected.result_video_url ? (

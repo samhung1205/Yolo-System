@@ -59,7 +59,6 @@ export default function ChatPage() {
     }).catch(() => {});
   }, []);
 
-  const currentModels = providerGroups.find((g) => g.provider === selectedProvider)?.models || [];
 
   useEffect(() => {
     if (threadRef.current) {
@@ -68,12 +67,6 @@ export default function ChatPage() {
   }, [messages]);
 
   useEffect(() => () => requestRef.current?.abort(), []);
-
-  function handleProviderChange(provider) {
-    setSelectedProvider(provider);
-    const group = providerGroups.find((g) => g.provider === provider);
-    setSelectedModel(group?.models[0] || null);
-  }
 
   useEffect(() => {
     let mounted = true;
@@ -213,9 +206,8 @@ export default function ChatPage() {
     <div className="page-stack chat-page">
       <section className="page-header">
         <div>
-          <div className="eyebrow">CHAT</div>
-          <h1>AI Chat</h1>
-          <p className="muted">Chat with the AI for general assistance. Use Detection Analyst for detection-specific analysis.</p>
+          <h1>AI 聊天</h1>
+          <p className="muted">一般問題可在這裡對話；影像結果請使用偵測分析助理。</p>
         </div>
       </section>
 
@@ -232,7 +224,7 @@ export default function ChatPage() {
         <aside id="conversation-list" className="panel chat-sidebar" aria-label="歷史對話">
           <div className="section-title chat-sidebar-header">
             <div>
-              <h2>Conversations</h2>
+              <h2>歷史對話</h2>
               <span className="muted small">
                 {conversations.length} conversations · latest {CONVERSATION_LIMIT}
               </span>
@@ -316,7 +308,7 @@ export default function ChatPage() {
 
         <div className="panel chat-main">
           <div className="chat-header">
-            <h2>{activeConversation?.title || "New Conversation"}</h2>
+            <h2>{activeConversation?.title || "新對話"}</h2>
             <span className="muted">
               {activeConversation ? `${activeConversation.turn_count} turns` : "尚未建立對話"}
             </span>
@@ -395,9 +387,9 @@ export default function ChatPage() {
                   aria-label="送出訊息"
                 >
                   {loading ? (
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <svg className="loading-spinner" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                       <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2.5" strokeDasharray="31.4" strokeDashoffset="10" strokeLinecap="round">
-                        <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="0.8s" repeatCount="indefinite" />
+
                       </circle>
                     </svg>
                   ) : (

@@ -115,16 +115,17 @@ export default function DetectionPage() {
   }
 
   return (
-    <div className="page-stack">
+    <div className="page-stack detection-page">
       <section className="page-header">
         <div>
-          <div className="eyebrow">DETECTION</div>
-          <h1>Object Detection</h1>
-          <p className="muted">Upload an image and use the YOLO model to identify and label detected objects.</p>
+          <h1>物件偵測</h1>
+          <p className="muted">選擇影像與模型，對照原圖、標註結果與偵測物件。</p>
         </div>
       </section>
 
-      <section className="panel">
+      <div className="detection-workspace">
+      <section className="panel detection-config">
+        <h2>偵測設定</h2>
         <form className="form-grid" onSubmit={handleSubmit}>
           <label className="field">
             <span>選擇圖片</span>
@@ -182,6 +183,8 @@ export default function DetectionPage() {
             </details>
           ) : null}
 
+          <details className="advanced-settings">
+            <summary>進階閾值設定 · conf {conf.toFixed(2)} / IoU {iou.toFixed(2)}</summary>
           <div className="threshold-controls">
             <label className="threshold-row">
               <span>信心閾值 <strong>(conf = {conf.toFixed(2)})</strong></span>
@@ -220,6 +223,8 @@ export default function DetectionPage() {
             disabled={loading}
           />
 
+          </details>
+
           {error ? <div className="alert alert-error" role="alert" aria-live="assertive">{error}</div> : null}
 
           <button type="submit" className="button" disabled={!file || !modelKey || loading}>
@@ -231,24 +236,24 @@ export default function DetectionPage() {
       <section className="two-column-grid detection-media-grid">
         <div className="panel detection-media-panel">
           <div className="section-title detection-media-header">
-            <h2>Original Image</h2>
+            <h2>原始影像</h2>
           </div>
           <div className="detection-media-body">
             {previewUrl ? (
               <ZoomableImage
                 src={previewUrl}
                 alt="Original preview"
-                title="Original Image"
+                title="原始影像"
               />
             ) : (
-              <p className="muted">尚未選擇圖片。</p>
+              <p className="muted">先選擇圖片，原圖會顯示在這裡。</p>
             )}
           </div>
         </div>
 
         <div className="panel detection-media-panel">
           <div className="section-title detection-media-header">
-            <h2>Detection Result</h2>
+            <h2>標註結果</h2>
             {result?.result_image_url ? (
               <button
                 type="button"
@@ -256,7 +261,7 @@ export default function DetectionPage() {
                 onClick={handleDownloadResult}
                 disabled={downloading}
               >
-                {downloading ? "Downloading..." : "Download"}
+                {downloading ? "Downloading..." : "下載"}
               </button>
             ) : null}
           </div>
@@ -265,14 +270,16 @@ export default function DetectionPage() {
               <ZoomableImage
                 src={buildAssetUrl(result.result_image_url)}
                 alt={`${file?.name ?? "圖片"} — YOLO 偵測結果`}
-                title="Detection Result"
+                title="標註結果"
               />
             ) : (
-              <p className="muted">尚未取得 detection 結果。</p>
+              <p className="muted">完成偵測後，這裡會顯示標註結果。</p>
             )}
           </div>
         </div>
       </section>
+
+      </div>
 
       {result?.id ? (
         <section className="panel">
@@ -353,7 +360,7 @@ export default function DetectionPage() {
                 ) : (
                   <tr>
                     <td colSpan={4} className="muted center-cell">
-                      未偵測到任何物件。
+                      此設定下未偵測到物件。請確認模型的類別，或展開進階設定調低信心閾值後重試。
                     </td>
                   </tr>
                 )}

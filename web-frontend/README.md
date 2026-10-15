@@ -42,3 +42,10 @@ VITE_API_BASE_URL=http://127.0.0.1:8000
 VITE_PROXY_TARGET=http://127.0.0.1:8000
 npm run dev -- --host 127.0.0.1 --port 5173
 ```
+
+## 2026-10-15 Web UX 改善
+
+手機導覽／聊天面板、鍵盤對話框、已保存結果分析選擇、批次錯誤恢復與首頁工作流程已分 A／B／C 改善。
+- 設計規範：[DESIGN.md](DESIGN.md)
+- 改善內容與回歸方法：[web-ui-improvements.md](../docs/web-ui-improvements.md)
+- 本次 UI 測試使用隔離示範 API；真實 YOLO、LLM 與 DB 整合仍需在正式開發環境驗證。

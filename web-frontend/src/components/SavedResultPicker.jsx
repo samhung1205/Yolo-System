@@ -10,6 +10,7 @@ export default function SavedResultPicker({ kind, value, onChange, disabled, onA
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [detailError, setDetailError] = useState("");
   const [revision, setRevision] = useState(0);
   useEffect(() => { setPage(1); }, [kind]);
   useEffect(() => {
@@ -25,6 +26,7 @@ export default function SavedResultPicker({ kind, value, onChange, disabled, onA
   useEffect(() => {
     let active = true;
     setSelected(null);
+    setDetailError("");
     onAvailabilityChange(false);
     if (!value) return () => { active = false; };
     const read = kind === "batch" ? detectionService.getBatch : detectionService.getDetection;
@@ -33,7 +35,7 @@ export default function SavedResultPicker({ kind, value, onChange, disabled, onA
         setSelected(result);
         onAvailabilityChange(["completed", "completed_with_errors"].includes(result.status));
       }
-    }).catch((err) => { if (active) setError(normalizeApiError(err, "無法讀取這筆結果，請重新選擇")); });
+    }).catch((err) => { if (active) setDetailError(normalizeApiError(err, "無法讀取這筆結果，請重新選擇")); });
     return () => { active = false; };
   }, [kind, value, revision, onAvailabilityChange]);
   const isBatch = kind === "batch";
@@ -57,7 +59,7 @@ export default function SavedResultPicker({ kind, value, onChange, disabled, onA
         <span>{page} / {pages}</span>
         <button type="button" className="button-ghost" disabled={disabled || loading || page >= pages} onClick={() => setPage(page + 1)}>下一頁</button>
       </div>}
-      {error && <div role="alert" className="alert alert-error">{error} <button type="button" className="button-ghost" disabled={disabled} onClick={() => setRevision(revision + 1)}>重試載入</button></div>}
+      {(error || detailError) && <div role="alert" className="alert alert-error">{detailError || error} <button type="button" className="button-ghost" disabled={disabled} onClick={() => setRevision(revision + 1)}>重試載入</button></div>}
       {!loading && !error && !items.length && <p className="muted small">尚無結果，請先到{isBatch ? "批次分析" : "物件偵測"}完成偵測。</p>}
       {selected && <div className="selected-artifact">
         {image && <img src={buildAssetUrl(image)} alt="目前分析的偵測結果" loading="lazy" />}

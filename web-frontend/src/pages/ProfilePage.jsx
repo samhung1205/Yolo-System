@@ -74,8 +74,7 @@ export default function ProfilePage() {
     <div className="page-stack">
       <section className="page-header">
         <div>
-          <div className="eyebrow">Profile</div>
-          <h1>My Profile</h1>
+          <h1>個人資料</h1>
         </div>
       </section>
 
@@ -109,7 +108,7 @@ export default function ProfilePage() {
             </div>
             <div>
               <span className="detail-label">Role</span>
-              <strong>{user?.is_admin ? "Administrator" : "User"}</strong>
+              <strong>{user?.is_admin ? "管理員" : "User"}</strong>
             </div>
             <div>
               <span className="detail-label">Status</span>
