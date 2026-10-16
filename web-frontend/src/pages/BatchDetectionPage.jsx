@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import ClassThresholdEditor from "../components/ClassThresholdEditor";
+import YoloModelSelect from "../components/YoloModelSelect";
+import ThresholdSummary from "../components/ThresholdSummary";
 import ZoomableImage from "../components/ZoomableImage";
 import Modal from "../components/Modal";
 import detectionService from "../services/detectionService";
@@ -256,29 +258,14 @@ export default function BatchDetectionPage() {
               disabled={uploading} onChange={handleFilesChange} />
           </label>
           <p className="muted small" role="status">已選擇 {files.length} 個檔案；重新選擇會取代目前清單。</p>
-          <label className="field">
-            <span>選擇推論模型</span>
-            <select
-              value={modelKey}
-              onChange={(event) => setModelKey(event.target.value)}
-              disabled={modelsLoading || !yoloModels.some((model) => model.available)}
-              required
-            >
-              {modelsLoading ? <option value="">載入模型清單中...</option> : null}
-              {yoloModels.map((model) => (
-                <option key={model.key} value={model.key} disabled={!model.available}>
-                  {model.display_name}
-                  {model.available ? "" : "（不可用）"}
-                </option>
-              ))}
-            </select>
-          </label>
+          <YoloModelSelect models={yoloModels} value={modelKey} loading={modelsLoading}
+            onChange={setModelKey} />
 
           {modelsError && <div className="alert alert-error" role="alert">{modelsError}
             <button type="button" className="button-ghost" onClick={() => setModelsRevision((value) => value + 1)}>重試模型載入</button>
           </div>}
           <details className="advanced-settings">
-            <summary>進階閾值設定 · conf {conf.toFixed(2)} / IoU {iou.toFixed(2)}</summary>
+            <ThresholdSummary conf={conf} iou={iou} />
           <div className="threshold-controls">
             <label className="threshold-row">
               <span>信心閾值 <strong>(conf = {conf.toFixed(2)})</strong></span>

@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import ClassThresholdEditor from "../components/ClassThresholdEditor";
+import YoloModelSelect from "../components/YoloModelSelect";
+import ThresholdSummary from "../components/ThresholdSummary";
 import ZoomableImage from "../components/ZoomableImage";
 import detectionService from "../services/detectionService";
 import { buildAssetUrl, normalizeApiError } from "../services/api";
@@ -142,27 +144,8 @@ export default function DetectionPage() {
             <p className="muted small" style={{ marginTop: 6 }}>支援 JPG、PNG、WEBP，單檔最大 10 MB</p>
           </label>
 
-          <label className="field">
-            <span>選擇推論模型</span>
-            <select
-              value={modelKey}
-              onChange={(event) => {
-                setModelKey(event.target.value);
-                setResult(null);
-              }}
-              disabled={modelsLoading || !yoloModels.some((model) => model.available)}
-              required
-            >
-              {modelsLoading ? <option value="">載入模型清單中...</option> : null}
-              {!modelsLoading && !modelKey ? <option value="">請選擇模型</option> : null}
-              {yoloModels.map((model) => (
-                <option key={model.key} value={model.key} disabled={!model.available}>
-                  {model.display_name}
-                  {model.available ? "" : "（不可用）"}
-                </option>
-              ))}
-            </select>
-          </label>
+          <YoloModelSelect models={yoloModels} value={modelKey} loading={modelsLoading}
+            onChange={(key) => { setModelKey(key); setResult(null); }} />
 
           {modelsError ? (
             <div className="alert alert-error" role="alert">
@@ -184,7 +167,7 @@ export default function DetectionPage() {
           ) : null}
 
           <details className="advanced-settings">
-            <summary>進階閾值設定 · conf {conf.toFixed(2)} / IoU {iou.toFixed(2)}</summary>
+            <ThresholdSummary conf={conf} iou={iou} />
           <div className="threshold-controls">
             <label className="threshold-row">
               <span>信心閾值 <strong>(conf = {conf.toFixed(2)})</strong></span>

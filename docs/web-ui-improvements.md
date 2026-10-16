@@ -49,3 +49,16 @@
 - 真實 API／本機模型驗收另見 `web-real-integration-validation.md`；這階段未變更後端、資料表或 Desktop。
 
 驗證：production build、差異空白檢查；以真實後端在原生瀏覽器驗證兩種草稿與不同模型切換保留、分析模式及結果 ID 保留、Chat 舊對話與 Agent 真實串流內容保留、生成中切換中止接收與提示。桌面、390px 與 320px 無文件水平溢出；以 Enter 啟動分頁連結，手機可看到選定資料與輸入框。登出後重新登入、重新整理清除暫存及新對話防自動覆寫均通過；最終重新載入後無新增客戶端錯誤。狀態層另以 Node assertions 驗證 query 初值與設定值相同時仍須保存、兩頁草稿互不影響、清空選擇及連續 functional updates。開發時發現混合匯出 Context 與元件會造成 HMR 的 Context identity 問題，已將狀態層拆至 `state/assistantState.js`。
+
+## 2026-10-16 — 偵測卡片等高、模型分類與閾值換行
+
+依使用者兩張截圖調整：
+
+- 桌面（1100px 以上）設定卡片與原圖／標註卡片一起延伸至同列高度，修正影像卡片提早結束的落差。1100px 以下保留自然高度；900px 以下設定移至影像上方，600px 以下影像單欄。影像既有 `object-fit: contain` 及比例保留。
+- 單張與批次共用 `YoloModelSelect`，以 API 的 `class_count` / `task` / `dataset_variant` 分為「4 類別」「7 類別」「7 類別 · Pre」「旋轉框 OBB · 4 類別」「COCO · 80 類別」。仍有 12 個模型（4 / 3 / 3 / 1 / 1），模型 key、預設值與不可用狀態保留；Pre 不另解釋為訓練前或預訓練。
+- 選項改顯示較短的 architecture，選單下方以「目前模型」顯示可換行的完整 display name，避免關閉狀態的原生 select 遮住類別／Pre 資訊。沿用原生 optgroup、label 與描述，不增加第二層選單。
+- 單張與批次共用 `ThresholdSummary`。標題獨立一行，conf／IoU 數值在下一行；每組數值不拆開，仍可整組換行。保留原生 details 的鍵盤展開行為。
+
+驗證：`cd web-frontend && npm run build`、`git -c core.whitespace=cr-at-eol diff --check`。使用 registry 的實際 12 筆 metadata 與隔離元件／API fixture，在原生瀏覽器檢查單張頁 16 組長寬（320×740、390×844、600×800、601×800、768×1024、844×390、900×700、901×700、1024×768、1100×800、1101×800、1280×800、1440×900、1920×1080、2560×1440、3332×1332），均無文件水平溢出、數值拆開或模型說明裁切。1920px 的三張卡片均約 541px 高。另以 11 組尺寸檢查進階設定展開，桌面仍等高，窄螢幕自然堆疊。
+
+批次頁亦檢查手機、平板、橫向與桌面尺寸；切換 EfficientViM、Pre、COCO、OBB 均更新完整名稱，Enter 可展開進階設定。這次為版面回歸，未寫入真實 DB、觸發推論或驗證跨瀏覽器／實體裝置。臨時 harness 與 fixture 在驗收後移除，不納入產品程式。

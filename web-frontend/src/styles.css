@@ -2204,7 +2204,7 @@ a.button { display: inline-flex; align-items: center; justify-content: center; w
 .dashboard-tool-links { display: flex; flex-wrap: wrap; gap: 8px 24px; }
 .dashboard-tool-links a { display: flex; align-items: center; gap: 8px; min-height: 44px; color: var(--muted); }
 .dashboard-tool-links a:hover { color: var(--accent-strong); }
-.detection-workspace { display: grid; grid-template-columns: minmax(250px, 300px) minmax(0, 1fr); align-items: start; gap: 20px; }
+.detection-workspace { display: grid; grid-template-columns: minmax(250px, 300px) minmax(0, 1fr); align-items: stretch; gap: 20px; }
 .detection-workspace > section { min-width: 0; }
 .detection-media-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .detection-media-panel { padding: 16px; grid-template-rows: auto minmax(260px, 1fr); }
@@ -2214,6 +2214,12 @@ a.button { display: inline-flex; align-items: center; justify-content: center; w
 .advanced-settings { min-width: 0; }
 .advanced-settings > summary, .admin-create > summary { min-height: 44px; padding-block: 12px; cursor: pointer; color: var(--accent-strong); font-weight: 600; }
 .advanced-settings[open] > summary { margin-bottom: 12px; }
+.threshold-summary-title { display: inline; }
+.threshold-summary-values { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 6px; color: var(--muted); font-size: .875rem; font-weight: 400; font-variant-numeric: tabular-nums; }
+.threshold-summary-values > span { white-space: nowrap; }
+.field .yolo-model-description { display: grid; gap: 4px; overflow-wrap: anywhere; }
+.yolo-model-description-label { font-size: .75rem; }
+.yolo-model-field select { min-width: 0; max-width: 100%; }
 .advanced-settings .table-wrapper { max-height: 360px; overflow: auto; }
 .threshold-controls { background: var(--panel-alt); border-color: var(--line); }
 .threshold-row .threshold-hint { color: var(--muted); font-size: .8125rem; line-height: 1.5; }
@@ -2240,7 +2246,7 @@ a.button { display: inline-flex; align-items: center; justify-content: center; w
   .app-layout { display: block; }
   .content-shell { padding: 24px; }
   .agent-controls { max-height: none; }
-  .detection-workspace { grid-template-columns: minmax(230px, 280px) minmax(0, 1fr); }
+  .detection-workspace { grid-template-columns: minmax(230px, 280px) minmax(0, 1fr); align-items: start; }
   .detection-media-grid { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 900px) {
