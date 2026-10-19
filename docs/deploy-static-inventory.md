@@ -1,0 +1,119 @@
+# 部署媒體盤點附表
+
+盤點日期：2026-10-20（Asia/Taipei）。此表只列檔名與大小，不包含媒體內容。
+
+- `web-frontend/public/`：沒有超過 400,000 bytes 的檔案。
+- `web-frontend/dist/`：本次 production build 沒有超過 400,000 bytes 的檔案。
+- `backend/static/`：超過 400,000 bytes 共 106 檔，詳列如下；這些是受保護的執行期媒體，並非自動打包到 CDN 的前端資產。
+- 400 KB 為本次診斷篩選門檻，不是通用平台硬限制；清單會隨使用者新增或刪除資料改變。
+
+| 路徑（相對專案根目錄） | Bytes | MiB |
+| --- | ---: | ---: |
+| `backend/static/detections/originals/task_72_fe0a5258.bmp` | 9,644,694 | 9.198 |
+| `backend/static/detections/originals/task_73_fc949a48.bmp` | 9,644,694 | 9.198 |
+| `backend/static/detections/originals/task_80_49ddff1d.png` | 2,732,105 | 2.606 |
+| `backend/static/detections/originals/task_107_31d9f8fc.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_108_1987ea58.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_109_efa4bd79.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_110_0fbdc6b5.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_111_9ce40151.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_112_93ca55aa.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_113_b2749b6f.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_114_26eb03f7.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_115_3ea7bc9b.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_116_64b356ef.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_117_ff9badc8.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_118_e5cd6d69.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_119_e5832230.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_120_b10b231f.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_121_f126cfb7.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_122_f22fc4b9.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_123_a935f67d.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_124_65c90469.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_125_2a47953f.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_126_cc60894c.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_127_0c08d3fa.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_128_6c3194f9.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_129_c36b6d81.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_130_2430777a.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_131_d0cb7b7b.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_132_d059fa32.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_133_d18528dd.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_134_8eee1344.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_135_b981cbb7.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_136_28121f6b.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_137_586a1f8a.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_138_438b4ae8.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_139_e2422a6b.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_140_9aafb675.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_141_07290dc8.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_142_4f3eb604.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_143_0189df70.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_144_bcc034b4.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_146_bd333004.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_147_f8074131.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_148_c40b92e7.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_14_fd350407.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_16_273fa2c5.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_17_f32d418e.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_19_d9498519.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_20_d02c6ce7.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_21_23928a4e.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_22_23d72376.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_27_5ed1ab0a.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_29_812736b5.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_30_fd838f42.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_31_16b1061c.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_35_78aba1ef.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_37_0fa8dede.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_38_3f7594eb.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_39_6df5436c.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_40_57fade95.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_42_8439ac05.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_45_1272b78d.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_46_a4d17cde.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_48_5347868d.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_49_9154df2f.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_50_1f2accd9.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_51_8aec987c.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_52_b0e11207.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_57_f81d1890.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_58_dbc7ba50.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_59_ffcf735d.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_60_3c68d2a2.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_61_992c893b.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_62_e8e15032.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_63_b1d0f32c.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_64_28c6f79d.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_65_159f57f6.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_66_92b1d863.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_67_048833cf.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_68_3c102a80.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_74_63e61b55.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_81_2a2f254c.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_82_e6c24643.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_83_539928e2.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_84_c90f4e80.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_85_75f7bdc0.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_86_1154ec71.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_87_810fed6e.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_88_d93b77b0.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_89_b95a155d.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_8_f1ab6f4f.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_90_4d6e0780.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_91_ae3fbaa2.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_92_e8776937.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_93_b4c99905.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_94_0f047ffc.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_9_5cada738.bmp` | 2,596,614 | 2.476 |
+| `backend/static/detections/originals/task_53_da87d457.bmp` | 1,228,854 | 1.172 |
+| `backend/static/detections/originals/task_54_c508d417.bmp` | 1,228,854 | 1.172 |
+| `backend/static/detections/originals/task_55_f08638cb.bmp` | 1,228,854 | 1.172 |
+| `backend/static/detections/originals/task_56_b322ee9d.bmp` | 1,228,854 | 1.172 |
+| `backend/static/detections/originals/task_69_b32ac5b1.bmp` | 1,080,054 | 1.030 |
+| `backend/static/detections/originals/task_70_8c5810fa.bmp` | 1,080,054 | 1.030 |
+| `backend/static/detections/originals/task_71_ab0e4ff1.bmp` | 1,080,054 | 1.030 |
+| `backend/static/detections/results/task_72_26adf177.jpg` | 599,495 | 0.572 |
+| `backend/static/detections/results/task_73_f9ffcec5.jpg` | 563,444 | 0.537 |
+
+部署選型、保存策略與驗收計畫見 [DEPLOY.md](../DEPLOY.md)。

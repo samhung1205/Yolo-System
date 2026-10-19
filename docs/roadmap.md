@@ -182,20 +182,42 @@ Phase 0 ✅  →  Phase 1 🔜  →  Phase 2  →  Phase 3  →  Phase 4  →  P
 
 ## Phase 6 — 完善與部署
 
-**目標**: 完整部署文件、測試、Docker、CI/CD  
-**預估工時**: 5-10 小時  
-**前置條件**: Phase 5 完成
+**狀態**：待實作；2026-10-20 已完成部署診斷與方向確認，尚未完成部署驗收。
 
-### 任務清單
-- [ ] 建立 `docker-compose.yml`（backend + MySQL + web-frontend）
-- [ ] 建立 `Dockerfile`（backend）
-- [ ] 建立 `Dockerfile`（web-frontend）
-- [ ] 撰寫 backend 單元測試（pytest）
-- [ ] 撰寫 API 整合測試
-- [ ] 建立 Alembic migration 說明
-- [ ] 補充 README.md 部署說明
-- [ ] 建立 `audit_logs` 完整實作
-- [ ] 效能調整與錯誤處理完善
+**使用者決策**：10–50 人實驗室／內部使用，免費優先，使用既有實驗室主機，Ollama 同機運行。
+
+**前置條件**：Phase 5 完成；取得目標主機規格與既有備份位置。
+
+**詳細依據與平台比較**：[DEPLOY.md](../DEPLOY.md)。
+
+### 目前已有的基礎
+
+- [x] 既有 backend pytest 與 API 測試（不是從零補寫測試）。2026-10-20 重跑 173 通過、1 失敗；Agent SSE 測試依賴本機 Ollama 模型清單，仍需隔離後重驗。
+- [x] Alembic migrations 已至 `0013`；正式升級與還原流程仍需補齊。
+- [x] React production build 可產出；同網址服務與 Docker 尚未建立。
+- [x] 部署診斷、媒體容量盤點與每日備份／清理方案已記錄，未建立實際排程。
+
+### 依序實作與驗證
+
+1. **6.1 同網址服務**
+   - [ ] 量測目標主機 YOLO／Ollama 記憶體、延遲與排隊；確認同時推論量。
+   - [ ] 提供 React build，統一代理 `/api/*`、受保護 `/static/*`；完成 HTTPS、上傳大小與 SSE 設定。
+   - 驗證：前端深連結重新整理、登入／上傳／下載／Agent 串流、Desktop API 連線正常，私人媒體仍須認證。
+2. **6.2 Docker 與持久保存**
+   - [ ] Compose、backend／frontend build 與 nginx Dockerfile、`.dockerignore`。
+   - [ ] MySQL／上傳媒體／Ollama 模型持久 volume；交付未納入 Git 的 YOLO checkpoint 及根目錄相容模組。
+   - 驗證：容器內實際載入自訂模型；容器重建後資料與模型可用。
+3. **6.3 維運與復原**
+   - [ ] 正式設定、專用 DB 帳號、migration／seed admin 改密與升級流程。
+   - [ ] 每日 DB 一致性備份與媒體增量備份至既有獨立磁碟／NAS，保留有限版本；先確認清理 dry-run，再決定排程。
+   - [ ] 定義影片／批次在行程重啟後的復原；多 worker 前改共享限流狀態。
+   - 驗證：隔離還原 DB 與媒體；檢查排程結果、磁碟容量與重啟後任務狀態。
+4. **6.4 部署驗收與文件**
+   - [ ] 隔離測試對本機模型清單的依賴，完成容器環境端到端回歸與 CI。
+   - [ ] 補正式啟停、備份還原、升級／rollback 與 README 部署指令；完成後才標記 Phase 6 完成。
+   - 驗證：登入→偵測→歷史→Chat／Agent 全流程、權限隔離、持久保存與復原。
+
+**另行安排**：1000 張批次、空間推論、完整 `audit_logs`、大規模併發；httpOnly cookie 仍待討論，不隨本次文件更新自動變更認證。
 
 ---
 

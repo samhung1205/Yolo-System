@@ -77,6 +77,12 @@
 
 > **目前已完成至「部署前清理」（react-router 7、頭像歸屬與清理、對話輪次唯一鍵）。下一步：Phase 6 同網址部署（FastAPI / nginx 提供 React build、Docker；token 是否改 httpOnly cookie 待討論）；之後再排批次上限提高（輪詢瘦身 → 分片上傳 → 1000 張）、批次分析 Phase 2（空間關係推論），或 Phase 6（Docker、測試、部署文件完善），視優先順序決定。**
 
+**Phase 6 部署決策（2026-10-20）**
+
+- 使用者確認：10–50 人實驗室／內部使用，免費優先；改用既有實驗室主機，Ollama 同機運行，不建立付費雲端資源。
+- 診斷與驗收計畫見 `DEPLOY.md`、`docs/roadmap.md` Phase 6；每日備份／清理使用既有主機與獨立儲存，實際排程尚未建立。主機規格、同時推論量及備份位置仍需確認。
+- 本次只有文件與盤點，Phase 6 仍未完成；下一步先做同網址服務，再依序 Docker／持久保存、備份與復原、部署驗收。不把 1000 張批次或 httpOnly cookie 改造一起帶入。
+
 **部署前清理 — ✅ 完成（2026-10-20）**
 
 - [x] **react-router 6 → 7.18.4**（修 open redirect，moderate）：移除 `react-router-dom`，改 import `react-router`；`RouterProvider` 改從 `react-router/dom` 匯入，移除已成預設的 `v7_startTransition` future flag。v8 需要 React 19，暫不升級

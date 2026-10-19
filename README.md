@@ -58,6 +58,7 @@ React Web Frontend  ──HTTP──> FastAPI Backend ──> MySQL (SQLAlchemy)
 Yolo_system/
 │
 ├── README.md                   # 本文件
+├── DEPLOY.md                   # 部署診斷、實驗室主機方案與 Phase 6 驗收計畫
 ├── AGENTS.md                   # AI 協作規範文件
 ├── yolo.sql                    # Legacy 資料庫 schema（參考用）
 │
@@ -217,7 +218,7 @@ Python module path，由
 | Agent 重構 A | 單一 graph 執行路徑 + 全模式對話歷史 + 明確錯誤 | ✅ **已完成**（graph compile 一次、runtime context、`invoke`/`stream` 同一 graph；B 用 `create_agent`、Deep Agents 延到 C） |
 | 安全強化 P0 | 上傳白名單 + static nosniff、LLM 白名單與限流、隱藏內部錯誤 | ✅ **已完成**（`app/core/uploads.py`、`app/services/llm_policy.py`；其餘審查發現見 AGENTS.md） |
 | 批次上限 1000 張 | 分片上傳 + 輪詢瘦身 + 中斷復原 | ⏳ 待辦（已完成瓶頸分析，見 AGENTS.md） |
-| Phase 6 | Docker、測試、部署文件完善 | ⏳ 待辦 |
+| Phase 6 | 實驗室主機同網址部署、Docker、備份與驗收 | ⏳ 待辦（2026-10-20 確認免費優先，見 [DEPLOY.md](DEPLOY.md)） |
 
 ---
 
@@ -230,6 +231,7 @@ Python module path，由
 | [api-spec.md](docs/api-spec.md) | API 端點規格 |
 | [database-design.md](docs/database-design.md) | 新資料表設計 |
 | [roadmap.md](docs/roadmap.md) | 開發路線圖與里程碑 |
+| [DEPLOY.md](DEPLOY.md) | 部署診斷、平台比較、實驗室免費部署與 Phase 6 驗收計畫 |
 | [AGENTS.md](AGENTS.md) | AI 協作規範 |
 
 ---
