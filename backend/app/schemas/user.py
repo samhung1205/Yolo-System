@@ -10,7 +10,8 @@ from pydantic import BaseModel, field_validator
 
 USERNAME_RE = re.compile(r"^[A-Za-z0-9]{3,32}$")
 EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
-PASSWORD_RE = re.compile(r"^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,64}$")
+# Printable ASCII without spaces: letters + digits required, symbols allowed.
+PASSWORD_RE = re.compile(r"^(?=.*[A-Za-z])(?=.*\d)[\x21-\x7E]{8,64}$")
 
 
 class UserCreate(BaseModel):
@@ -45,7 +46,7 @@ class UserCreate(BaseModel):
     def validate_password(cls, v: str) -> str:
         text = v.strip()
         if not PASSWORD_RE.match(text):
-            raise ValueError("密碼必須為至少 8 位英數組合，且同時包含字母與數字")
+            raise ValueError("密碼需為 8-64 位，同時包含英文字母與數字，可使用符號（不可含空白或中文）")
         return text
 
 
@@ -95,7 +96,7 @@ class ProfileUpdate(BaseModel):
             return None
         text = v.strip()
         if not PASSWORD_RE.match(text):
-            raise ValueError("密碼必須為至少 8 位英數組合，且同時包含字母與數字")
+            raise ValueError("密碼需為 8-64 位，同時包含英文字母與數字，可使用符號（不可含空白或中文）")
         return text
 
 
@@ -137,5 +138,5 @@ class UserUpdate(BaseModel):
             return None
         text = v.strip()
         if not PASSWORD_RE.match(text):
-            raise ValueError("密碼必須為至少 8 位英數組合，且同時包含字母與數字")
+            raise ValueError("密碼需為 8-64 位，同時包含英文字母與數字，可使用符號（不可含空白或中文）")
         return text

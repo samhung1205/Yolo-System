@@ -21,12 +21,21 @@ class Settings(BaseSettings):
     DB_USER: str = "root"
     DB_PASSWORD: str = ""
     DB_NAME: str = "yolo"
+    # Log every SQL statement (with bound parameters). Off by default: the
+    # parameters include password hashes and personal data.
+    DB_ECHO: bool = False
 
     # JWT
     SECRET_KEY: str = "change-me-in-production"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 24 hours
     STATIC_URL_EXPIRE_SECONDS: int = 3600  # signed /static URLs for <img> tags
+
+    # Failed-login throttling (0 disables a limit). Counts reset on success
+    # for the account; the per-IP limit catches guessing across accounts.
+    LOGIN_MAX_FAILURES_PER_ACCOUNT: int = 5
+    LOGIN_MAX_FAILURES_PER_IP: int = 20
+    LOGIN_FAILURE_WINDOW_SECONDS: int = 900
 
     # DeepSeek
     DEEPSEEK_API_KEY: str = ""
@@ -164,6 +173,10 @@ class Settings(BaseSettings):
         if isinstance(v, str):
             return v.strip().lower()
         return v
+
+    @property
+    def is_production(self) -> bool:
+        return self.APP_ENV.strip().lower() in ("production", "prod")
 
     @property
     def DATABASE_URL(self) -> str:

@@ -11,7 +11,7 @@ engine = create_engine(
     pool_pre_ping=True,       # auto-reconnect on stale connections
     pool_size=10,
     max_overflow=20,
-    echo=(settings.APP_ENV == "development"),
+    echo=settings.DB_ECHO,
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

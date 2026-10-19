@@ -50,7 +50,7 @@ class LlmSelection:
 
 
 def _is_production() -> bool:
-    return settings.APP_ENV.strip().lower() in ("production", "prod")
+    return settings.is_production
 
 
 def _strip_latest(name: str) -> str:

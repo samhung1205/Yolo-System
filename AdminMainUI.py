@@ -494,7 +494,10 @@ class AdminWindow(QMainWindow, AdminMainWindow):
         self.lineEdit_old_password.setText("")
         self.lineEdit_new_password.setText("")
         self.lineEdit_check_password.setText("")
-        DialogOver(parent=self, text="密码修改成功，下次登录生效！", title="成功", flags="success")
+        DialogOver(parent=self, text="密码修改成功，请使用新密码重新登录", title="成功", flags="success")
+        # The backend revokes all existing tokens on a password change, so the
+        # stored session is no longer valid.
+        self.to_close()
 
 
 

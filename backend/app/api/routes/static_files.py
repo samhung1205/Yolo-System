@@ -13,8 +13,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
-from app.core.deps import get_db
-from app.core.security import decode_access_token
+from app.core.deps import get_db, resolve_user_from_token
 from app.core.static_tokens import verify_static_signature
 from app.core.uploads import STATIC_INLINE_MEDIA_TYPES
 from app.models.user import User
@@ -76,23 +75,7 @@ def _get_user_from_authorization(db: Session, authorization: Optional[str]) -> U
         )
 
     token = authorization.split(" ", 1)[1].strip()
-    payload = decode_access_token(token)
-    if payload is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    user_id = payload.get("sub")
-    if user_id is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    user = db.query(User).filter(User.id == int(user_id), User.is_active == True).first()
+    user = resolve_user_from_token(db, token)
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

@@ -49,9 +49,10 @@ def update_user(
     user_id: int,
     user_in: UserUpdate,
     db: Annotated[Session, Depends(get_db)],
-    _: Annotated[User, Depends(get_current_admin)],
+    current_admin: Annotated[User, Depends(get_current_admin)],
 ):
     """Admin updates a user's information."""
+    user_service.guard_admin_change(db, acting_user=current_admin, target_user_id=user_id, user_in=user_in)
     user = user_service.update_user(db, user_id, user_in)
     return to_user_read(user)
 
@@ -60,8 +61,9 @@ def update_user(
 def delete_user(
     user_id: int,
     db: Annotated[Session, Depends(get_db)],
-    _: Annotated[User, Depends(get_current_admin)],
+    current_admin: Annotated[User, Depends(get_current_admin)],
 ):
     """Admin deletes a user."""
+    user_service.guard_admin_change(db, acting_user=current_admin, target_user_id=user_id, deleting=True)
     user_service.delete_user(db, user_id)
     return {"message": "User deleted successfully"}

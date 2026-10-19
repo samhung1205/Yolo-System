@@ -245,7 +245,7 @@ export default function UserManagementPage() {
                 type="password"
                 value={form.password}
                 onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
-                placeholder="至少 8 位英數組合"
+                placeholder="8–64 位，含英文字母與數字，可用符號"
                 required
               />
             </label>

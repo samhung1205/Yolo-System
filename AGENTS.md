@@ -75,7 +75,7 @@
 
 ## 當前 Phase
 
-> **目前已完成至「Agent 重構 B」，前一階段為「Agent 重構 A」。下一步：Agent 重構 C（評測 + 決定預設引擎與模型 + Deep Agents 試做）；之後再排批次上限提高（輪詢瘦身 → 分片上傳 → 1000 張）、批次分析 Phase 2（空間關係推論），或 Phase 6（Docker、測試、部署文件完善），視優先順序決定。**
+> **目前已完成至「安全強化 P1」（部署前認證強化）。下一步：Phase 6 同網址部署（FastAPI / nginx 提供 React build、Docker；token 是否改 httpOnly cookie 待討論）；之後再排批次上限提高（輪詢瘦身 → 分片上傳 → 1000 張）、批次分析 Phase 2（空間關係推論），或 Phase 6（Docker、測試、部署文件完善），視優先順序決定。**
 
 **Agent 重構 B — ✅ 完成（2026-10-19）**
 
@@ -93,7 +93,7 @@
 - qwen2.5：調整 prompt + 預載資料後主要錯誤消失，每題 1–6 秒；仍偶爾夾雜簡體字
 - 建議：要開 `tool_calling` 時優先用 gemma4；qwen2.5 適合維持 `pipeline`。以 C 的評測量化後再決定預設
 
-*C 進度（2026-10-19）*
+*Agent 重構 C — ✅ 完成（2026-10-20）*
 - [x] `tests/evals/evaluate_agent_engines.py` + `agent_engine_cases.jsonl`（16 題）：in-memory SQLite 固定資料，兩個引擎都跑真實工具 / repository 程式碼；檢查工具軌跡（類似 agentevals superset）、必含內容、不得洩漏他人資料、數字必須來自資料、繁體中文；`--rescore` 可不呼叫模型重新評分
 - [x] 本機結果（Ollama，每題 2 次，報告：`tests/evals/results/agent_engine_eval_report.md`）
 
@@ -111,7 +111,7 @@
 - [x] 使用者決定：預設 `AGENT_ENGINE=tool_calling`，Agent 的 Ollama 預設模型 `AGENT_OLLAMA_MODEL=gemma4`（Chat 仍用 `OLLAMA_MODEL`）
 - [x] `GET /api/models?purpose=chat|agent` 回傳 `is_default` / `default_model`；Web 的 Chat / Agent 頁改為預選後端預設，不再預選清單第一個（原本有 OpenAI key 時會預設選到付費的 gpt-4.1-mini）
 - [x] Deep Agents 試做環境：另建 conda 環境 `yolo-deepagents`（clone 自 `yolo-backend`，deepagents 0.7.28 / langchain 1.4.6 / langgraph 1.2.16），主環境不動；現有 120 項測試在新環境也全部通過
-- [ ] Deep Agents 試做範圍：待使用者回覆。原則（使用者確認）：不適合就不放進專案，只留評估紀錄
+- [x] Deep Agents：**決定不採用**（2026-10-20，使用者確認）。理由：本專案的 Agent 任務都是短、唯讀的查詢與解釋，用不到虛擬檔案系統、subagent 與規劃；預設的長 system prompt 與檔案寫入工具反而增加本地 7–8B 模型的負擔，也違反「Agent 不寫資料」原則；且需升級 LangChain 並強制安裝 Anthropic / Google 整合套件。`AGENT_ENABLE_DEEPAGENTS` 維持 `false`。試做用的 conda 環境 `yolo-deepagents` 可刪除
 
 **Agent 重構 A — ✅ 完成（2026-10-19）**
 
@@ -144,6 +144,19 @@
 - [x] 文件：重寫 `desktop-app/README.md`；README / docs 移除本機絕對路徑；`docs/api-spec.md` 補 `PUT /api/auth/profile`
 - [x] 測試：`tests/test_profile_update.py`（7 項）
 
+**安全強化 P1（部署前認證強化）— ✅ 完成（2026-10-20）**
+
+- [x] `python-jose`（已停止維護）→ PyJWT；token 加 `ver` / `iat`，decode 要求 `exp` / `sub`
+- [x] migration `0012`：`users.token_version`；改密碼 / 停用 / 變更管理員身分時 +1，舊 token 立即失效；`deps.resolve_user_from_token()` 統一驗證（`/static` 的 Bearer 驗證也改用它）。0012 前的 token 無 `ver` 視為 0，升級不會把人登出
+- [x] Web 個人資料頁與 Desktop 改密碼成功後清除登入狀態並導回登入
+- [x] 登入失敗節流：`app/core/rate_limit.FailureWindow`，同帳號 5 次 / 同 IP 20 次（15 分鐘）→ 429 + `Retry-After`
+- [x] 密碼規則改為 8–64 位可列印 ASCII（可含符號、不含空白），後端 / Desktop / Web 一致
+- [x] 管理員不能刪除 / 停用 / 降級自己，也不能移除最後一位啟用中的管理員（`user_service.guard_admin_change`）
+- [x] `app/core/startup_checks.py`：`SECRET_KEY` 為範例值或少於 32 字元、seed admin 仍是預設密碼 → development 警告、production 拒絕啟動；`@app.on_event` 改為 `lifespan`
+- [x] production 關閉 `/docs` / `/redoc` / `/openapi.json`；SQL echo 改由 `DB_ECHO`（預設關閉）控制
+- [x] 測試：`tests/test_auth_hardening.py`（31 項）；全套 151 項通過
+- **部署 / 升級注意**：更新程式後必須先執行 `alembic upgrade head`（新增 `users.token_version`），否則登入查詢會失敗
+
 **安全強化 P0 — ✅ 完成（2026-10-19）**
 
 *背景*：全面安全審查後先處理四項 P0。審查同時確認：`.env`、`mysql/dataDB.py`、`utils/deepseek.py` 從未進入 git 歷史；擁有權檢查、static 路徑穿越防護、signed URL、agent admin 硬檢查、checkpoint SHA 校驗皆正確。
@@ -157,13 +170,13 @@
 
 *審查發現、尚未處理（依優先順序）*
 - [ ] npm 剩餘：vite 5 → 需 vite 8（dev server 漏洞，high）、react-router-dom 6 → 需 v7（moderate），皆為 breaking upgrade
-- [ ] 登入無頻率限制 / 帳號鎖定；註冊開放 + `APP_HOST=0.0.0.0` 時區網內任何人可註冊使用
-- [ ] JWT 24h 且無撤銷；改密碼後舊 token 不失效；token 存於 localStorage（改密碼需舊密碼已於桌面版修復時完成）
-- [ ] `python-jose` 已停止維護 → 改用 PyJWT
-- [ ] migration `0002` seed admin 預設密碼公開於 repo，需確認已改；DB 使用 `root` 帳號
-- [ ] 密碼規則 `[A-Za-z\d]` 禁止特殊字元（反而降低強度）
-- [ ] development 環境 SQLAlchemy `echo=True` 會把查詢參數寫進 log；`/docs` 公開
-- [ ] 頭像上傳不綁定使用者、無清理機制；`SECRET_KEY` 啟動檢查只比對一個預設值
+- [x] 登入頻率限制（P1 完成）；仍待辦：註冊開放 + `APP_HOST=0.0.0.0` 時區網內任何人可註冊使用（部署時決定是否關閉註冊或限制網段）
+- [x] JWT 撤銷（P1 完成）；仍待辦：token 存於 localStorage → 同網址部署時評估改 httpOnly cookie
+- [x] `python-jose` → PyJWT（P1 完成）
+- [x] seed admin 預設密碼：啟動時檢查（P1 完成）；仍待辦：DB 使用 `root` 帳號（部署時建立專用帳號）
+- [x] 密碼規則允許符號（P1 完成）
+- [x] SQL echo 預設關閉、production 關閉 `/docs`（P1 完成）
+- [ ] 頭像上傳不綁定使用者、無清理機制（`SECRET_KEY` 檢查已於 P1 加強）
 - [ ] LLM 限流為單行程記憶體；多 worker 部署需改 Redis
 
 **各類別閾值（per-class conf / IOU）— ✅ 完成（2026-09-04）**

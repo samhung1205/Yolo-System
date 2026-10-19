@@ -68,6 +68,43 @@ def create_user_by_admin(db: Session, user_in: UserCreate, is_admin: bool = Fals
     return new_user
 
 
+def guard_admin_change(
+    db: Session,
+    *,
+    acting_user: User,
+    target_user_id: int,
+    user_in: Optional[UserUpdate] = None,
+    deleting: bool = False,
+) -> None:
+    """Refuse changes that would lock administrators out.
+
+    An admin may not delete, demote or deactivate their own account, and the
+    last active admin cannot be removed by anyone.
+    """
+    target = get_user_by_id(db, target_user_id)
+    removes_admin = deleting or (
+        user_in is not None
+        and ((user_in.is_admin is False) or (user_in.is_active is False))
+    )
+    if not removes_admin or not target.is_admin:
+        return
+    if target.id == acting_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="不能刪除、停用或移除自己的管理員權限",
+        )
+    other_admins = (
+        db.query(User)
+        .filter(User.is_admin == True, User.is_active == True, User.id != target.id)
+        .count()
+    )
+    if other_admins == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="系統至少需要保留一位啟用中的管理員",
+        )
+
+
 def update_user(db: Session, user_id: int, user_in: UserUpdate) -> User:
     user = get_user_by_id(db, user_id)
 
@@ -95,14 +132,22 @@ def update_user(db: Session, user_id: int, user_in: UserUpdate) -> User:
     if user_in.avatar is not None:
         user.avatar = user_in.avatar
 
+    revoke_tokens = False
     if user_in.password is not None:
         user.password_hash = hash_password(user_in.password)
+        revoke_tokens = True
 
-    if user_in.is_admin is not None:
+    if user_in.is_admin is not None and user_in.is_admin != user.is_admin:
         user.is_admin = user_in.is_admin
+        revoke_tokens = True
 
-    if user_in.is_active is not None:
+    if user_in.is_active is not None and user_in.is_active != user.is_active:
         user.is_active = user_in.is_active
+        revoke_tokens = True
+
+    if revoke_tokens:
+        # Every token issued before this change stops working (deps.resolve_user_from_token).
+        user.token_version = (user.token_version or 0) + 1
 
     db.commit()
     db.refresh(user)

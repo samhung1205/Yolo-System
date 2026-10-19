@@ -9,6 +9,7 @@ import re
 
 USERNAME_RE = re.compile(r"^[A-Za-z0-9]{3,32}$")
 EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
-PASSWORD_RE = re.compile(r"^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,64}$")
+# Printable ASCII without spaces: letters + digits required, symbols allowed.
+PASSWORD_RE = re.compile(r"^(?=.*[A-Za-z])(?=.*\d)[\x21-\x7E]{8,64}$")
 
-PASSWORD_RULE_TEXT = "密码必须为 8-64 位英数组合，且同时包含字母与数字"
+PASSWORD_RULE_TEXT = "密码需为 8-64 位，同时包含英文字母与数字，可使用符号（不可含空格或中文）"

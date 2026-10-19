@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 
 import authService from "../services/authService";
 import { normalizeApiError } from "../services/api";
@@ -61,6 +61,7 @@ function EyeSlashIcon() {
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const notice = useLocation().state?.notice || "";
   const [form, setForm] = useState({ username: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
@@ -108,6 +109,8 @@ export default function LoginPage() {
             登入後可執行物件偵測、查詢歷史紀錄，並使用 AI Agent 分析結果。
           </p>
         </div>
+
+        {notice ? <div className="alert alert-success" role="status" aria-live="polite">{notice}</div> : null}
 
         {/* Form */}
         <form className="form-grid" onSubmit={handleSubmit}>

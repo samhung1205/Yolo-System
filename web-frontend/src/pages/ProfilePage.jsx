@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import authService from "../services/authService";
 import userService from "../services/userService";
 import { buildAvatarUrl, normalizeApiError } from "../services/api";
 
 export default function ProfilePage() {
+  const navigate = useNavigate();
   const [user, setUser] = useState(authService.getCurrentUser());
   const [loadError, setLoadError] = useState("");
 
@@ -67,6 +69,12 @@ export default function ProfilePage() {
     setSaving(true);
     try {
       const updated = await userService.updateProfile(payload);
+      if (payload.password) {
+        // A password change revokes every existing token (including this one).
+        authService.clearSession();
+        navigate("/login", { replace: true, state: { notice: "密碼已更新，請使用新密碼重新登入。" } });
+        return;
+      }
       // Refresh stored session user
       await authService.fetchCurrentUser();
       setUser(updated);
@@ -157,7 +165,7 @@ export default function ProfilePage() {
                   type="password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="至少 8 位英數組合（留空表示不更改）"
+                  placeholder="8–64 位，含英文字母與數字，可用符號（留空表示不更改）"
                   autoComplete="new-password"
                 />
               </label>

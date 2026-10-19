@@ -34,6 +34,7 @@ CREATE TABLE users (
     is_admin        BOOLEAN      NOT NULL DEFAULT FALSE,
     is_active       BOOLEAN      NOT NULL DEFAULT TRUE,
     last_login      DATETIME     NULL,
+    token_version   INT          NOT NULL DEFAULT 0,   -- migration 0012
     PRIMARY KEY (id),
     INDEX idx_username (username),
     INDEX idx_email (email)
@@ -41,6 +42,7 @@ CREATE TABLE users (
 ```
 
 補充：
+- `token_version`（migration `0012`）：JWT 帶 `ver` claim，改密碼 / 停用 / 變更管理員身分時 +1，舊 token 立即失效；0012 之前簽發、沒有 `ver` 的 token 視為版本 0
 - `email` 在資料表層仍允許 `NULL`，是為了與既有 legacy user 資料相容
 - 新的 Web / Desktop 註冊流程已要求 `email` 必填
 

@@ -7,7 +7,7 @@ Auth API routes:
 """
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_user, get_db
@@ -36,10 +36,14 @@ def register(
 @router.post("/login", response_model=TokenResponse)
 def login(
     credentials: LoginRequest,
+    request: Request,
     db: Annotated[Session, Depends(get_db)],
 ):
     """Authenticate and receive a JWT access token."""
-    token, user = login_user(db, credentials.username, credentials.password)
+    # request.client is the direct peer; behind a reverse proxy configure
+    # uvicorn --proxy-headers so this is the real client address.
+    client_ip = request.client.host if request.client else None
+    token, user = login_user(db, credentials.username, credentials.password, client_ip=client_ip)
     return TokenResponse(
         access_token=token,
         token_type="bearer",

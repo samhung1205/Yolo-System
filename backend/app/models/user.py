@@ -27,6 +27,9 @@ class User(Base):
     is_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     last_login: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Bumped on password change / deactivation / role change; JWTs carry it as
+    # the "ver" claim and older versions are rejected (migration 0012).
+    token_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
 
     def __repr__(self) -> str:
         return f"<User id={self.id} username={self.username} is_admin={self.is_admin}>"

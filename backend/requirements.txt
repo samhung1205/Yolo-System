@@ -9,7 +9,7 @@ alembic>=1.13.0
 cryptography>=42.0.0
 
 # Auth & Security
-python-jose[cryptography]>=3.3.0
+PyJWT>=2.8,<3  # replaces python-jose (unmaintained)
 bcrypt>=4.1.0
 # passlib removed: incompatible with bcrypt >= 4.x; using bcrypt directly
 

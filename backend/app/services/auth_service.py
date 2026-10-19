@@ -7,6 +7,8 @@ from fastapi import HTTPException, status
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
+from app.core.rate_limit import FailureWindow
 from app.core.security import create_access_token, hash_password, verify_password
 from app.models.user import User
 from app.schemas.user import UserCreate
@@ -47,26 +49,52 @@ def register_user(db: Session, user_in: UserCreate) -> User:
     return new_user
 
 
-def login_user(db: Session, username: str, password: str) -> tuple[str, User]:
+login_failures = FailureWindow()
+
+
+def _check_login_throttle(account_key: str, ip_key: str) -> None:
+    window = settings.LOGIN_FAILURE_WINDOW_SECONDS
+    retry_after = max(
+        login_failures.retry_after(account_key, limit=settings.LOGIN_MAX_FAILURES_PER_ACCOUNT, window_seconds=window),
+        login_failures.retry_after(ip_key, limit=settings.LOGIN_MAX_FAILURES_PER_IP, window_seconds=window),
+    )
+    if retry_after:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="登入失敗次數過多，請稍後再試。",
+            headers={"Retry-After": str(retry_after)},
+        )
+
+
+def login_user(db: Session, username: str, password: str, client_ip: str | None = None) -> tuple[str, User]:
     """
     Authenticate a user and return (jwt_token, user).
-    Raises 401 if credentials are invalid.
+    Raises 401 if credentials are invalid, 429 after too many failures.
     """
     account = username.strip()
+    account_key = f"account:{account.lower()}"
+    ip_key = f"ip:{client_ip or 'unknown'}"
+    _check_login_throttle(account_key, ip_key)
+
     user = db.query(User).filter(
         or_(User.username == account, User.email == account),
         User.is_active == True,
     ).first()
 
     if user is None or not verify_password(password, user.password_hash):
+        window = settings.LOGIN_FAILURE_WINDOW_SECONDS
+        login_failures.record(account_key, window_seconds=window)
+        login_failures.record(ip_key, window_seconds=window)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="帳號或密碼錯誤",
         )
 
+    login_failures.reset(account_key)
+
     # Update last_login timestamp
     user.last_login = datetime.now(timezone.utc)
     db.commit()
 
-    token = create_access_token(data={"sub": str(user.id)})
+    token = create_access_token(data={"sub": str(user.id), "ver": user.token_version or 0})
     return token, user

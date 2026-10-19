@@ -14,6 +14,12 @@
 Authorization: Bearer <jwt_token>
 ```
 
+- JWT 以 PyJWT 簽發（HS256），內含 `sub`（user id）、`ver`（`users.token_version`）、`iat`、`exp`
+- 改密碼、停用帳號、變更管理員身分後，該使用者**所有既有 token 立即失效**（回 401），需重新登入
+- 登入失敗節流：同一帳號 15 分鐘內失敗 `LOGIN_MAX_FAILURES_PER_ACCOUNT`（預設 5）次、或同一 IP 失敗 `LOGIN_MAX_FAILURES_PER_IP`（預設 20）次後，回 429 + `Retry-After`；該帳號登入成功會清除帳號計數
+- 密碼規則：8–64 位可列印 ASCII（不含空白），需同時包含英文字母與數字，可使用符號
+- `APP_ENV=production` 時不提供 `/docs`、`/redoc`、`/openapi.json`
+
 ### 錯誤格式
 ```json
 {
@@ -153,7 +159,7 @@ GET /static/detections/results/task_12_a1b2c3d4.jpg?sig=<hmac>&exp=<unix_ts>
 ```
 
 - `avatar`：必須是 `POST /api/upload/avatar` 回傳的 `filename`（格式 `YYYYMMDDhhmmss_xxxxxxxx.{jpg,png,gif,webp}`），且檔案存在；格式不符 422，檔案不存在 400
-- `password`：規則同註冊；**必須同時提供 `current_password`**，缺少或錯誤回 400「目前密碼不正確」
+- `password`：規則同註冊；**必須同時提供 `current_password`**，缺少或錯誤回 400「目前密碼不正確」。成功後所有既有 token 失效，Web / Desktop 會導回登入頁
 
 **Response 200**：`UserRead`
 
@@ -210,6 +216,10 @@ GET /static/detections/results/task_12_a1b2c3d4.jpg?sig=<hmac>&exp=<unix_ts>
   "avatar": "20260418_example.jpg"
 }
 ```
+
+### PUT / DELETE /api/users/{id} 的管理員保護
+- 管理員不能刪除、停用自己，或移除自己的管理員身分 → 400
+- 不能刪除 / 停用 / 降級最後一位啟用中的管理員 → 400
 
 ### DELETE /api/users/{id}
 **Response 200**

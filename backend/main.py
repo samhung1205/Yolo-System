@@ -4,11 +4,14 @@ FastAPI application entry point.
 Phase 1: Auth + Users (admin) + Upload + Health check
 """
 import os
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.security_headers import SecurityHeadersMiddleware
+from app.core.startup_checks import run_startup_checks
+from app.db.session import SessionLocal
 from app.api.routes import (
     agents,
     auth,
@@ -23,12 +26,27 @@ from app.api.routes import (
     yolo_models,
 )
 
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    print(f"[YOLO API] env={settings.APP_ENV}")
+    if not settings.is_production:
+        print(f"[YOLO API] docs → http://localhost:{settings.APP_PORT}/docs")
+    # Raises in production while a problem remains; warns otherwise.
+    for problem in run_startup_checks(settings, SessionLocal):
+        print(f"[YOLO API] WARNING: {problem} — fix this before any real deployment.")
+    yield
+
+
+# Interactive API docs expose every route and schema; keep them off in production.
+_docs_enabled = not settings.is_production
 app = FastAPI(
     title="YOLO System API",
     description="Backend API for YOLO detection system — desktop + web dual-track architecture",
     version="0.1.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
+    docs_url="/docs" if _docs_enabled else None,
+    redoc_url="/redoc" if _docs_enabled else None,
+    openapi_url="/openapi.json" if _docs_enabled else None,
+    lifespan=lifespan,
 )
 
 app.add_middleware(SecurityHeadersMiddleware)
@@ -64,16 +82,3 @@ app.include_router(models.router, prefix="/api/models", tags=["Models"])
 app.include_router(yolo_models.router, prefix="/api/yolo-models", tags=["YOLO Models"])
 app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
 
-
-@app.on_event("startup")
-async def startup_event():
-    print(f"[YOLO API] env={settings.APP_ENV}")
-    print(f"[YOLO API] docs → http://localhost:{settings.APP_PORT}/docs")
-    if settings.SECRET_KEY == "change-me-in-production":
-        message = (
-            "[YOLO API] WARNING: SECRET_KEY is still the built-in default. "
-            "JWT tokens are forgeable — set SECRET_KEY in backend/.env before any real deployment."
-        )
-        if settings.APP_ENV.lower() in ("production", "prod"):
-            raise RuntimeError(message)
-        print(message)

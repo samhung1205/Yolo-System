@@ -90,11 +90,11 @@ export default function RegisterPage() {
               onChange={(event) =>
                 setForm((prev) => ({ ...prev, password: event.target.value }))
               }
-              autoComplete="new-password" minLength={8} pattern="(?=.*[A-Za-z])(?=.*[0-9]).{8,}" aria-describedby="password-hint"
+              autoComplete="new-password" minLength={8} pattern="(?=.*[A-Za-z])(?=.*[0-9])[\x21-\x7E]{8,64}" maxLength={64} aria-describedby="password-hint"
               placeholder="輸入新密碼"
               required
             />
-            <small id="password-hint" className="muted">至少 8 位，需同時包含英文字母與數字。</small>
+            <small id="password-hint" className="muted">8–64 位，需同時包含英文字母與數字，可使用符號（不可含空白）。</small>
           </label>
 
           {error ? <div className="alert alert-error" role="alert" aria-live="assertive">{error}</div> : null}
