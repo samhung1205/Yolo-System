@@ -10,15 +10,15 @@ The availability of each provider is determined by the current `.env`:
 """
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal, Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 
 from app.core.config import settings
 from app.core.deps import get_current_user
 from app.models.user import User
-from app.services.llm_policy import allowed_models
+from app.services.llm_policy import allowed_models, provider_default_model
 
 router = APIRouter()
 
@@ -30,11 +30,16 @@ class ProviderModelList(BaseModel):
     available: bool = True
     """False when the provider's API key is not configured; models are shown
     as read-only placeholders so the user knows what to configure."""
+    is_default: bool = False
+    """True for the provider the backend uses when the client sends none."""
+    default_model: Optional[str] = None
+    """Model the backend uses for this provider when the client sends none."""
 
 
 @router.get("", response_model=list[ProviderModelList])
 def list_available_models(
     _current_user: Annotated[User, Depends(get_current_user)],
+    purpose: Literal["chat", "agent"] = Query(default="chat"),
 ) -> list[ProviderModelList]:
     """Return all LLM providers with the models a client is allowed to pick.
 
@@ -43,23 +48,44 @@ def list_available_models(
     a configured API key are included with ``available=False`` so the frontend
     can display them as "needs configuration" rather than hiding them entirely.
     """
-    return [
+    if purpose == "agent":
+        default_provider = settings.agent_effective_provider
+    else:
+        default_provider = settings.CHAT_PROVIDER
+
+    def default_for(provider: str) -> str:
+        if purpose == "agent" and provider == default_provider:
+            return settings.agent_effective_model
+        if purpose == "agent" and provider == "ollama":
+            return settings.AGENT_OLLAMA_MODEL or provider_default_model("ollama")
+        return provider_default_model(provider)
+
+    def models_for(provider: str) -> list[str]:
+        models = allowed_models(provider)
+        preferred = default_for(provider)
+        return [preferred] + [m for m in models if m != preferred] if preferred in models else models
+
+    groups = [
         ProviderModelList(
             provider="openai",
             label="OpenAI GPT",
-            models=allowed_models("openai"),
+            models=models_for("openai"),
             available=bool(settings.OPENAI_API_KEY.strip()),
         ),
         ProviderModelList(
             provider="deepseek",
             label="DeepSeek",
-            models=allowed_models("deepseek"),
+            models=models_for("deepseek"),
             available=bool(settings.DEEPSEEK_API_KEY.strip()),
         ),
         ProviderModelList(
             provider="ollama",
             label="Ollama (本地)",
-            models=allowed_models("ollama"),
+            models=models_for("ollama"),
             available=True,
         ),
     ]
+    for group in groups:
+        group.default_model = default_for(group.provider)
+        group.is_default = group.provider == default_provider
+    return groups

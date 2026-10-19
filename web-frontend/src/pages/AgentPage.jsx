@@ -6,7 +6,7 @@ import remarkGfm from "remark-gfm";
 import { normalizeApiError } from "../services/api";
 import agentService from "../services/agentService";
 import authService from "../services/authService";
-import modelService from "../services/modelService";
+import modelService, { pickDefaultSelection } from "../services/modelService";
 import ModelPicker from "../components/ModelPicker";
 import { useAssistantState } from "../state/assistantState";
 import SavedResultPicker from "../components/SavedResultPicker";
@@ -169,15 +169,15 @@ export default function AgentPage() {
 
   useEffect(() => {
     let active = true;
-    modelService.listModels().then((groups) => {
+    modelService.listModels("agent").then((groups) => {
       if (!active) return;
       if (Array.isArray(groups) && groups.length > 0) {
         setProviderGroups(groups);
-        // Prefer the first provider that is actually usable (API key set /
-        // local daemon); unavailable ones are only display placeholders.
-        const usable = groups.find((g) => g.available !== false) || groups[0];
-        setSelectedProvider((current) => current || usable.provider);
-        setSelectedModel((current) => current || usable.models[0] || null);
+        // Start from the backend's default (e.g. local gemma4 for the agent)
+        // rather than the first provider in the list, which may be a paid API.
+        const initial = pickDefaultSelection(groups);
+        setSelectedProvider((current) => current || initial.provider);
+        setSelectedModel((current) => current || initial.model);
       }
     }).catch(() => {});
     return () => {

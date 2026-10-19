@@ -747,8 +747,10 @@ data: {"type":"error","message":"錯誤訊息"}
 
 | 值 | 行為 |
 |----|------|
-| `pipeline`（預設） | 依 mode / 關鍵字決定流程，後端先查好資料，再呼叫一次 LLM（`app/agents/graph.py`） |
-| `tool_calling` | LangChain v1 `create_agent`：模型自行決定呼叫哪些唯讀工具（`app/agents/tool_agent.py`、`langchain_tools.py`），每次請求最多 `AGENT_MAX_TOOL_CALLS` 次工具呼叫 |
+| `tool_calling`（預設） | LangChain v1 `create_agent`：模型自行決定呼叫哪些唯讀工具（`app/agents/tool_agent.py`、`langchain_tools.py`），每次請求最多 `AGENT_MAX_TOOL_CALLS` 次工具呼叫 |
+| `pipeline` | 依 mode / 關鍵字決定流程，後端先查好資料，再呼叫一次 LLM（`app/agents/graph.py`） |
+
+預設值依據 `tests/evals/evaluate_agent_engines.py` 評測（2026-10-19）：tool_calling + gemma4 31/32 題通過。provider 為 ollama 且未指定模型時，Agent 用 `AGENT_OLLAMA_MODEL`（預設 `gemma4`），Chat 仍用 `OLLAMA_MODEL`。
 
 - `tool_calling` 遇到以下情況自動改走 `pipeline`：`provider=mock`、`mode=report`（報告 markdown 需保持確定性）、`AGENT_ENABLE_VISION=true` 時的 `explain_detection`（只有 pipeline 會附圖）
 - 各 mode 可用工具：`explain_detection` → 偵測詳情 / 比較；`history_analysis` → 歷史統計 / 近期清單 / 模型表現 / 偵測詳情；`batch_analysis` → 批次統計 / 依類別查影像；`admin_help` → 使用者清單 / 全站統計（僅 admin）；`general_chat` → 無工具；`auto` → 全部一般工具（admin 另含管理工具）
@@ -846,6 +848,15 @@ Desktop 端使用 `DesktopApiClient.stream_agent_chat()`（`AICSMain.py → Agen
 ### GET /api/models
 > 需要 JWT 驗證。回傳目前環境中可用的 LLM providers 與其模型清單，由前端模型選單用於動態渲染選項。
 
+**Query Params**
+- `purpose`（`chat` | `agent`，預設 `chat`）：決定哪個 provider 標成預設。`chat` 依 `CHAT_PROVIDER`；`agent` 依 `AGENT_PROVIDER`（未設定則同 `CHAT_PROVIDER`）與 `AGENT_MODEL` / `AGENT_OLLAMA_MODEL`
+
+**每個 provider 額外欄位**
+- `is_default`：client 不指定 provider 時後端會用的 provider
+- `default_model`：該 provider 的預設模型（也會排在 `models` 第一個）
+
+前端（ChatPage / AgentPage）以 `pickDefaultSelection()` 預選「可用的預設 provider + default_model」，避免預設選到清單第一個的付費 API。
+
 **決策邏輯：**
 - 回傳的模型清單與 `/api/chat`、`/api/agent/chat*` 實際允許的白名單**同一份**（`app/services/llm_policy.py`）
 - `openai`：一律列出；`available` 依 `OPENAI_API_KEY` 是否設定。模型 = `OPENAI_CHAT_MODEL` + `OPENAI_ALLOWED_MODELS`（未設定時預設 `gpt-4.1-mini`、`gpt-4o`）
@@ -868,7 +879,9 @@ Desktop 端使用 `DesktopApiClient.stream_agent_chat()`（`AICSMain.py → Agen
     "provider": "openai",
     "label": "OpenAI GPT",
     "models": ["gpt-4.1-mini", "gpt-4o"],
-    "available": true
+    "available": true,
+    "is_default": false,
+    "default_model": "gpt-4.1-mini"
   },
   {
     "provider": "deepseek",

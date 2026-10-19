@@ -64,11 +64,15 @@ class Settings(BaseSettings):
     AGENT_PROVIDER: str = ""
     AGENT_MODEL: str = ""
     AGENT_ENABLE_DEEPAGENTS: bool = False
-    # "pipeline" (default): keyword/mode routing + one LLM call (graph.py).
-    # "tool_calling": LangChain create_agent picks read-only tools itself
-    # (tool_agent.py); falls back to the pipeline for mock / report / vision.
-    AGENT_ENGINE: str = "pipeline"
+    # "tool_calling" (default since the 2026-10-19 eval, tests/evals/
+    # evaluate_agent_engines.py): LangChain create_agent picks read-only tools
+    # itself (tool_agent.py); falls back to the pipeline for mock / report /
+    # vision. "pipeline": keyword/mode routing + one LLM call (graph.py).
+    AGENT_ENGINE: str = "tool_calling"
     AGENT_MAX_TOOL_CALLS: int = 8
+    # Ollama model the agent uses when AGENT_MODEL is empty (chat keeps
+    # OLLAMA_MODEL). gemma4 scored best in the engine eval.
+    AGENT_OLLAMA_MODEL: str = "gemma4"
     AGENT_MAX_HISTORY_TURNS: int = 10
     AGENT_RECURSION_LIMIT: int = 25
     # When true, explain_detection / report modes attach the annotated result
@@ -148,7 +152,7 @@ class Settings(BaseSettings):
     @classmethod
     def normalize_agent_engine(cls, v: Any) -> str:
         if isinstance(v, str):
-            value = v.strip().lower() or "pipeline"
+            value = v.strip().lower() or "tool_calling"
             if value not in ("pipeline", "tool_calling"):
                 raise ValueError("AGENT_ENGINE must be 'pipeline' or 'tool_calling'")
             return value
@@ -179,7 +183,7 @@ class Settings(BaseSettings):
             return self.AGENT_MODEL.strip()
         provider = self.agent_effective_provider
         if provider == "ollama":
-            return self.OLLAMA_MODEL or "llama3.2"
+            return self.AGENT_OLLAMA_MODEL or self.OLLAMA_MODEL or "gemma4"
         if provider == "deepseek":
             return self.DEEPSEEK_CHAT_MODEL or "deepseek-chat"
         return self.OPENAI_CHAT_MODEL or "mock-chat"

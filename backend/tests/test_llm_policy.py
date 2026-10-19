@@ -195,3 +195,29 @@ def test_chat_route_rejects_unlisted_model(client):
         json={"question": "hi", "provider": "openai", "model": "o1-pro"},
     )
     assert response.status_code == 400
+
+
+def test_models_endpoint_flags_agent_default(client, monkeypatch):
+    monkeypatch.setattr(settings, "AGENT_PROVIDER", "")
+    monkeypatch.setattr(settings, "AGENT_MODEL", "")
+    monkeypatch.setattr(settings, "CHAT_PROVIDER", "ollama")
+    monkeypatch.setattr(settings, "OLLAMA_MODEL", "llama3.2")
+    monkeypatch.setattr(settings, "AGENT_OLLAMA_MODEL", "gemma4")
+    monkeypatch.setattr(llm_policy, "fetch_ollama_models", lambda: ["llama3.2", "gemma4", "qwen2.5"])
+
+    agent = {g["provider"]: g for g in client.get("/api/models", params={"purpose": "agent"}).json()}
+    assert agent["ollama"]["is_default"] is True
+    assert agent["ollama"]["default_model"] == "gemma4"
+    assert agent["ollama"]["models"][0] == "gemma4"
+    assert agent["openai"]["is_default"] is False
+
+    chat = {g["provider"]: g for g in client.get("/api/models").json()}
+    assert chat["ollama"]["default_model"] == "llama3.2"
+
+
+def test_agent_defaults_to_tool_calling_with_gemma4(monkeypatch):
+    from app.core.config import Settings
+
+    fresh = Settings(_env_file=None, CHAT_PROVIDER="ollama")
+    assert fresh.AGENT_ENGINE == "tool_calling"
+    assert fresh.agent_effective_model == "gemma4"

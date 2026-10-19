@@ -108,8 +108,10 @@
 
   - pipeline 在 Auto 模式未選資料時（「第 12 筆」、比較兩筆、問他人資料）所有模型都 0 分：關鍵字路由只能叫使用者切換模式
   - 數字 grounding 全部模型都很好（僅 1 次編造），主要差異在內容完整度與繁簡體
-- [ ] 待使用者決定：`AGENT_ENGINE` 預設值、預設本地模型（評測建議 tool_calling + gemma4；qwen2.5 較快但正確率低）
-- [ ] Deep Agents 試做（需先決定：另開 conda 環境或升級主環境 LangChain 1.3→1.4.6；試做範圍）
+- [x] 使用者決定：預設 `AGENT_ENGINE=tool_calling`，Agent 的 Ollama 預設模型 `AGENT_OLLAMA_MODEL=gemma4`（Chat 仍用 `OLLAMA_MODEL`）
+- [x] `GET /api/models?purpose=chat|agent` 回傳 `is_default` / `default_model`；Web 的 Chat / Agent 頁改為預選後端預設，不再預選清單第一個（原本有 OpenAI key 時會預設選到付費的 gpt-4.1-mini）
+- [x] Deep Agents 試做環境：另建 conda 環境 `yolo-deepagents`（clone 自 `yolo-backend`，deepagents 0.7.28 / langchain 1.4.6 / langgraph 1.2.16），主環境不動；現有 120 項測試在新環境也全部通過
+- [ ] Deep Agents 試做範圍：待使用者回覆。原則（使用者確認）：不適合就不放進專案，只留評估紀錄
 
 **Agent 重構 A — ✅ 完成（2026-10-19）**
 
