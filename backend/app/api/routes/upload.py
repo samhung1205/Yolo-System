@@ -3,30 +3,34 @@ File upload routes:
   POST /api/upload/avatar
 """
 import os
-import uuid
-from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from sqlalchemy.orm import Session
 
-from app.core.deps import get_current_user
+from app.core.deps import get_current_user, get_db
 from app.core.static_tokens import build_signed_static_url
 from app.core.uploads import InvalidUploadError, image_extension_for_bytes
 from app.models.user import User
+from app.services import avatar_service
 
 router = APIRouter()
 
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB
-AVATAR_DIR = "static/avatars"
 
 
 @router.post("/avatar")
 async def upload_avatar(
     file: Annotated[UploadFile, File(description="Avatar image (JPEG/PNG, max 5MB)")],
     current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
 ):
-    """Upload an avatar image. Returns the saved filename."""
+    """Upload an avatar image. Returns the saved filename.
+
+    The file is named after the uploader (avatar_service), so only this user
+    can later assign it; their older unassigned uploads are pruned here.
+    """
     if file.content_type not in ALLOWED_IMAGE_TYPES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -54,13 +58,13 @@ async def upload_avatar(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="只支援 JPEG、PNG、GIF、WEBP 格式",
         )
-    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-    filename = f"{timestamp}_{uuid.uuid4().hex[:8]}{ext}"
-    save_path = os.path.join(AVATAR_DIR, filename)
-
-    os.makedirs(AVATAR_DIR, exist_ok=True)
-    with open(save_path, "wb") as f:
+    filename = avatar_service.new_avatar_filename(current_user.id, ext)
+    avatar_dir = avatar_service.AVATAR_DIR
+    os.makedirs(avatar_dir, exist_ok=True)
+    with open(avatar_dir / filename, "wb") as f:
         f.write(contents)
+
+    avatar_service.prune_pending_uploads(db, current_user.id, keep=filename)
 
     return {
         "filename": filename,

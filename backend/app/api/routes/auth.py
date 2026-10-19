@@ -16,8 +16,7 @@ from app.models.user import User
 from app.schemas.auth import LoginRequest, TokenResponse
 from app.schemas.user import ProfileUpdate, UserCreate, UserRead, UserUpdate
 from app.services.auth_service import login_user, register_user
-from app.services import user_service
-from app.services.user_service import AVATAR_DIR
+from app.services import avatar_service, user_service
 from app.services.user_response_service import to_user_read
 
 router = APIRouter()
@@ -74,10 +73,9 @@ def update_my_profile(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="目前密碼不正確",
             )
-    if profile_in.avatar is not None and not (AVATAR_DIR / profile_in.avatar).is_file():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="找不到上傳的頭像，請重新上傳",
+    if profile_in.avatar is not None:
+        avatar_service.check_avatar_assignment(
+            db, acting_user_id=current_user.id, filename=profile_in.avatar, target_user=current_user
         )
 
     update_data = UserUpdate(

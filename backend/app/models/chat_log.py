@@ -3,7 +3,7 @@ Chat log ORM model for persisted AI chat records.
 """
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.session import Base
@@ -11,6 +11,10 @@ from app.db.session import Base
 
 class ChatLog(Base):
     __tablename__ = "chat_logs"
+    # Migration 0013; chat_repository.append_log retries on a collision.
+    __table_args__ = (
+        UniqueConstraint("user_id", "conversation_id", "turn_index", name="uq_chat_logs_user_conversation_turn"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(

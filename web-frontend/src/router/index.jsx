@@ -1,5 +1,5 @@
 import { lazy } from "react";
-import { Navigate, createBrowserRouter } from "react-router-dom";
+import { Navigate, createBrowserRouter } from "react-router";
 
 import Layout from "../components/Layout";
 import AssistantWorkspace from "../components/AssistantWorkspace";

@@ -14,12 +14,26 @@ EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 PASSWORD_RE = re.compile(r"^(?=.*[A-Za-z])(?=.*\d)[\x21-\x7E]{8,64}$")
 
 
+def _clean_avatar(v: Optional[str]) -> Optional[str]:
+    """Shape check only; who may use which file is checked in avatar_service."""
+    if v is None:
+        return None
+    text = v.strip()
+    if not text:
+        return None
+    if len(text) > 255 or "/" in text or "\\" in text or text.startswith("."):
+        raise ValueError("頭像檔名無效，請重新上傳頭像")
+    return text
+
+
 class UserCreate(BaseModel):
     username: str
     email: Optional[str] = None
     password: str
     nickname: Optional[str] = None
     avatar: Optional[str] = None
+
+    _validate_avatar = field_validator("avatar")(classmethod(lambda cls, v: _clean_avatar(v)))
 
     @field_validator("username")
     @classmethod
@@ -64,9 +78,6 @@ class UserRead(BaseModel):
     model_config = {"from_attributes": True}
 
 
-AVATAR_FILENAME_RE = re.compile(r"^\d{14}_[0-9a-f]{8}\.(jpg|png|gif|webp)$")
-
-
 class ProfileUpdate(BaseModel):
     """Self-service profile update — nickname, avatar and password only.
 
@@ -79,15 +90,7 @@ class ProfileUpdate(BaseModel):
     password: Optional[str] = None
     current_password: Optional[str] = None
 
-    @field_validator("avatar")
-    @classmethod
-    def validate_avatar(cls, v: Optional[str]) -> Optional[str]:
-        if v is None:
-            return None
-        text = v.strip()
-        if not AVATAR_FILENAME_RE.match(text):
-            raise ValueError("頭像檔名無效，請重新上傳頭像")
-        return text
+    _validate_avatar = field_validator("avatar")(classmethod(lambda cls, v: _clean_avatar(v)))
 
     @field_validator("password")
     @classmethod
@@ -108,6 +111,8 @@ class UserUpdate(BaseModel):
     is_admin: Optional[bool] = None
     is_active: Optional[bool] = None
     avatar: Optional[str] = None
+
+    _validate_avatar = field_validator("avatar")(classmethod(lambda cls, v: _clean_avatar(v)))
 
     @field_validator("username")
     @classmethod

@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from app.core.deps import get_current_admin, get_db
 from app.models.user import User
 from app.schemas.user import UserCreate, UserRead, UserUpdate
-from app.services import user_service
+from app.services import avatar_service, user_service
 from app.services.user_response_service import to_user_read
 
 router = APIRouter()
@@ -40,6 +40,8 @@ def create_user(
     current_admin: Annotated[User, Depends(get_current_admin)],
 ):
     """Admin creates a new user account."""
+    if user_in.avatar is not None:
+        avatar_service.check_avatar_assignment(db, acting_user_id=current_admin.id, filename=user_in.avatar)
     user = user_service.create_user_by_admin(db, user_in)
     return to_user_read(user)
 
@@ -53,6 +55,13 @@ def update_user(
 ):
     """Admin updates a user's information."""
     user_service.guard_admin_change(db, acting_user=current_admin, target_user_id=user_id, user_in=user_in)
+    if user_in.avatar is not None:
+        avatar_service.check_avatar_assignment(
+            db,
+            acting_user_id=current_admin.id,
+            filename=user_in.avatar,
+            target_user=user_service.get_user_by_id(db, user_id),
+        )
     user = user_service.update_user(db, user_id, user_in)
     return to_user_read(user)
 

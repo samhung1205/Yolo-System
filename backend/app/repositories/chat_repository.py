@@ -2,6 +2,7 @@
 Repository helpers for chat logs.
 """
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.chat_log import ChatLog
@@ -31,6 +32,44 @@ def create_log(
     db.commit()
     db.refresh(chat_log)
     return chat_log
+
+
+APPEND_MAX_ATTEMPTS = 5
+
+
+def append_log(
+    db: Session,
+    *,
+    user_id: int,
+    conversation_id: str,
+    provider: str,
+    model_name: str,
+    question: str,
+    answer: str,
+) -> ChatLog:
+    """Store a turn at the conversation's next turn_index.
+
+    Concurrent requests can pick the same index; the unique constraint
+    (migration 0013) rejects the loser, which retries with a fresh index.
+    """
+    for attempt in range(APPEND_MAX_ATTEMPTS):
+        turn_index = get_next_turn_index(db, user_id=user_id, conversation_id=conversation_id)
+        try:
+            return create_log(
+                db,
+                user_id=user_id,
+                conversation_id=conversation_id,
+                turn_index=turn_index,
+                provider=provider,
+                model_name=model_name,
+                question=question,
+                answer=answer,
+            )
+        except IntegrityError:
+            db.rollback()
+            if attempt == APPEND_MAX_ATTEMPTS - 1:
+                raise
+    raise AssertionError("unreachable")
 
 
 def list_logs(db: Session, *, user_id: int | None = None, limit: int = 50) -> list[ChatLog]:

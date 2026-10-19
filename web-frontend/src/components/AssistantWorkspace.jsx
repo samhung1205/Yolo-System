@@ -1,5 +1,5 @@
 import { useReducer } from "react";
-import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { NavLink, Outlet, useLocation } from "react-router";
 import { AssistantStateContext, updateWorkspace } from "../state/assistantState";
 
 export default function AssistantWorkspace() {

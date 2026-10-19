@@ -75,7 +75,21 @@
 
 ## 當前 Phase
 
-> **目前已完成至「安全強化 P1」（部署前認證強化）。下一步：Phase 6 同網址部署（FastAPI / nginx 提供 React build、Docker；token 是否改 httpOnly cookie 待討論）；之後再排批次上限提高（輪詢瘦身 → 分片上傳 → 1000 張）、批次分析 Phase 2（空間關係推論），或 Phase 6（Docker、測試、部署文件完善），視優先順序決定。**
+> **目前已完成至「部署前清理」（react-router 7、頭像歸屬與清理、對話輪次唯一鍵）。下一步：Phase 6 同網址部署（FastAPI / nginx 提供 React build、Docker；token 是否改 httpOnly cookie 待討論）；之後再排批次上限提高（輪詢瘦身 → 分片上傳 → 1000 張）、批次分析 Phase 2（空間關係推論），或 Phase 6（Docker、測試、部署文件完善），視優先順序決定。**
+
+**部署前清理 — ✅ 完成（2026-10-20）**
+
+- [x] **react-router 6 → 7.18.4**（修 open redirect，moderate）：移除 `react-router-dom`，改 import `react-router`；`RouterProvider` 改從 `react-router/dom` 匯入，移除已成預設的 `v7_startTransition` future flag。v8 需要 React 19，暫不升級
+- [x] **頭像歸屬與清理**（`app/services/avatar_service.py`）
+  - 上傳檔名改為 `u{上傳者 id}_YYYYMMDDhhmmss_xxxxxxxx.ext`，不需新資料表
+  - `PUT /api/auth/profile`、`POST /api/users`、`PUT /api/users/{id}`：只能指定自己上傳、存在、且沒被其他帳號使用的檔案；重送目前的頭像（含舊格式檔名）一律允許
+  - 換頭像後刪除沒人使用的舊檔；同一上傳者超過 1 小時未指定的上傳，在他下次上傳時清除；刪除帳號時一併刪除其頭像與未指定的上傳
+  - `scripts/cleanup_avatars.py`：整個目錄的孤兒檔清理（含舊格式），預設 dry-run，`--apply` 才刪
+  - Desktop 不需修改（沿用 upload 回傳的 `filename`）
+- [x] **對話輪次唯一鍵**：migration `0013` 先把重複輪次依原順序重編為 1..n，再加 `UNIQUE (user_id, conversation_id, turn_index)`；`chat_repository.append_log()` 撞鍵時以下一個編號重試（最多 5 次），Chat / Agent 的四個寫入點都改用它
+- [x] 測試：`tests/test_avatar_ownership.py`（15 項）、`tests/test_chat_turn_index.py`（7 項）；全套 174 項通過
+- [x] 實測（真實 FastAPI + 暫用 SQLite + Vite dev server）：登入導頁、受保護路由導回 `/login`、admin 路由擋一般使用者、未知路徑導回 `/`、`/agent?mode=&detection_id=` 帶入、改密碼後帶提示導回登入；頭像上傳 / 指定 / 換頭像刪舊檔 / 盜用他人上傳回 400
+- **部署 / 升級注意**：執行 `alembic upgrade head`（在 `backend/` 目錄）套用 `0013`
 
 **Agent 重構 B — ✅ 完成（2026-10-19）**
 
@@ -169,14 +183,14 @@
 - [x] 測試：`tests/test_upload_hardening.py`、`tests/test_llm_policy.py`、`tests/test_error_sanitization.py`（新增 31 項，全套 82 項通過）
 
 *審查發現、尚未處理（依優先順序）*
-- [ ] npm 剩餘：vite 5 → 需 vite 8（dev server 漏洞，high）、react-router-dom 6 → 需 v7（moderate），皆為 breaking upgrade
+- [ ] npm 剩餘：vite 5 → 需 vite 8（只影響 dev server，high；breaking upgrade）。react-router 7 已於「部署前清理」完成
 - [x] 登入頻率限制（P1 完成）；仍待辦：註冊開放 + `APP_HOST=0.0.0.0` 時區網內任何人可註冊使用（部署時決定是否關閉註冊或限制網段）
 - [x] JWT 撤銷（P1 完成）；仍待辦：token 存於 localStorage → 同網址部署時評估改 httpOnly cookie
 - [x] `python-jose` → PyJWT（P1 完成）
 - [x] seed admin 預設密碼：啟動時檢查（P1 完成）；仍待辦：DB 使用 `root` 帳號（部署時建立專用帳號）
 - [x] 密碼規則允許符號（P1 完成）
 - [x] SQL echo 預設關閉、production 關閉 `/docs`（P1 完成）
-- [ ] 頭像上傳不綁定使用者、無清理機制（`SECRET_KEY` 檢查已於 P1 加強）
+- [x] 頭像上傳綁定上傳者 + 清理機制（部署前清理完成）
 - [ ] LLM 限流為單行程記憶體；多 worker 部署需改 Redis
 
 **各類別閾值（per-class conf / IOU）— ✅ 完成（2026-09-04）**
@@ -335,8 +349,8 @@ Ultralytics 的 `predict()` 只接受純量 `conf`/`iou`，因此 per-class 必�
 - [x] `/static` 認證（signed URL + JWT fallback；`<img>` 使用 API 回傳的 `*_url` / `avatar_url`）
 - [ ] migration `0002` seed admin 預設密碼：部署後必須立即改密
 - [ ] YOLO 推論 / LLM 串流阻塞 worker：正式部署需 job queue（Phase 6）
-- [ ] `turn_index` 併發重複（低風險，待補 unique constraint）
-- [ ] webcam / RTSP legacy QThread 重啟問題（legacy 範圍）
+- [x] `turn_index` 併發重複：migration `0013` 唯一鍵 + 重試（部署前清理完成）
+- [x] webcam / RTSP legacy QThread 重啟問題（桌面版維護模式修復）
 
 **Phase 0 — 已完成**
 - [x] 盤點 legacy 專案
@@ -602,4 +616,4 @@ cd backend && uvicorn main:app --reload --port 8000
 
 ---
 
-*最後更新: 安全強化 P0 — 2026-10-19*
+*最後更新: 部署前清理 — 2026-10-20*

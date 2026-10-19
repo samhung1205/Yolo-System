@@ -11,8 +11,8 @@ from app.core.security import hash_password
 from app.models.detection_task import DetectionTask
 from app.models.user import User
 from app.schemas.user import UserCreate, UserUpdate
+from app.services import avatar_service
 
-AVATAR_DIR = Path("static/avatars")
 STATIC_ROOT = Path("static")
 
 
@@ -129,6 +129,7 @@ def update_user(db: Session, user_id: int, user_in: UserUpdate) -> User:
     if user_in.nickname is not None:
         user.nickname = user_in.nickname
 
+    previous_avatar = user.avatar
     if user_in.avatar is not None:
         user.avatar = user_in.avatar
 
@@ -151,6 +152,8 @@ def update_user(db: Session, user_id: int, user_in: UserUpdate) -> User:
 
     db.commit()
     db.refresh(user)
+    if previous_avatar and previous_avatar != user.avatar:
+        avatar_service.delete_if_unreferenced(db, previous_avatar)
     return user
 
 
@@ -160,9 +163,15 @@ def delete_user(db: Session, user_id: int) -> None:
     # Collect static file paths BEFORE the delete cascades the DB rows away,
     # so detection media and the avatar don't become orphaned on disk.
     file_paths = _collect_user_static_files(db, user)
+    avatar = user.avatar
 
     db.delete(user)
     db.commit()
+
+    # The avatar goes only if no other account uses it; unassigned uploads by
+    # this user go regardless of age.
+    avatar_service.delete_if_unreferenced(db, avatar)
+    avatar_service.prune_pending_uploads(db, user_id, older_than_seconds=0)
 
     for path in file_paths:
         try:
@@ -187,6 +196,4 @@ def _collect_user_static_files(db: Session, user: User) -> list[Path]:
         ):
             if relative:
                 paths.append(STATIC_ROOT / relative)
-    if user.avatar and "/" not in user.avatar and "\\" not in user.avatar:
-        paths.append(AVATAR_DIR / user.avatar)
     return paths

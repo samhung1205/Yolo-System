@@ -7,12 +7,13 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.api.routes import auth as auth_routes
+from app.services import avatar_service
 from app.core.deps import get_current_user, get_db
 from app.core.security import hash_password
 from app.models.user import User
 from main import app
 
-AVATAR = "20261019120000_ab12cd34.png"
+AVATAR = "u7_20261019120000_ab12cd34.png"
 
 
 @pytest.fixture
@@ -49,7 +50,8 @@ def client(tmp_path, monkeypatch):
             "is_active": True,
         },
     )
-    monkeypatch.setattr(auth_routes, "AVATAR_DIR", tmp_path)
+    monkeypatch.setattr(avatar_service, "AVATAR_DIR", tmp_path)
+    monkeypatch.setattr(avatar_service, "is_referenced", lambda db, name, exclude_user_id=None: False)
 
     test_client = TestClient(app)
     test_client.calls = calls
@@ -98,6 +100,14 @@ def test_avatar_must_look_like_an_uploaded_filename(client):
 
 def test_avatar_must_exist(client):
     response = client.put("/api/auth/profile", json={"avatar": AVATAR})
+    assert response.status_code == 400
+    assert client.calls == []
+
+
+def test_avatar_uploaded_by_someone_else_is_rejected(client):
+    other = "u8_20261019120000_ab12cd34.png"
+    (client.avatar_dir / other).write_bytes(b"png")
+    response = client.put("/api/auth/profile", json={"avatar": other})
     assert response.status_code == 400
     assert client.calls == []
 

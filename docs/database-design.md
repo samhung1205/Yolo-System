@@ -182,7 +182,8 @@ CREATE TABLE chat_logs (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     INDEX ix_chat_logs_user_id (user_id),
     INDEX ix_chat_logs_conversation_id (conversation_id),
-    INDEX ix_chat_logs_created_at (created_at)
+    INDEX ix_chat_logs_created_at (created_at),
+    UNIQUE KEY uq_chat_logs_user_conversation_turn (user_id, conversation_id, turn_index)  -- migration 0013
 );
 ```
 
@@ -191,6 +192,7 @@ CREATE TABLE chat_logs (
   - 同一段對話的識別碼，用於 history 與 context 聚合
 - `turn_index`
   - 對話內第幾輪問答
+  - 同一使用者、同一對話內唯一（migration `0013`）。兩個請求同時寫同一段對話時，後寫入的會撞到唯一鍵，`chat_repository.append_log()` 會改用下一個編號重試
 - `provider`
   - 目前支援 `openai`、`deepseek`
 - `model_name`
@@ -230,6 +232,8 @@ users (1) ──────< chat_logs (M)
 - `0009`: `detection_tasks` 新增 `model_key` / `model_sha256` / `model_class_map_json` / `confidence_threshold` / `iou_threshold`（YOLO checkpoint provenance）
 - `0010`: 建立 `detection_batches` 表，並在 `detection_tasks` 新增 `batch_id`（nullable FK，`ON DELETE CASCADE`）— 批次影像分析 Phase 1
 - `0011`: `detection_tasks` 與 `detection_batches` 各新增 `class_thresholds_json`（各類別自訂 conf/IOU）
+- `0012`: `users` 新增 `token_version`（JWT 撤銷）
+- `0013`: `chat_logs` 新增唯一鍵 `(user_id, conversation_id, turn_index)`；建立前先把既有重複的輪次依原順序重新編號為 1..n
 
 ### 執行指令
 ```bash
@@ -280,3 +284,4 @@ alembic upgrade head
 | v0.8 | 2026-07-14 | migration `0009`：`detection_tasks` 新增 YOLO checkpoint provenance 欄位（`model_key`/`model_sha256`/`model_class_map_json`/`confidence_threshold`/`iou_threshold`） |
 | v0.9 | 2026-07-23 | migration `0010`：新增 `detection_batches` 表 + `detection_tasks.batch_id`，支援批次影像分析（Phase 1：多圖上傳 + 每類別總數聚合 + Agent `batch_analysis` 模式） |
 | v1.0 | 2026-09-04 | migration `0011`：`detection_tasks` / `detection_batches` 新增 `class_thresholds_json`，支援各類別獨立 conf/IOU 閾值（image + batch） |
+| v1.1 | 2026-10-20 | migration `0012`：`users.token_version`；migration `0013`：`chat_logs` 輪次唯一鍵；頭像檔名帶上傳者 id（`u{id}_…`），檔案層面的歸屬與清理，資料表不變 |

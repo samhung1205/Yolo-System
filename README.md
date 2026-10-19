@@ -146,7 +146,7 @@ conda run -n yolo-backend pip install -r requirements.txt
 # CHAT_PROVIDER=mock
 # CORS_ORIGINS 可用逗號分隔，或 JSON array 字串
 
-# 執行 migration 建立 users / detection_* 資料表（需先確認 MySQL 連線）
+# 執行 migration 建立 users / detection_* 資料表（需先確認 MySQL 連線；請在 backend/ 目錄執行）
 conda run -n yolo-backend alembic upgrade head
 
 # 啟動伺服器（約 20 秒冷啟動）
@@ -210,6 +210,7 @@ Python module path，由
 | Phase 6A-6 | IME 輸入修復 + 對話滾動 + Agent Vision | ✅ **已完成**（中文輸入法送出誤判修復、對話 thread 滾動修復、`AGENT_ENABLE_VISION` 唯讀圖片附加） |
 | 批次影像分析 Phase 1 | 多圖 / 資料夾批次上傳 + 類別總數聚合 + Agent `batch_analysis` | ✅ **已完成**（`POST /api/detections/batch`、`detection_batches` 表、Web `/detections/batch` 頁面、Agent 新模式） |
 | 各類別閾值 Phase 1 | 各類別獨立 conf / IOU 閾值（image + batch） | ✅ **已完成**（migration `0011`、`class_thresholds` Form 欄位、Web `ClassThresholdEditor`；影片與 Desktop 未支援） |
+| 部署前清理 | react-router 7、頭像歸屬與清理、對話輪次唯一鍵 | ✅ **已完成**（migration `0013`；`scripts/cleanup_avatars.py`） |
 | 安全強化 P1 | 認證強化（部署前） | ✅ **已完成**（PyJWT + token 撤銷 migration `0012`、登入節流、密碼可含符號、管理員自我保護、啟動檢查、production 關閉 `/docs`） |
 | Agent 重構 C | Agent 評測 + 預設引擎/模型 + Deep Agents 評估 | ✅ **已完成**（`tests/evals/evaluate_agent_engines.py`；預設 `tool_calling` + gemma4；Deep Agents 評估後不採用） |
 | Agent 重構 B | tool-calling 引擎（LangChain `create_agent`） | ✅ **已完成**（`AGENT_ENGINE=tool_calling` 開啟，預設仍為 `pipeline`；Web 顯示工具進度） |

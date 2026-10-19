@@ -64,16 +64,10 @@ def create_chat_reply(
             detail=PROVIDER_REQUEST_FAILED_MESSAGE,
         ) from exc
 
-    turn_index = chat_repository.get_next_turn_index(
+    chat_log = chat_repository.append_log(
         db,
         user_id=current_user.id,
         conversation_id=normalized_conversation_id,
-    )
-    chat_log = chat_repository.create_log(
-        db,
-        user_id=current_user.id,
-        conversation_id=normalized_conversation_id,
-        turn_index=turn_index,
         provider=completion.provider,
         model_name=completion.model_name,
         question=question,
@@ -108,6 +102,8 @@ def stream_chat_reply(
                 user_id=user_id,
                 conversation_id=normalized_conversation_id,
             )
+            # Expected index for the start event; append_log assigns the real
+            # one (reported in "done") if another request took it meanwhile.
             turn_index = chat_repository.get_next_turn_index(
                 db,
                 user_id=user_id,
@@ -134,11 +130,10 @@ def stream_chat_reply(
             if not answer:
                 raise ChatProviderRequestError("Provider did not return any assistant content")
 
-            chat_log = chat_repository.create_log(
+            chat_log = chat_repository.append_log(
                 db,
                 user_id=user_id,
                 conversation_id=normalized_conversation_id,
-                turn_index=turn_index,
                 provider=completion_provider or "",
                 model_name=completion_model_name or "",
                 question=question,

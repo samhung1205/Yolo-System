@@ -152,13 +152,14 @@ GET /static/detections/results/task_12_a1b2c3d4.jpg?sig=<hmac>&exp=<unix_ts>
 ```json
 {
   "nickname": "新暱稱",
-  "avatar": "20261019120000_ab12cd34.png",
+  "avatar": "u7_20261019120000_ab12cd34.png",
   "password": "Newpass123",
   "current_password": "Oldpass123"
 }
 ```
 
-- `avatar`：必須是 `POST /api/upload/avatar` 回傳的 `filename`（格式 `YYYYMMDDhhmmss_xxxxxxxx.{jpg,png,gif,webp}`），且檔案存在；格式不符 422，檔案不存在 400
+- `avatar`：必須是**自己**用 `POST /api/upload/avatar` 上傳的 `filename`（`u{上傳者 id}_…`），檔案存在、且沒有被其他帳號使用；否則 400。含路徑字元（`/`、`\`、開頭 `.`）回 422。重送目前的頭像檔名一律允許（包含舊格式檔名）
+- 換成新頭像後，舊頭像檔若已沒有任何帳號使用會立即刪除
 - `password`：規則同註冊；**必須同時提供 `current_password`**，缺少或錯誤回 400「目前密碼不正確」。成功後所有既有 token 失效，Web / Desktop 會導回登入頁
 
 **Response 200**：`UserRead`
@@ -237,12 +238,15 @@ GET /static/detections/results/task_12_a1b2c3d4.jpg?sig=<hmac>&exp=<unix_ts>
 **Request Body**
 - `file`: JPEG / PNG / GIF / WEBP，大小限制 5 MB
 - 實際以 Pillow 解碼驗證；**儲存的副檔名由解碼出的影像格式決定**，不採用 client 檔名的副檔名。無法解碼的檔案回 400
+- 檔名格式 `u{上傳者 user id}_YYYYMMDDhhmmss_xxxxxxxx.{jpg,png,gif,webp}`：只有上傳者本人能把它設為頭像（管理員也是先自己上傳，再於 `POST /api/users` / `PUT /api/users/{id}` 指定給其他帳號）
+- 上傳後檔案處於「未指定」狀態，需再呼叫 `PUT /api/auth/profile`（或管理員端點）才會生效。同一位上傳者超過 1 小時仍未指定的舊上傳，會在他下一次上傳時清除
+- 全目錄清理（含舊格式檔名）：`python scripts/cleanup_avatars.py`（預設只列出，`--apply` 才刪除）
 
 **Response 200**
 ```json
 {
-  "filename": "20260418120000_ab12cd34.jpg",
-  "url": "/static/avatars/20260418120000_ab12cd34.jpg"
+  "filename": "u7_20260418120000_ab12cd34.jpg",
+  "url": "/static/avatars/u7_20260418120000_ab12cd34.jpg?..."
 }
 ```
 

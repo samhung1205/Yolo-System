@@ -139,17 +139,11 @@ def create_agent_reply(
     # /api/chat's provider field.
     if not errors:
         try:
-            turn_index = chat_repository.get_next_turn_index(
-                db,
-                user_id=current_user.id,
-                conversation_id=normalized_conversation_id,
-            )
             effective_model = model_name_override or settings.agent_effective_model
-            chat_repository.create_log(
+            chat_repository.append_log(
                 db,
                 user_id=current_user.id,
                 conversation_id=normalized_conversation_id,
-                turn_index=turn_index,
                 provider=AGENT_PROVIDER_TAG,
                 model_name=effective_model,
                 question=message,
@@ -275,17 +269,11 @@ def stream_agent_reply(
                     references = data.get("references") or references
 
                     try:
-                        turn_index = chat_repository.get_next_turn_index(
-                            db,
-                            user_id=current_user.id,
-                            conversation_id=normalized_conversation_id,
-                        )
                         effective_model = model_name_override or settings.agent_effective_model
-                        chat_repository.create_log(
+                        chat_repository.append_log(
                             db,
                             user_id=current_user.id,
                             conversation_id=normalized_conversation_id,
-                            turn_index=turn_index,
                             provider=AGENT_PROVIDER_TAG,
                             model_name=effective_model,
                             question=message,
