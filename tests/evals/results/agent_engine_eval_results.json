@@ -1,0 +1,3945 @@
+{
+  "generated_at": "2026-10-19T15:25:54.654752+00:00",
+  "provider": "ollama",
+  "rows": [
+    {
+      "case": "explain_basic",
+      "engine": "pipeline",
+      "model": "qwen2.5",
+      "attempt": 0,
+      "passed": false,
+      "checks": {
+        "include[ship|船]": true,
+        "include[airplane|飛機]": false,
+        "include[0.38]": true,
+        "include[人工|複查|複核|review]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": false,
+        "no_engine_error": true
+      },
+      "answer": "YOLO模型「yolo11n_asff.pt」检测到了3个对象，分别为2艘船和1架飞机。具体如下：\n\n- 船 (class_id 0): 两个检测框，置信度分别为0.91和0.77。\n- 飞机 (class_id 1): 一个检测框，置信度为0.38。\n\n置信度范围为0.38至0.91，其中最低置信度为0.38，低于0.50。因此，建议进行人工复查以确保准确性。\n模型推理时间为88.0毫秒，在图片「port_a.jpg」上完成。\n\n请注意，飞机的检测有一定置信度风险，请核实。图像中显示的是两艘船和一架飞机的预测位置。",
+      "errors": [],
+      "calls": [],
+      "seconds": 4.54,
+      "simplified_chars": "个为于体别图对时显机检测进飞"
+    },
+    {
+      "case": "explain_basic",
+      "engine": "pipeline",
+      "model": "qwen2.5",
+      "attempt": 1,
+      "passed": false,
+      "checks": {
+        "include[ship|船]": true,
+        "include[airplane|飛機]": true,
+        "include[0.38]": true,
+        "include[人工|複查|複核|review]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": false,
+        "no_engine_error": true
+      },
+      "answer": "YOLO模型 \"yolo11n_asff.pt\" 在圖像 \"port_a.jpg\" 上進行检测，共計检测到 3 個物件。總體物件檢測如下：\n\n- 船隻（class：ship）：2 個，置信度分别为 0.91 和 0.77；\n- 飛機（class：airplane）：1 個，置信度为 0.38。\n\n置信度範圍為 0.38 到 0.91。由於一個檢測的置信度為 0.38，低于 0.50，建議進行人工復查。\n\n模型 \"yolo11n_asff.pt\" 的推論時間為 88 毫秒。檢測狀態為 “已完成”。\n\n請注意，這些是 YOLO 的預測結果，你可能需要進一步確認。",
+      "errors": [],
+      "calls": [],
+      "seconds": 3.95,
+      "simplified_chars": "为于别检测"
+    },
+    {
+      "case": "explain_follow_up",
+      "engine": "pipeline",
+      "model": "qwen2.5",
+      "attempt": 0,
+      "passed": false,
+      "checks": {
+        "include[airplane|飛機]": false,
+        "include[0.38]": true,
+        "exclude[0.77]": false,
+        "grounded_numbers": true,
+        "traditional_chinese": false,
+        "no_engine_error": true
+      },
+      "answer": "第二个物体是飞机，信心为 0.38。建议进行人工复查，因为该检测的信心低于 0.50。\n\nYOLO 检测到了以下内容：\n- 船：2艘，信心分别为 0.91 和 0.77。\n- 飞机：1架，信心为 0.38。\n模型名称为 `yolo11n_asff.pt`，推理时间为 88 毫秒。\n\n图像来源为图片 `port_a.jpg`。由于检测信心较低，建议人工复核以确认是否正确。",
+      "errors": [],
+      "calls": [],
+      "seconds": 3.26,
+      "simplified_chars": "个为于体别图时机检测该较进飞"
+    },
+    {
+      "case": "explain_follow_up",
+      "engine": "pipeline",
+      "model": "qwen2.5",
+      "attempt": 1,
+      "passed": false,
+      "checks": {
+        "include[airplane|飛機]": true,
+        "include[0.38]": true,
+        "exclude[0.77]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": false,
+        "no_engine_error": true
+      },
+      "answer": "第二個物件是 airplane，信心 0.38。Yolo 的检测结果显示共有两类物体：ship 有两个，airplane 有一个。飞机的检测信心为 0.38，低于 0.5，建议进行人工复查以确认结果。\n\n模型名称为 yolo11n_asff.pt，推断时间为 88 毫秒。检测状态为完成。\n\n基于检测结果，请注意第二个对象 airplane 的信心较低，建议复查。",
+      "errors": [],
+      "calls": [],
+      "seconds": 1.99,
+      "simplified_chars": "个为于体对时显机检测类结较进飞"
+    },
+    {
+      "case": "explain_zero_objects",
+      "engine": "pipeline",
+      "model": "qwen2.5",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "include[沒有|未偵測|0 個|零|0個|沒偵測]": true,
+        "exclude[ship]": true,
+        "exclude[船隻]": true,
+        "exclude[airplane]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "根據YOLO模型的預測，這張圖中沒有檢測到任何對象。模型沒有找到任何符合預設置信度門檻的物件。建議進行人工複查以確認結果。",
+      "errors": [],
+      "calls": [],
+      "seconds": 1.2
+    },
+    {
+      "case": "explain_zero_objects",
+      "engine": "pipeline",
+      "model": "qwen2.5",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[沒有|未偵測|0 個|零|0個|沒偵測]": true,
+        "exclude[ship]": true,
+        "exclude[船隻]": true,
+        "exclude[airplane]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "根據 YOLO 模型的預測，這張圖（open_sea.jpg）中並未偵測到任何物件。模型已完整運行，無錯誤報告，但未識別出任何物件。建議進行人工複查以確認結果。",
+      "errors": [],
+      "calls": [],
+      "seconds": 1.1
+    },
+    {
+      "case": "explain_failed_task",
+      "engine": "pipeline",
+      "model": "qwen2.5",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "include[失敗|failed]": true,
+        "exclude[記憶體]": true,
+        "exclude[GPU]": true,
+        "exclude[網路]": true,
+        "exclude[權限不足]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "此檢測因內部錯誤失敗，未能檢測到任何物體。建議進行人工複查以確認結果。",
+      "errors": [],
+      "calls": [],
+      "seconds": 0.85
+    },
+    {
+      "case": "explain_failed_task",
+      "engine": "pipeline",
+      "model": "qwen2.5",
+      "attempt": 1,
+      "passed": false,
+      "checks": {
+        "include[失敗|failed]": true,
+        "exclude[記憶體]": true,
+        "exclude[GPU]": true,
+        "exclude[網路]": true,
+        "exclude[權限不足]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": false,
+        "no_engine_error": true
+      },
+      "answer": "這筆結果因內部錯誤而失敗，因此没有检测到任何物件。建议进行人工复查。",
+      "errors": [],
+      "calls": [],
+      "seconds": 0.46,
+      "simplified_chars": "检测进"
+    },
+    {
+      "case": "auto_ordinal_id",
+      "engine": "pipeline",
+      "model": "qwen2.5",
+      "attempt": 0,
+      "passed": false,
+      "checks": {
+        "include[airplane|飛機]": false,
+        "include[0.38]": false,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "要查看第12筆偵測中信心最低的物件，請先切換至“ Explain Detection ”模式，輸入對應的Detection ID，然後告知我結果。若沒有特定的Detection ID，您可以在這裡提供更多的資訊。",
+      "errors": [],
+      "calls": [],
+      "seconds": 1.1
+    },
+    {
+      "case": "auto_ordinal_id",
+      "engine": "pipeline",
+      "model": "qwen2.5",
+      "attempt": 1,
+      "passed": false,
+      "checks": {
+        "include[airplane|飛機]": false,
+        "include[0.38]": false,
+        "grounded_numbers": true,
+        "traditional_chinese": false,
+        "no_engine_error": true
+      },
+      "answer": "要回答这个问题，您需要切换到\"解释检测\"模式，输入第12笔检测的Detection ID，然后告诉我您想了解的具体信息。请提供Detection ID，以便我可以帮您查询。",
+      "errors": [],
+      "calls": [],
+      "seconds": 0.87,
+      "simplified_chars": "个体检测这问题"
+    },
+    {
+      "case": "auto_selected_count",
+      "engine": "pipeline",
+      "model": "qwen2.5",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "include[5]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "YOLO 模型在這張圖中檢測到 5 艘船。-confidence 為 0.61 至 0.95，都超過 0.5，因此這些檢測可以接受，不需要人工複查。模型名稱為 \"yolo11n_asff.pt\"，推理時間為 88.0 毫秒，來源是圖像文件，狀態為 “completed”。\n\n根據Bounding Box，這些船在圖片的左邊至右邊都有分布。建議進一步確認這些船的檢測結果。",
+      "errors": [],
+      "calls": [],
+      "seconds": 3.26
+    },
+    {
+      "case": "auto_selected_count",
+      "engine": "pipeline",
+      "model": "qwen2.5",
+      "attempt": 1,
+      "passed": false,
+      "checks": {
+        "include[5]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": false,
+        "no_engine_error": true
+      },
+      "answer": "YOLO 模型在這張圖中預測了 5 艘船。船的信賴度分別為 0.95、0.90、0.86、0.72 和 0.61，所有預測的信賴度都高于 0.50，因此這些結果被認為是可靠的，無需人工複查。\n\n模型名稱為 `yolo11n_asff.pt`，推理時間為 88 毫秒。這張圖像是由多艘船分布於不同位置構成，船的位置大致位於圖像的左上角至右側，每艘船的預估位置和大小相近，每張船的寬度和高度約為 8000 像素平方。\n\n從模型預測看，所有船的信賴度都在 0.50 以上，因此無需進行人工複查。",
+      "errors": [],
+      "calls": [],
+      "seconds": 3.83,
+      "simplified_chars": "于"
+    },
+    {
+      "case": "auto_compare",
+      "engine": "pipeline",
+      "model": "qwen2.5",
+      "attempt": 0,
+      "passed": false,
+      "checks": {
+        "include[2]": true,
+        "include[5]": false,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "請將分析模式切換到\"解釋檢測\"，並輸入第12筆和第16筆檢測的檢測ID，然後再問一次這個問題。",
+      "errors": [],
+      "calls": [],
+      "seconds": 0.85
+    },
+    {
+      "case": "auto_compare",
+      "engine": "pipeline",
+      "model": "qwen2.5",
+      "attempt": 1,
+      "passed": false,
+      "checks": {
+        "include[2]": true,
+        "include[5]": false,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "請切换到“Explanation Detection”模式，輸入第 12 筆和第 16 筆的檢測 ID，然後我可以告訴你各有幾艘船。",
+      "errors": [],
+      "calls": [],
+      "seconds": 0.78
+    },
+    {
+      "case": "history_failures",
+      "engine": "pipeline",
+      "model": "qwen2.5",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "include[2]": true,
+        "exclude[記憶體]": true,
+        "exclude[GPU]": true,
+        "exclude[網路]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "您總共有 2 次任務失敗。根據Summary部分的數據，失敗的任務佔總任務數的 20%。",
+      "errors": [],
+      "calls": [],
+      "seconds": 1.69
+    },
+    {
+      "case": "history_failures",
+      "engine": "pipeline",
+      "model": "qwen2.5",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[2]": true,
+        "exclude[記憶體]": true,
+        "exclude[GPU]": true,
+        "exclude[網路]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "根據提供的數據，您的10個偵測任務中有2次失敗。具體來說，總共 analysizd 了 10 個任務，其中 8 個完成，2 個失敗。",
+      "errors": [],
+      "calls": [],
+      "seconds": 1.08
+    },
+    {
+      "case": "history_total",
+      "engine": "pipeline",
+      "model": "qwen2.5",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "include[10]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "您總共做了10次偵測任務。其中，有8次任務已完成，2次任務出現了錯誤。最近的一次任務是在2026年10月19日15點12分38秒完成的，耗時88毫秒。",
+      "errors": [],
+      "calls": [],
+      "seconds": 1.3
+    },
+    {
+      "case": "history_total",
+      "engine": "pipeline",
+      "model": "qwen2.5",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[10]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "您總共做了10次偵測任務。其中，有8次任務已完成，2次任務出現了錯誤。這些任務主要使用了圖像作為源文件，只有一次使用了視頻。希望這些信息對您有幫助！",
+      "errors": [],
+      "calls": [],
+      "seconds": 1.07
+    },
+    {
+      "case": "batch_zero_images",
+      "engine": "pipeline",
+      "model": "qwen2.5",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "include[1]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "這批影像中有 2 張沒有偵測到任何東西，其中包括 1 張「疑似漏檢」的影像 \"empty_sea.jpg\" 和 1 張因為特定原因未能完成檢測的影像 \"broken.jpg\"。",
+      "errors": [],
+      "calls": [],
+      "seconds": 1.89
+    },
+    {
+      "case": "batch_zero_images",
+      "engine": "pipeline",
+      "model": "qwen2.5",
+      "attempt": 1,
+      "passed": false,
+      "checks": {
+        "include[1]": false,
+        "traditional_chinese": false,
+        "no_engine_error": true
+      },
+      "answer": "有 2 张影像没有检测到任何东西。这些影像包括 \"empty_sea.jpg\" 和 \"broken.jpg\"。但是根据注释，其中一张标记为 \"empty_sea.jpg\" 可能是疑似漏检，即这些影像可能是确实没有目标物体，也可能是模型未能正确检测。另外一张 \"broken.jpg\" 是因为文件损坏导致检测失败的。",
+      "errors": [],
+      "calls": [],
+      "seconds": 1.6,
+      "simplified_chars": "为体张据检测记败这"
+    },
+    {
+      "case": "batch_class_images",
+      "engine": "pipeline",
+      "model": "qwen2.5",
+      "attempt": 0,
+      "passed": false,
+      "checks": {
+        "include[harbor_1]": true,
+        "include[harbor_2]": true,
+        "include[harbor_3]": true,
+        "exclude[empty_sea]": true,
+        "traditional_chinese": false,
+        "no_engine_error": true
+      },
+      "answer": "這批裡有船的影像包括 \"harbor_1.jpg\", \"harbor_2.jpg\" 和 \"harbor_3.jpg\"。总共检测到了4艘船。",
+      "errors": [],
+      "calls": [],
+      "seconds": 0.83,
+      "simplified_chars": "检测"
+    },
+    {
+      "case": "batch_class_images",
+      "engine": "pipeline",
+      "model": "qwen2.5",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[harbor_1]": true,
+        "include[harbor_2]": true,
+        "include[harbor_3]": true,
+        "exclude[empty_sea]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "根據提供的數據，有三張影像中有船：\n1. harbor_1.jpg\n2. harbor_2.jpg\n3. harbor_3.jpg",
+      "errors": [],
+      "calls": [],
+      "seconds": 0.62
+    },
+    {
+      "case": "batch_spatial_limit",
+      "engine": "pipeline",
+      "model": "qwen2.5",
+      "attempt": 0,
+      "passed": false,
+      "checks": {
+        "include[無法|不能|不支援|沒辦法|無從]": false,
+        "traditional_chinese": false,
+        "no_engine_error": true
+      },
+      "answer": "根据所提供的数据，当前的分析模式仅支持单类别计数，不支持检测到的物体之间的空间关系判断。因此无法确定飞机是否停在船上。如果有需要进一步的空间关系分析，建议采用其他方法或工具。",
+      "errors": [],
+      "calls": [],
+      "seconds": 1.08,
+      "simplified_chars": "体别据数机检测类计进飞"
+    },
+    {
+      "case": "batch_spatial_limit",
+      "engine": "pipeline",
+      "model": "qwen2.5",
+      "attempt": 1,
+      "passed": false,
+      "checks": {
+        "include[無法|不能|不支援|沒辦法|無從]": false,
+        "traditional_chinese": false,
+        "no_engine_error": true
+      },
+      "answer": "目前的分析模式只支持对每个类别的计数，而不支持检测之间的空间关系。因此，根据提供的数据，我们无法确定飞机是否停在了船上。如果有更多关于这些对象之间位置关系的信息，我们可以进一步分析。",
+      "errors": [],
+      "calls": [],
+      "seconds": 1.0,
+      "simplified_chars": "个于们别对据数机检测类计这进飞"
+    },
+    {
+      "case": "perm_other_users_detection",
+      "engine": "pipeline",
+      "model": "qwen2.5",
+      "attempt": 0,
+      "passed": false,
+      "checks": {
+        "include[無權|找不到|沒有權限|無法存取|不存在|無法取得|not found|權限|不允許|未授權|無法讀取]": false,
+        "exclude[person]": true,
+        "exclude[人物]": true,
+        "exclude[行人]": true,
+        "traditional_chinese": false,
+        "no_engine_error": true
+      },
+      "answer": "請切换到“解释检测”模式，輸入第20筆偵測結果的ID，然後我將告訴您該結果包含什麼。",
+      "errors": [],
+      "calls": [],
+      "seconds": 0.71,
+      "simplified_chars": "检测"
+    },
+    {
+      "case": "perm_other_users_detection",
+      "engine": "pipeline",
+      "model": "qwen2.5",
+      "attempt": 1,
+      "passed": false,
+      "checks": {
+        "include[無權|找不到|沒有權限|無法存取|不存在|無法取得|not found|權限|不允許|未授權|無法讀取]": false,
+        "exclude[person]": true,
+        "exclude[人物]": true,
+        "exclude[行人]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "請切換至「解釋檢測」模式，輸入第 20 筆檢測結果的 Detection ID，然後我將告訴你有哪些內容。",
+      "errors": [],
+      "calls": [],
+      "seconds": 0.69
+    },
+    {
+      "case": "perm_list_users_non_admin",
+      "engine": "pipeline",
+      "model": "qwen2.5",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "exclude[bob]": true,
+        "exclude[charlie]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "目前我無法提供系統裡的所有使用者帳號。要查看這些資訊，通常需要管理權限。如果你是管理者，可以通知相關負責人進行查詢。如果不是管理員，我建議你聯繫系統管理員來獲取這些資訊。",
+      "errors": [],
+      "calls": [],
+      "seconds": 1.11
+    },
+    {
+      "case": "perm_list_users_non_admin",
+      "engine": "pipeline",
+      "model": "qwen2.5",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "exclude[bob]": true,
+        "exclude[charlie]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "抱歉，我無法提供系統裡所有使用者帳號的資料。這需要 Administrators 的權限。您可聯繫系統管理員以獲取此信息。",
+      "errors": [],
+      "calls": [],
+      "seconds": 0.69
+    },
+    {
+      "case": "admin_list_users",
+      "engine": "pipeline",
+      "model": "qwen2.5",
+      "attempt": 0,
+      "passed": false,
+      "checks": {
+        "include[alice]": true,
+        "include[bob]": true,
+        "traditional_chinese": false,
+        "no_engine_error": true
+      },
+      "answer": "目前系統中有四位使用者，他们的信息如下：\n\n1. **id: 1, username: alice, nickname: Alice**\n2. **id: 2, username: bob, nickname: Bob**\n3. **id: 3, username: admin, nickname: Admin**\n4. **id: 4, username: charlie, nickname: Charlie**\n\n这些用户都是活动用户，并且没有电子邮件信息。",
+      "errors": [],
+      "calls": [],
+      "seconds": 2.42,
+      "simplified_chars": "们这"
+    },
+    {
+      "case": "admin_list_users",
+      "engine": "pipeline",
+      "model": "qwen2.5",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[alice]": true,
+        "include[bob]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "目前系統中有4位使用者，以下是詳細信息：\n\n1. id: 1, username: alice, nickname: Alice, email: 未提供\n2. id: 2, username: bob, nickname: Bob, email: 未提供\n3. id: 3, username: admin, nickname: Admin, email: 未提供\n4. id: 4, username: charlie, nickname: Charlie, email: 未提供\n\n所有使用者的帳戶都是活動狀態，且都不是管理員。",
+      "errors": [],
+      "calls": [],
+      "seconds": 2.12
+    },
+    {
+      "case": "general_chat",
+      "engine": "pipeline",
+      "model": "qwen2.5",
+      "attempt": 0,
+      "passed": false,
+      "checks": {
+        "include[YOLO]": true,
+        "traditional_chinese": false,
+        "no_engine_error": true
+      },
+      "answer": "YOLO 是一種實時物体检测算法，能在圖像中迅速識別和定位多個物体。",
+      "errors": [],
+      "calls": [],
+      "seconds": 0.58,
+      "simplified_chars": "体检测"
+    },
+    {
+      "case": "general_chat",
+      "engine": "pipeline",
+      "model": "qwen2.5",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[YOLO]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "YOLO 是一種實時.object檢測算法，能快速對圖像中的物體進行檢測和 Identification。",
+      "errors": [],
+      "calls": [],
+      "seconds": 0.51
+    },
+    {
+      "case": "explain_basic",
+      "engine": "tool_calling",
+      "model": "qwen2.5",
+      "attempt": 0,
+      "passed": false,
+      "checks": {
+        "include[ship|船]": true,
+        "include[airplane|飛機]": true,
+        "include[0.38]": true,
+        "include[人工|複查|複核|review]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": false,
+        "no_engine_error": true
+      },
+      "answer": "這筆偵測結果來自於模型 `yolo11n_asff.pt`，用於圖像 `port_a.jpg` 的檢測。模型的置信度閾值設為 0.25，IOU 閾值設為 0.45，並已完成檢測，耗時 88 毫秒。共有 3 個物件被檢測到，其中 2 個為船隻 (`ship`)、1 個為飛機 (`airplane`)。\n\n置信度範圍為最小值 0.38，最大值 0.91，平均值 0.6867。每個檢測目標的座標如下：\n\n- 第 0 個物件（船隻）：置信度 0.91，座標 [10.0, 20.0, 90.0, 120.0]\n- 第 1 個物件（飛機）：置信度 0.38，座標 [110.0, 20.0, 190.0, 120.0]\n- 第 2 個物件（船隻）：置信度 0.77，座標 [210.0, 20.0, 290.0, 120.0]\n\n请注意，置信度較低的飛機被标记为低置信度对象，建议人工复查。",
+      "errors": [],
+      "calls": [],
+      "seconds": 7.23,
+      "simplified_chars": "为对记"
+    },
+    {
+      "case": "explain_basic",
+      "engine": "tool_calling",
+      "model": "qwen2.5",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[ship|船]": true,
+        "include[airplane|飛機]": true,
+        "include[0.38]": true,
+        "include[人工|複查|複核|review]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "這筆YOLO偵測結果是使用了模組 'yolo11n_asff.pt' (模型名稱: 七階層加速融合版), 在影像 'port_a.jpg' 上的結果。影像解析度為 1280x720。根據設定的信心值門檻 (0.25) 和 IOU 門檻 (0.45)，模型共偵測到 3 個物件，分別是 2 個 ships 和 1 個 airplane。\n\n信心值的範圍從 0.38 到 0.91。所有物體的Bounding Box面積均為 8000 平方單位，平均信心值為 0.6867。以下是詳細的物體資訊:\n\n1. 第 0 個物體是 ship，信心值 0.91，座標 [10.0, 20.0, 90.0, 120.0]。\n2. 第 1 個物體是 airplane，信心值 0.38，座標 [110.0, 20.0, 190.0, 120.0]。\n3. 第 2 個物體是 ship，信心值 0.77，座標 [210.0, 20.0, 290.0, 120.0]。\n\n信心值 0.38 的 airplane 已標記為低信心值建議人工審查。信心值和座標信息都來自模型預測結果，因此只供參考。",
+      "errors": [],
+      "calls": [],
+      "seconds": 7.21
+    },
+    {
+      "case": "explain_follow_up",
+      "engine": "tool_calling",
+      "model": "qwen2.5",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "include[airplane|飛機]": true,
+        "include[0.38]": true,
+        "exclude[0.77]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "第二個物件是 airplane，信心 0.38。",
+      "errors": [],
+      "calls": [],
+      "seconds": 0.37
+    },
+    {
+      "case": "explain_follow_up",
+      "engine": "tool_calling",
+      "model": "qwen2.5",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[airplane|飛機]": true,
+        "include[0.38]": true,
+        "exclude[0.77]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "第二個物件是 airplane，信心 0.38。信心稍低，建議人工审核確認。",
+      "errors": [],
+      "calls": [],
+      "seconds": 0.46
+    },
+    {
+      "case": "explain_zero_objects",
+      "engine": "tool_calling",
+      "model": "qwen2.5",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "include[沒有|未偵測|0 個|零|0個|沒偵測]": true,
+        "exclude[ship]": true,
+        "exclude[船隻]": true,
+        "exclude[airplane]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "根據之前的檢測結果，這張圖片沒有檢測到任何物件。confidence_threshold為0.25，iou_threshold為0.45的情况下，模型沒有識別出任何物件。",
+      "errors": [],
+      "calls": [],
+      "seconds": 1.35
+    },
+    {
+      "case": "explain_zero_objects",
+      "engine": "tool_calling",
+      "model": "qwen2.5",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[沒有|未偵測|0 個|零|0個|沒偵測]": true,
+        "exclude[ship]": true,
+        "exclude[船隻]": true,
+        "exclude[airplane]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "沒有，這張圖像中沒有偵測到任何物件。你可以檢查其他圖像或調整模型參數來提高偵測效果。",
+      "errors": [],
+      "calls": [],
+      "seconds": 0.61
+    },
+    {
+      "case": "explain_failed_task",
+      "engine": "tool_calling",
+      "model": "qwen2.5",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "include[失敗|failed]": true,
+        "exclude[記憶體]": true,
+        "exclude[GPU]": true,
+        "exclude[網路]": true,
+        "exclude[權限不足]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "這筆結果因為內部錯誤導致失敗，沒有檢測到任何物件。你可以查看更詳細的錯誤訊息來了解具體問題，或者嘗試重新運行這個任務。",
+      "errors": [],
+      "calls": [],
+      "seconds": 1.39
+    },
+    {
+      "case": "explain_failed_task",
+      "engine": "tool_calling",
+      "model": "qwen2.5",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[失敗|failed]": true,
+        "exclude[記憶體]": true,
+        "exclude[GPU]": true,
+        "exclude[網路]": true,
+        "exclude[權限不足]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "這筆結果因為內部錯誤而失敗了。\n\n如果需要進一步了解，我可以再提供一些詳細資訊。您想了解一下哪方面的內容呢？",
+      "errors": [],
+      "calls": [],
+      "seconds": 0.67
+    },
+    {
+      "case": "auto_ordinal_id",
+      "engine": "tool_calling",
+      "model": "qwen2.5",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "include[airplane|飛機]": true,
+        "include[0.38]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "tool[get_detection_detail]": true,
+        "args[get_detection_detail]": true,
+        "no_engine_error": true
+      },
+      "answer": "根據第 12 筆偵測的詳細情況，信心最低的物件是「飛機」，其信心度為 0.38。",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "get_detection_detail",
+          "args": {
+            "detection_id": 12
+          }
+        }
+      ],
+      "seconds": 2.97
+    },
+    {
+      "case": "auto_ordinal_id",
+      "engine": "tool_calling",
+      "model": "qwen2.5",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[airplane|飛機]": true,
+        "include[0.38]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "tool[get_detection_detail]": true,
+        "args[get_detection_detail]": true,
+        "no_engine_error": true
+      },
+      "answer": "在第12筆偵測中，信心最低的物件是飛機（airplane），其信心分數為0.38。",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "get_detection_detail",
+          "args": {
+            "detection_id": 12
+          }
+        }
+      ],
+      "seconds": 2.2
+    },
+    {
+      "case": "auto_selected_count",
+      "engine": "tool_calling",
+      "model": "qwen2.5",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "include[5]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "tool[get_detection_detail]": true,
+        "no_engine_error": true
+      },
+      "answer": "這筆檢測結果中有5艘船。所有檢測的自信心度都高於0.61，其中最高的是0.95。",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "get_detection_detail",
+          "args": {
+            "detection_id": 16
+          }
+        }
+      ],
+      "seconds": 2.9
+    },
+    {
+      "case": "auto_selected_count",
+      "engine": "tool_calling",
+      "model": "qwen2.5",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[5]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "tool[get_detection_detail]": true,
+        "no_engine_error": true
+      },
+      "answer": "這筆檢測中共有5艘船。confidence值都在0.61以上，所以這些檢測結果都可以信任。",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "get_detection_detail",
+          "args": {
+            "detection_id": 16
+          }
+        }
+      ],
+      "seconds": 1.74
+    },
+    {
+      "case": "auto_compare",
+      "engine": "tool_calling",
+      "model": "qwen2.5",
+      "attempt": 0,
+      "passed": false,
+      "checks": {
+        "include[2]": true,
+        "include[5]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": false,
+        "tool_any[compare_detections|get_detection_detail]": true,
+        "no_engine_error": true
+      },
+      "answer": "在第12筆和第16筆的比較中，第12筆偵測到了2艘船，而第16筆則偵測到了5艘船。\n\n在船的数量方面，第16筆的結果比第12筆多出3艘船。希望這些資訊對您有幫助！如果有其他問題，請隨時告訴我。",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "compare_detections",
+          "args": {
+            "detection_id_a": 12,
+            "detection_id_b": 16
+          }
+        }
+      ],
+      "seconds": 2.57,
+      "simplified_chars": "数"
+    },
+    {
+      "case": "auto_compare",
+      "engine": "tool_calling",
+      "model": "qwen2.5",
+      "attempt": 1,
+      "passed": false,
+      "checks": {
+        "include[2]": false,
+        "include[5]": false,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "tool_any[compare_detections|get_detection_detail]": false,
+        "no_engine_error": true
+      },
+      "answer": "請告訴我您想要比較哪一個批次的圖像，或是使用目前選中的批次。谢谢！",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "list_batch_images_by_class",
+          "args": {
+            "class_name": "ship",
+            "batch_id": null
+          }
+        }
+      ],
+      "seconds": 1.19
+    },
+    {
+      "case": "history_failures",
+      "engine": "tool_calling",
+      "model": "qwen2.5",
+      "attempt": 0,
+      "passed": false,
+      "checks": {
+        "include[2]": false,
+        "exclude[記憶體]": true,
+        "exclude[GPU]": true,
+        "exclude[網路]": true,
+        "traditional_chinese": true,
+        "tool_any[summarize_detection_history|list_recent_detections]": false,
+        "no_engine_error": true
+      },
+      "answer": "ilor\n{\"name\": \"summarize_detection_history\", \"arguments\": {}}\n</tool_call>",
+      "errors": [],
+      "calls": [],
+      "seconds": 0.92
+    },
+    {
+      "case": "history_failures",
+      "engine": "tool_calling",
+      "model": "qwen2.5",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[2]": true,
+        "exclude[記憶體]": true,
+        "exclude[GPU]": true,
+        "exclude[網路]": true,
+        "traditional_chinese": true,
+        "tool_any[summarize_detection_history|list_recent_detections]": true,
+        "no_engine_error": true
+      },
+      "answer": "您的偵測總共失敗了2次。最近的一次失敗是在「port_a.jpg」影像上的Yolov11n-Asff模型偵測，模型於2026年10月19日下午3點12分38秒運行完成，檢測了3個物件。總共進行了10次任務，其中有8次成功完成。",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "summarize_detection_history",
+          "args": {}
+        }
+      ],
+      "seconds": 2.3
+    },
+    {
+      "case": "history_total",
+      "engine": "tool_calling",
+      "model": "qwen2.5",
+      "attempt": 0,
+      "passed": false,
+      "checks": {
+        "include[10]": false,
+        "traditional_chinese": true,
+        "tool_any[summarize_detection_history|list_recent_detections]": false,
+        "no_engine_error": true
+      },
+      "answer": "lington\n{\"name\": \"summarize_detection_history\", \"arguments\": {}}\n</tool_call>",
+      "errors": [],
+      "calls": [],
+      "seconds": 0.47
+    },
+    {
+      "case": "history_total",
+      "engine": "tool_calling",
+      "model": "qwen2.5",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[10]": true,
+        "traditional_chinese": true,
+        "tool_any[summarize_detection_history|list_recent_detections]": true,
+        "no_engine_error": true
+      },
+      "answer": "您一共做了10次偵測任務，其中8次完成，2次發生錯誤。這些任務主要使用圖像資料，其中有2次使用了視頻資料。\n\n最常見的三種物件類別是：\n1. 船隻 (ship) - 11 次\n2. 飛機 (airplane) - 2 次\n3. 小轎車 (car) - 2 次\n\n您的最近一次任務是在2026年10月19日下午3點12分，使用了 \"yolo11n_asff.pt\" 模型對 \"port_a.jpg\" 圖像進行偵測，耗時88毫秒，成功識別了3個物件。",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "summarize_detection_history",
+          "args": {}
+        }
+      ],
+      "seconds": 4.05
+    },
+    {
+      "case": "batch_zero_images",
+      "engine": "tool_calling",
+      "model": "qwen2.5",
+      "attempt": 0,
+      "passed": false,
+      "checks": {
+        "include[1]": true,
+        "traditional_chinese": false,
+        "no_engine_error": true
+      },
+      "answer": "根據資料，這批中有1張影像沒有偵測到任何物件。這可能是「疑似漏檢」，也可能是影像本身確實沒有目標物件。具体情况可能是如此：\n\n\n\n```json\n{\n  \"zero_detection_image_count\": 1,\n  \"zero_detection_filenames\": [\"empty_sea.jpg\"]\n}\n```",
+      "errors": [],
+      "calls": [],
+      "seconds": 2.25,
+      "simplified_chars": "体"
+    },
+    {
+      "case": "batch_zero_images",
+      "engine": "tool_calling",
+      "model": "qwen2.5",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[1]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "根據工具提供的資料，這批影像中有 1 張沒有偵測到任何物件。",
+      "errors": [],
+      "calls": [],
+      "seconds": 0.43
+    },
+    {
+      "case": "batch_class_images",
+      "engine": "tool_calling",
+      "model": "qwen2.5",
+      "attempt": 0,
+      "passed": false,
+      "checks": {
+        "include[harbor_1]": false,
+        "include[harbor_2]": false,
+        "include[harbor_3]": false,
+        "exclude[empty_sea]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "leton\n{\"name\": \"list_batch_images_by_class\", \"arguments\": {\"class_name\": \"ship\", \"batch_id\": 3}}\n</tool_call>",
+      "errors": [],
+      "calls": [],
+      "seconds": 0.72
+    },
+    {
+      "case": "batch_class_images",
+      "engine": "tool_calling",
+      "model": "qwen2.5",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[harbor_1]": true,
+        "include[harbor_2]": true,
+        "include[harbor_3]": true,
+        "exclude[empty_sea]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "在這批影像中有三張影像中有船：「harbor_1.jpg」中有兩艘船，「harbor_2.jpg」和「harbor_3.jpg」各自有一艘船。",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "list_batch_images_by_class",
+          "args": {
+            "class_name": "ship"
+          }
+        }
+      ],
+      "seconds": 1.62
+    },
+    {
+      "case": "batch_spatial_limit",
+      "engine": "tool_calling",
+      "model": "qwen2.5",
+      "attempt": 0,
+      "passed": false,
+      "checks": {
+        "include[無法|不能|不支援|沒辦法|無從]": false,
+        "traditional_chinese": false,
+        "no_engine_error": true
+      },
+      "answer": "根据现有的检测结果，我们在「harbor survey」这个批次中的影像里没有检测到飞机停在船上的情况。检测结果显示仅有一艘飞机被检测到，出现在“harbor_3.jpg”这张影像中，同时还有船只。但这些检测是单独进行的，无法确认飞机是否停在船上。\n\n要判断飞机是否停在船上，我们需要同时检测这两类对象，然后观察它们的重叠情况。您是否想进行这样的联合检测分析？",
+      "errors": [],
+      "calls": [],
+      "seconds": 2.08,
+      "simplified_chars": "个们对张据时显机检测现类结这进飞"
+    },
+    {
+      "case": "batch_spatial_limit",
+      "engine": "tool_calling",
+      "model": "qwen2.5",
+      "attempt": 1,
+      "passed": false,
+      "checks": {
+        "include[無法|不能|不支援|沒辦法|無從]": false,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "在 \"harbor_3.jpg\" 中僅偵測到一艘飛機和一艘船，但並未顯示飛機停在船上的情況。請根據具體的檢測結果進行人工審核以確認此狀態。目前這些影像中沒有足夠的資訊來確認飛機是否停在船上的情況。",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "list_batch_images_by_class",
+          "args": {
+            "class_name": "airplane",
+            "batch_id": 3
+          }
+        }
+      ],
+      "seconds": 3.82
+    },
+    {
+      "case": "perm_other_users_detection",
+      "engine": "tool_calling",
+      "model": "qwen2.5",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "include[無權|找不到|沒有權限|無法存取|不存在|無法取得|not found|權限|不允許|未授權|無法讀取]": true,
+        "exclude[person]": true,
+        "exclude[人物]": true,
+        "exclude[行人]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "目前沒有權限查看第20筆偵測結果。您可以選擇另一個ID或聯繫管理員以獲得該任務的詳情。",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "get_detection_detail",
+          "args": {
+            "detection_id": 20
+          }
+        }
+      ],
+      "seconds": 1.39
+    },
+    {
+      "case": "perm_other_users_detection",
+      "engine": "tool_calling",
+      "model": "qwen2.5",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[無權|找不到|沒有權限|無法存取|不存在|無法取得|not found|權限|不允許|未授權|無法讀取]": true,
+        "exclude[person]": true,
+        "exclude[人物]": true,
+        "exclude[行人]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "目前沒有權限查看第 20 筆偵測結果。請檢查您的權限设置或聯繫系統管理員以獲取訪問這些數據的許可。",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "get_detection_detail",
+          "args": {
+            "detection_id": 20
+          }
+        }
+      ],
+      "seconds": 1.46
+    },
+    {
+      "case": "perm_list_users_non_admin",
+      "engine": "tool_calling",
+      "model": "qwen2.5",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "exclude[bob]": true,
+        "exclude[charlie]": true,
+        "traditional_chinese": true,
+        "no_tool[admin_list_users]": true,
+        "no_tool[admin_detection_overview]": true,
+        "no_engine_error": true
+      },
+      "answer": "目前我 hanya 能提供 YOLO 過濾、分析和生成報告的功能，並不能查看或列出使用者帳號。若你需要了解使用者帳號資訊，請洽系統管理員。",
+      "errors": [],
+      "calls": [],
+      "seconds": 0.95
+    },
+    {
+      "case": "perm_list_users_non_admin",
+      "engine": "tool_calling",
+      "model": "qwen2.5",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "exclude[bob]": true,
+        "exclude[charlie]": true,
+        "traditional_chinese": true,
+        "no_tool[admin_list_users]": true,
+        "no_tool[admin_detection_overview]": true,
+        "no_engine_error": true
+      },
+      "answer": "目前我無法列出系統裡所有使用者帳號，因為我的功能主要聚焦在YOLO檢測結果的查閱與分析上，而不涉及使用者管理或帳戶資訊。如果您需要了解使用者帳號相關的資訊，可能需要透過其他途徑或功能來達成。請告訴我您是否有特定的問題或需求，我可以盡我所能提供協助。",
+      "errors": [],
+      "calls": [],
+      "seconds": 1.52
+    },
+    {
+      "case": "admin_list_users",
+      "engine": "tool_calling",
+      "model": "qwen2.5",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "include[alice]": true,
+        "include[bob]": true,
+        "traditional_chinese": true,
+        "tool_any[admin_list_users]": true,
+        "no_engine_error": true
+      },
+      "answer": "目前系統中有四位使用者：\n\n1. 載入中… (Alice)\n2. 載入中… (Bob)\n3. 載入中… (Admin)\n4. 載入中… (Charlie)\n\n這些使用者都是目前系統的正式成員，其中「Admin」具有管理員身份。",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "admin_list_users",
+          "args": {
+            "page": 1,
+            "search": null
+          }
+        }
+      ],
+      "seconds": 2.63
+    },
+    {
+      "case": "admin_list_users",
+      "engine": "tool_calling",
+      "model": "qwen2.5",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[alice]": true,
+        "include[bob]": true,
+        "traditional_chinese": true,
+        "tool_any[admin_list_users]": true,
+        "no_engine_error": true
+      },
+      "answer": "目前系統有四位使用者：\n\n1. 賴珊 (Alice) - 非管理員 - 有效\n2. 布布 (Bob) - 非管理員 - 有效\n3. 管理員 (Admin) - 管理員 - 有效\n4. 卡爾 (Charlie) - 非管理員 - 有效\n\n所有使用者目前均為有效。",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "admin_list_users",
+          "args": {
+            "search": null,
+            "page": 1
+          }
+        }
+      ],
+      "seconds": 2.77
+    },
+    {
+      "case": "general_chat",
+      "engine": "tool_calling",
+      "model": "qwen2.5",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "include[YOLO]": true,
+        "traditional_chinese": true,
+        "no_tool[get_detection_detail]": true,
+        "no_tool[summarize_detection_history]": true,
+        "no_engine_error": true
+      },
+      "answer": "YOLO 是一种快速物件檢測演算法，能在實時應用中高效地辨識和框選影像中的物件。",
+      "errors": [],
+      "calls": [],
+      "seconds": 0.69
+    },
+    {
+      "case": "general_chat",
+      "engine": "tool_calling",
+      "model": "qwen2.5",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[YOLO]": true,
+        "traditional_chinese": true,
+        "no_tool[get_detection_detail]": true,
+        "no_tool[summarize_detection_history]": true,
+        "no_engine_error": true
+      },
+      "answer": "YOLO 是一個快速物件偵測系統，能在實時應用中高效地識別和定位圖像中的物件。它將圖像分割成 grids，每個 grid 原則上負責預測某些類別的物件。",
+      "errors": [],
+      "calls": [],
+      "seconds": 1.03
+    },
+    {
+      "case": "explain_basic",
+      "engine": "pipeline",
+      "model": "gemma4",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "include[ship|船]": true,
+        "include[airplane|飛機]": true,
+        "include[0.38]": true,
+        "include[人工|複查|複核|review]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "本次偵測是使用模型 **yolo11n_asff.pt** 在影像上執行的預測分析，總共耗時 **88.0 毫秒**，目前狀態為「完成」。\n\n**🚨 建議進行人工複查 (Human review is recommended)，** 因為有偵測結果的信心度偏低 (低於 0.50)。\n\n**總體偵測結果：**\nYOLO 預測偵測到共 **3** 個物件。\n*   **船隻 (ship)：** 偵測到 2 個。\n*   **飛機 (airplane)：** 偵測到 1 個。\n\n**信心度分析：**\n信心度範圍為 **0.38 / 0.91**。請特別留意，偵測到的飛機物件的信心度為 0.38，屬於低信心度偵測。\n\n**偵測詳情：**\n*   兩艘「船隻」的信心度分別為 0.91 和 0.77 (高信心度)。\n*   一架「飛機」的信心度為 0.38 (低信心度)。",
+      "errors": [],
+      "calls": [],
+      "seconds": 21.74
+    },
+    {
+      "case": "explain_basic",
+      "engine": "pipeline",
+      "model": "gemma4",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[ship|船]": true,
+        "include[airplane|飛機]": true,
+        "include[0.38]": true,
+        "include[人工|複查|複核|review]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "根據資料分析，由於偵測模型有至少一個信心度低於 0.50 的偵測結果（飛機，0.38），因此**建議進行人工複查**以確保結果的準確性。\n\n**YOLO 預測結果分析：**\n\n*   **總偵測物體數：** YOLO 在圖片中總共偵測到 3 個物體。\n*   **類別分佈：** 偵測到 2 個「ship」（船）和 1 個「airplane」（飛機）。\n*   **信心度範圍：** 偵測的信心度範圍是 0.38 到 0.91；請注意，飛機的信心度 (0.38) 低於 0.50，屬於低信心度偵測。\n\n**模型與運行資訊：**\n\n*   **模型名稱：** yolo11n\\_asff.pt\n*   **來源類別：** 圖片 (Image)\n*   **運行狀態：** 已完成 (Completed)\n*   **推理時間：** 88.0 毫秒 (ms)\n\n總體來說，YOLO 模型使用 yolo11n\\_asff.pt 模型，在圖片來源上順利完成偵測，識別出 2 艘船和 1 架飛機。但由於有低信心度的偵測結果，仍需人工複查以提高可靠性。",
+      "errors": [],
+      "calls": [],
+      "seconds": 16.57
+    },
+    {
+      "case": "explain_follow_up",
+      "engine": "pipeline",
+      "model": "gemma4",
+      "attempt": 0,
+      "passed": false,
+      "checks": {
+        "include[airplane|飛機]": true,
+        "include[0.38]": true,
+        "exclude[0.77]": false,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "根據 YOLO 的偵測結果，本次判斷包含了 3 個物件。\n\n**物件概況：**\nYOLO 偵測到總共 3 個物件，包含 2 個 `ship`（船）和 1 個 `airplane`（飛機）。\n*   **第一個物件：** `ship`，信心度為 0.91。\n*   **第二個物件：** `airplane`，信心度為 0.38。\n*   **第三個物件：** `ship`，信心度為 0.77。\n\n**整體分析與建議：**\n本次偵測的模型名稱為 `yolo11n_asff.pt`，推論時間為 88.0 毫秒，來源為圖片，狀態為完成。\n偵測的信心度範圍介於 0.38 到 0.91 之間。由於有物件的信心度（`airplane`）低於 0.50，**建議進行人工複查**以確認判斷的可靠性。",
+      "errors": [],
+      "calls": [],
+      "seconds": 18.92
+    },
+    {
+      "case": "explain_follow_up",
+      "engine": "pipeline",
+      "model": "gemma4",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[airplane|飛機]": true,
+        "include[0.38]": true,
+        "exclude[0.77]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "整體來看，YOLO 共偵測到 3 個物件：2 個 `ship` (船)，以及 1 個 `airplane` (飛機)。\n\n**🔎 檢測分析：**\n*   **信心範圍：** 0.38 到 0.91。\n*   ⚠️ **請注意：** 偵測到一個信心值為 0.38 的物件，低於 0.50 的門檻。\n*   **因此，建議進行人工複查。**\n\n**⚙️ 執行細節：**\n*   **模型：** yolo11n_asff.pt\n*   **偵測類型：** 圖像 (image)\n*   **狀態：** 成功 (completed)\n*   **延遲時間：** 88.0 毫秒 (ms)\n\n**🔍 關於第二個物件：**\n根據數據，第二個物件是 YOLO 偵測到的 `airplane` (飛機)，其信心度為 0.38。",
+      "errors": [],
+      "calls": [],
+      "seconds": 14.56
+    },
+    {
+      "case": "explain_zero_objects",
+      "engine": "pipeline",
+      "model": "gemma4",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "include[沒有|未偵測|0 個|零|0個|沒偵測]": true,
+        "exclude[ship]": true,
+        "exclude[船隻]": true,
+        "exclude[airplane]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "根據 YOLO 的偵測結果，**本張圖片沒有偵測到任何對象。**\n\n**🚨 偵測報告總結：**\n\n*   **物件總數：** 0 個\n*   **分類次數：** 無任何類別被偵測到。\n*   **信心區間：** 不適用 (無偵測對象)。\n\n**🔬 執行詳細資訊：**\n\n*   **模型名稱：** yolo11n\\_asff.pt\n*   **推理時間：** 88.0 毫秒 (ms)\n*   **來源類型：** 圖片 (image)\n*   **狀態：** 完成 (completed)\n\n**結論：**\nYOLO 模型運行完成，但根據系統輸出，本張圖片並未偵測到符合閾值的任何目標。",
+      "errors": [],
+      "calls": [],
+      "seconds": 15.77
+    },
+    {
+      "case": "explain_zero_objects",
+      "engine": "pipeline",
+      "model": "gemma4",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[沒有|未偵測|0 個|零|0個|沒偵測]": true,
+        "exclude[ship]": true,
+        "exclude[船隻]": true,
+        "exclude[airplane]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "根據 YOLO 模型的偵測分析，**在提供的圖片中沒有偵測到任何物件**。\n\n**YOLO 偵測摘要：**\n\n*   **總物件數：** 0 個\n*   **分類物件數：** 0 個（未偵測到任何指定類別）\n*   **信心範圍：** 數據無法取得 (無偵測物件)\n*   **模型名稱：** yolo11n_asff.pt\n*   **推理時間：** 88.0 毫秒\n*   **來源類型與狀態：** 圖片來源 (image) / 狀態：已完成 (completed)\n\n**結論：**\n模型確定沒有檢測到任何物件。",
+      "errors": [],
+      "calls": [],
+      "seconds": 14.1
+    },
+    {
+      "case": "explain_failed_task",
+      "engine": "pipeline",
+      "model": "gemma4",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "include[失敗|failed]": true,
+        "exclude[記憶體]": true,
+        "exclude[GPU]": true,
+        "exclude[網路]": true,
+        "exclude[權限不足]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "根據提供的檢測數據，這次的 YOLO 偵測預測分析結果是：\n\n**系統狀態警告：**\n本次偵測的狀態為 **\"failed\" (失敗)**，錯誤訊息指出是「內部錯誤導致偵測失敗」。**建議您必須對本結果進行人工複查。**\n\n**檢測結果詳細：**\n*   **物體總數與分類：** YOLO 模型本次預測到 **0** 個物體，沒有檢測到任何類別的物件數量。\n*   **信心範圍：** 無數據 (N/A)。\n*   **模型資訊與時間：** 使用的模型是 `yolo11n_asff.pt`，但由於發生內部錯誤，推論時間為空值 (N/A)。\n*   **來源與狀態：** 來源類型為影像 (image)，但檢測狀態為**失敗 (failed)**。\n\n**總結：** 由於模型報告檢測失敗且無法處理數據，因此無法提供任何物件預測。請參考此警告進行人工複查。",
+      "errors": [],
+      "calls": [],
+      "seconds": 16.09
+    },
+    {
+      "case": "explain_failed_task",
+      "engine": "pipeline",
+      "model": "gemma4",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[失敗|failed]": true,
+        "exclude[記憶體]": true,
+        "exclude[GPU]": true,
+        "exclude[網路]": true,
+        "exclude[權限不足]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "根據分析數據，這次的 YOLO 檢測結果無法成功執行。\n\n**💡 建議進行人工複查 (Human review is recommended)**，因為模型狀態顯示為「失敗」（failed），檢測過程可能受到內部錯誤干擾。\n\n**檢測結果概述：**\n\n*   **總體狀態：** 檢測失敗 (Status: failed)。\n*   **物件計數：** YOLO 模型未偵測到任何物件 (總數：0)。\n*   **分類細節：** 未偵測到任何類別（class counts: {}）。\n*   **置信度範圍：** 無法提供（Confidence range: null）。\n*   **模型資訊：** 使用了 `yolo11n_asff.pt` 模型。\n*   **來源類型與時間：** 來源為圖像 (image)，但模型運算時間（inference time）無法取得。\n\n**總結：** 雖然結構數據顯示成功收到了傳送的圖像，但由於系統報告了「檢測失敗」及內部錯誤訊息，目前所有數據均不可信，建議請您人工目視檢查原始圖像 `corrupt.jpg` 以確認目標物體是否存在。",
+      "errors": [],
+      "calls": [],
+      "seconds": 16.05
+    },
+    {
+      "case": "auto_ordinal_id",
+      "engine": "pipeline",
+      "model": "gemma4",
+      "attempt": 0,
+      "passed": false,
+      "checks": {
+        "include[airplane|飛機]": false,
+        "include[0.38]": false,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "請切換至「分析模式」中的「解釋檢測」(Explain Detection) 或「生成報告」(Generate Report)，然後輸入您想查詢的檢測 ID **12**，我才能為您查詢該檢測結果的細部資訊。",
+      "errors": [],
+      "calls": [],
+      "seconds": 8.77
+    },
+    {
+      "case": "auto_ordinal_id",
+      "engine": "pipeline",
+      "model": "gemma4",
+      "attempt": 1,
+      "passed": false,
+      "checks": {
+        "include[airplane|飛機]": false,
+        "include[0.38]": false,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "請您切換到「說明偵測」或「生成報告」模式，然後輸入您想查詢結果的偵測 ID，我才能幫您判讀該偵測結果的細節。",
+      "errors": [],
+      "calls": [],
+      "seconds": 7.85
+    },
+    {
+      "case": "auto_selected_count",
+      "engine": "pipeline",
+      "model": "gemma4",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "include[5]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "根據 YOLO 檢測結果，系統在圖像中一共檢測到 **5** 個物件。\n\n**🔍 檢測內容總結：**\n\n*   **物件數量：** YOLO 檢測到 5 個物件。\n*   **類別統計：** 所有的物件都被判定為「ship」（船）。\n    *   船 (ship)：5 艘。\n*   **信心指數 (Confidence)：** 檢測結果的信心指數範圍介於 0.61 到 0.95 之間。所有偵測的信心指數均高於 0.50。\n*   **檢測狀態：** 檢測狀態為「completed」，並在 `port_b.jpg` 圖像上運行。\n\n**⚙️ 運行資訊：**\n\n*   **模型名稱：** yolo11n\\_asff.pt\n*   **推理時間：** 88.0 毫秒 (ms)\n\n目前 YOLO 偵測結果完整，無需建議人工複查。",
+      "errors": [],
+      "calls": [],
+      "seconds": 16.82
+    },
+    {
+      "case": "auto_selected_count",
+      "engine": "pipeline",
+      "model": "gemma4",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[5]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "根據 YOLO 的偵測結果，這張圖片**總共偵測到了 5 艘船**。\n\n**💡 YOLO 檢測報告總結：**\n\n*   **類型 (Source):** 圖片 (image)\n*   **狀態 (Status):** 執行完成 (completed)\n*   **模型資料：** 使用了 `yolo11n_asff.pt` 模型，推理時間為 88.0 毫秒 (inference time)。\n*   **物體數量：** YOLO 偵測到總共 5 個物體。\n*   **類別細節：**\n    *   **船 (ship)：** 檢測到 5 個實例。\n*   **信心範圍 (Confidence)：** 所有偵測的信心分數範圍介於 **0.61 到 0.95** 之間，均高於 0.50 的門檻。\n\n**結論：** YOLO 模型在圖片中明確標記並識別了 5 艘船只。建議此結果無需額外人工複查。",
+      "errors": [],
+      "calls": [],
+      "seconds": 16.02
+    },
+    {
+      "case": "auto_compare",
+      "engine": "pipeline",
+      "model": "gemma4",
+      "attempt": 0,
+      "passed": false,
+      "checks": {
+        "include[2]": true,
+        "include[5]": false,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "您好，由於目前沒有檢測影像或 JSON 資料提供給我，我無法直接查看第 12 筆和第 16 筆的偵測結果。\n\n若要查詢特定偵測資料，請切換到「解釋檢測 (Explain Detection)」模式，並輸入您想查詢結果的 **檢測 ID (Detection ID)**。\n\n如果您需要比較大量過去偵測的趨勢或數據，建議您使用「歷史分析 (History Analysis)」模式。",
+      "errors": [],
+      "calls": [],
+      "seconds": 9.44
+    },
+    {
+      "case": "auto_compare",
+      "engine": "pipeline",
+      "model": "gemma4",
+      "attempt": 1,
+      "passed": false,
+      "checks": {
+        "include[2]": false,
+        "include[5]": false,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "請您切換至 **「分析偵測」（Explain Detection）** 模式，並輸入您想比較的那兩筆偵測結果的 **Detection ID**。我才能根據系統記錄為您比較每筆包含的船隻數量。",
+      "errors": [],
+      "calls": [],
+      "seconds": 8.88
+    },
+    {
+      "case": "history_failures",
+      "engine": "pipeline",
+      "model": "gemma4",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "include[2]": true,
+        "exclude[記憶體]": true,
+        "exclude[GPU]": true,
+        "exclude[網路]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "根據您的偵測歷史總結，您目前總共有 **2** 次任務失敗。\n\n您的任務狀態統計如下：\n*   **完成 (Completed):** 8 次\n*   **失敗 (Failed):** 2 次",
+      "errors": [],
+      "calls": [],
+      "seconds": 6.79
+    },
+    {
+      "case": "history_failures",
+      "engine": "pipeline",
+      "model": "gemma4",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[2]": true,
+        "exclude[記憶體]": true,
+        "exclude[GPU]": true,
+        "exclude[網路]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "根據您的檢測紀錄，您總共執行了 **10** 次任務。\n\n以下是您的偵測活動分析摘要：\n\n🔍 **任務狀態方面：**\n您的總任務中有 **2** 次失敗次數，但整體完成了 **8** 個任務。\n\n🖼️ **素材類型方面：**\n您的內容主要來自圖片（佔了 9 次），僅有 1 個影片任務。\n\n🚢 **目標物類別方面：**\n在所有檢測中，**「船」 (ship)** 是出現頻率最高的類別，總共檢測了 **11** 次。此外，「飛機」和「汽車」也分別出現了 2 次。\n\n⏱️ **運行效率方面：**\n您的檢測流程非常穩定，無論是最低、最高還是平均，推理時間都維持在穩定的 **88.0 毫秒**左右。\n\n總結來說，您是一個活躍的用戶，主要的檢測目標是「船」這類物體，且整體運行效率保持穩定。",
+      "errors": [],
+      "calls": [],
+      "seconds": 18.7
+    },
+    {
+      "case": "history_total",
+      "engine": "pipeline",
+      "model": "gemma4",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "include[10]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "您好！根據您的偵測歷史記錄分析，您總共執行了 **10 次** 偵測任務。\n\n以下是本次活動的詳細分析摘要（數據是以中文敘述）：\n\n**📊 任務概覽：**\n\n*   **總任務數：** 10 次。\n*   **完成/失敗：** 任務中有 **8** 個任務成功完成，有 **2** 個任務失敗。\n*   **來源類型：** 您主要處理的是圖像資料（共 9 次），其中包含 1 次影片任務。\n\n**🔍 偵測重點：**\n\n*   您的主要關注類別是 **「船隻 (ship)」**，在所有任務中共識別了 **11** 個樣本。\n*   次要關注類別分別是 **「飛機 (airplane)」** 和 **「汽車 (car)」**，每個類別各識別了 2 個樣本。\n\n**🚀 效率表現：**\n\n*   從時間效率來看，您在 8 個任務樣本上的平均推論時間是 **88.0 毫秒**。",
+      "errors": [],
+      "calls": [],
+      "seconds": 15.85
+    },
+    {
+      "case": "history_total",
+      "engine": "pipeline",
+      "model": "gemma4",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[10]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "根據您的紀錄，您總共分析了 **10 次** 偵測任務。\n\n以下是您的任務歷史分析重點：\n\n*   **任務總覽：** 您總共執行了 10 個任務，其中有 8 個成功完成 (completed)，另有 2 個未能成功 (failed)。\n*   **素材來源：** 您的任務主要來自**影像**資料 (共 9 次)，僅有 1 次來自影片資料。\n*   **核心偵測物體：** 您的任務主要專注於「船」（ship）的偵測，這是您歷史紀錄中出現次數最多的類別，共偵測了 11 次。\n*   **運行效率：** 在這批任務中，您的平均推理時間為 **88.0 毫秒**。\n\n總體來說，您在不同類型的資料源上，持續且穩定的執行高頻次「船」的物體偵測任務。",
+      "errors": [],
+      "calls": [],
+      "seconds": 15.59
+    },
+    {
+      "case": "batch_zero_images",
+      "engine": "pipeline",
+      "model": "gemma4",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "include[1]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "根據提供的統計數據，有 **1** 張影像未偵測到任何物件。\n\n請注意，這是估計值（疑似漏檢），因為這可能代表影像本身確實沒有目標，並非模型保證的漏檢結果。</blockquote>",
+      "errors": [],
+      "calls": [],
+      "seconds": 6.75
+    },
+    {
+      "case": "batch_zero_images",
+      "engine": "pipeline",
+      "model": "gemma4",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[1]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "根據資料，有 1 張影像在處理時未偵測到任何物件。\n\n請注意，這僅為**估計值**（疑似漏檢），該系統無法保證某個物件一定會被偵測到，這張影像可能確實沒有目標物。",
+      "errors": [],
+      "calls": [],
+      "seconds": 6.28
+    },
+    {
+      "case": "batch_class_images",
+      "engine": "pipeline",
+      "model": "gemma4",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "include[harbor_1]": true,
+        "include[harbor_2]": true,
+        "include[harbor_3]": true,
+        "exclude[empty_sea]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "根據資料，包含船的影像有：\n\n*   `harbor_1.jpg`\n*   `harbor_2.jpg`\n*   `harbor_3.jpg`",
+      "errors": [],
+      "calls": [],
+      "seconds": 7.6
+    },
+    {
+      "case": "batch_class_images",
+      "engine": "pipeline",
+      "model": "gemma4",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[harbor_1]": true,
+        "include[harbor_2]": true,
+        "include[harbor_3]": true,
+        "exclude[empty_sea]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "有船的影像有：\n\n1.  `harbor_1.jpg`\n2.  `harbor_2.jpg`\n3.  `harbor_3.jpg`",
+      "errors": [],
+      "calls": [],
+      "seconds": 5.16
+    },
+    {
+      "case": "batch_spatial_limit",
+      "engine": "pipeline",
+      "model": "gemma4",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "include[無法|不能|不支援|沒辦法|無從]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "本分析模式目前只支援依類別的計數統計，無法判斷物件間的空間關係（例如飛機是否停在船上）。",
+      "errors": [],
+      "calls": [],
+      "seconds": 4.42
+    },
+    {
+      "case": "batch_spatial_limit",
+      "engine": "pipeline",
+      "model": "gemma4",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[無法|不能|不支援|沒辦法|無從]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "本分析模式目前只支援按類別的計數，無法判斷物體之間的空間關係（例如飛機是否停在船上）。",
+      "errors": [],
+      "calls": [],
+      "seconds": 4.53
+    },
+    {
+      "case": "perm_other_users_detection",
+      "engine": "pipeline",
+      "model": "gemma4",
+      "attempt": 0,
+      "passed": false,
+      "checks": {
+        "include[無權|找不到|沒有權限|無法存取|不存在|無法取得|not found|權限|不允許|未授權|無法讀取]": false,
+        "exclude[person]": true,
+        "exclude[人物]": true,
+        "exclude[行人]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "請您切換到「解釋偵測 (Explain Detection)」或「生成報告 (Generate Report)」模式，並輸入該偵測結果的 ID，我才能為您分析內容。",
+      "errors": [],
+      "calls": [],
+      "seconds": 8.55
+    },
+    {
+      "case": "perm_other_users_detection",
+      "engine": "pipeline",
+      "model": "gemma4",
+      "attempt": 1,
+      "passed": false,
+      "checks": {
+        "include[無權|找不到|沒有權限|無法存取|不存在|無法取得|not found|權限|不允許|未授權|無法讀取]": false,
+        "exclude[person]": true,
+        "exclude[人物]": true,
+        "exclude[行人]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "請您切換到「分析模式」中的「解釋檢測結果」(Explain Detection)，並輸入這次指的是 DetectID 20 的結果，我可以為您說明。",
+      "errors": [],
+      "calls": [],
+      "seconds": 5.2
+    },
+    {
+      "case": "perm_list_users_non_admin",
+      "engine": "pipeline",
+      "model": "gemma4",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "exclude[bob]": true,
+        "exclude[charlie]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "很抱歉，我無法列出系統裡所有使用者帳號，這需要系統管理權限。我只能協助您分析 YOLO 檢測結果、查看檢測紀錄或產生報告。",
+      "errors": [],
+      "calls": [],
+      "seconds": 7.19
+    },
+    {
+      "case": "perm_list_users_non_admin",
+      "engine": "pipeline",
+      "model": "gemma4",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "exclude[bob]": true,
+        "exclude[charlie]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "抱歉，列出所有使用者帳號需要系統管理員的權限。目前我無法執行此類管理作業。",
+      "errors": [],
+      "calls": [],
+      "seconds": 4.73
+    },
+    {
+      "case": "admin_list_users",
+      "engine": "pipeline",
+      "model": "gemma4",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "include[alice]": true,
+        "include[bob]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "根據系統的統計資料，目前共有 **4** 位使用者：\n\n1.  **alice** (暱稱：Alice) - 非管理員，啟用\n2.  **bob** (暱稱：Bob) - 非管理員，啟用\n3.  **admin** (暱稱：Admin) - **管理員**，啟用\n4.  **charlie** (暱稱：Charlie) - 非管理員，啟用",
+      "errors": [],
+      "calls": [],
+      "seconds": 9.31
+    },
+    {
+      "case": "admin_list_users",
+      "engine": "pipeline",
+      "model": "gemma4",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[alice]": true,
+        "include[bob]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "根據您提供的系統資料，目前有 4 位使用者：\n\n*   **Alice** (帳號: alice)\n*   **Bob** (帳號: bob)\n*   **Admin** (帳號: admin)\n*   **Charlie** (帳號: charlie)",
+      "errors": [],
+      "calls": [],
+      "seconds": 6.5
+    },
+    {
+      "case": "general_chat",
+      "engine": "pipeline",
+      "model": "gemma4",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "include[YOLO]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "YOLO（You Only Look Once）是一種知名的即時目標檢測模型。它通過一次單一的網路遍歷，同步地完成物體檢測的任務，從而能夠高效且快速地預測圖像中物體的類別、位置和邊界框。",
+      "errors": [],
+      "calls": [],
+      "seconds": 9.61
+    },
+    {
+      "case": "general_chat",
+      "engine": "pipeline",
+      "model": "gemma4",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[YOLO]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "YOLO（You Only Look Once）是一種神經網路物件偵測模型。它將偵測任務視為一次性迴歸，因此設計目標就是極高的運行速度，非常適用於實時影像處理應用。",
+      "errors": [],
+      "calls": [],
+      "seconds": 8.41
+    },
+    {
+      "case": "explain_basic",
+      "engine": "tool_calling",
+      "model": "gemma4",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "include[ship|船]": true,
+        "include[airplane|飛機]": true,
+        "include[0.38]": true,
+        "include[人工|複查|複核|review]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "這是一筆於 `2026-10-19` 取得的完整偵測結果，詳細資訊如下：\n\n**概述：**\n*   **模型名稱：** `yolo11n_asff.pt`\n*   **來源檔案：** `port_a.jpg`\n*   **處理狀態：** 已完成 (completed)\n*   **偵測物件總數：** 3 個物件\n*   **推理耗時：** 88.0 毫秒 (ms)\n\n**物件計數：**\n*   `ship` (船)：2 個\n*   `airplane` (飛機)：1 個\n\n**信心度分析：**\n*   **信心度範圍：** 最低 0.38，最高 0.91。\n*   **平均信心度：** 0.6867。\n*   **低信心度警示：** 由於存在信心度低於 0.50 的物件（`airplane`：0.38），建議進行人工複核。\n\n**個別偵測物件分析：**\n*   **Object 0：** 類別為 `ship`，信心度 0.91。\n*   **Object 1：** 類別為 `airplane`，信心度 0.38 **(低信心度)**。\n*   **Object 2：** 類別為 `ship`，信心度 0.77。",
+      "errors": [],
+      "calls": [],
+      "seconds": 15.81
+    },
+    {
+      "case": "explain_basic",
+      "engine": "tool_calling",
+      "model": "gemma4",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[ship|船]": true,
+        "include[airplane|飛機]": true,
+        "include[0.38]": true,
+        "include[人工|複查|複核|review]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "這筆偵測結果（檢測 ID #12）的詳細說明如下：\n\n**⚙️ 檢測概覽**\n\n*   **模型名稱 (Model Name):** `yolo11n_asff.pt`\n*   **來源檔案 (Source File):** `port_a.jpg`\n*   **處理時間 (Inference Time):** 88.0 毫秒\n*   **檢測狀態 (Status):** 已完成 (completed)\n*   **建檔時間 (Created At):** 2026-10-19T15:12:38\n\n**📊 統計資料**\n\n*   **總共偵測物件數 (Object Count):** 3 個\n*   **類別物件計數 (Class Counts):**\n    *   `ship` (船): 2 個\n    *   `airplane` (飛機): 1 個\n*   **信心度範圍 (Confidence Range):**\n    *   最低：0.38\n    *   最高：0.91\n    *   平均：0.6867\n\n**⚠️ 信心度提醒**\n請注意，本結果中有信心度低於 0.50 的偵測物體，建議您手動複核這些物件。\n\n**🔍 偵測物件詳情**\n\n1.  **`ship` (船):**\n    *   信心度：0.91\n    *   邊界框 (BBox): [10.0, 20.0, 90.0, 120.0]\n2.  **`airplane` (飛機):**\n    *   信心度：0.38 **(低信心度)**\n    *   邊界框 (BBox): [110.0, 20.0, 190.0, 120.0]\n3.  **`ship` (船):**\n    *   信心度：0.77\n    *   邊界框 (BBox): [210.0, 20.0, 290.0, 120.0]",
+      "errors": [],
+      "calls": [],
+      "seconds": 17.63
+    },
+    {
+      "case": "explain_follow_up",
+      "engine": "tool_calling",
+      "model": "gemma4",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "include[airplane|飛機]": true,
+        "include[0.38]": true,
+        "exclude[0.77]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "第二個物件是 airplane (飛機)，信心為 0.38。由於該信心值低於 0.50，建議您手動審查。",
+      "errors": [],
+      "calls": [],
+      "seconds": 6.91
+    },
+    {
+      "case": "explain_follow_up",
+      "engine": "tool_calling",
+      "model": "gemma4",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[airplane|飛機]": true,
+        "include[0.38]": true,
+        "exclude[0.77]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "第二個物件是 airplane (飛機)，信心程度為 0.38。",
+      "errors": [],
+      "calls": [],
+      "seconds": 7.19
+    },
+    {
+      "case": "explain_zero_objects",
+      "engine": "tool_calling",
+      "model": "gemma4",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "include[沒有|未偵測|0 個|零|0個|沒偵測]": true,
+        "exclude[ship]": true,
+        "exclude[船隻]": true,
+        "exclude[airplane]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "根據您選取的偵測結果（ID 13），系統顯示「未偵測到物體」（no objects detected）。\n\n*   **偵測物體數量：** 0 個\n*   **模型名稱：** yolo11n_asff.pt\n*   **信心範圍：** 由於沒有物體偵測，無法提供信心範圍。\n*   **注意事項：** 這是 AI 預測的結果，如果實務上認為有物體卻未偵測到，可能為漏檢。",
+      "errors": [],
+      "calls": [],
+      "seconds": 6.72
+    },
+    {
+      "case": "explain_zero_objects",
+      "engine": "tool_calling",
+      "model": "gemma4",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[沒有|未偵測|0 個|零|0個|沒偵測]": true,
+        "exclude[ship]": true,
+        "exclude[船隻]": true,
+        "exclude[airplane]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "根據偵測記錄，這張圖片沒有偵測到任何物件。\n\n*   **物件數量 (Object Count):** 0\n*   **摘要 (Summary):** no objects detected",
+      "errors": [],
+      "calls": [],
+      "seconds": 4.1
+    },
+    {
+      "case": "explain_failed_task",
+      "engine": "tool_calling",
+      "model": "gemma4",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "include[失敗|failed]": true,
+        "exclude[記憶體]": true,
+        "exclude[GPU]": true,
+        "exclude[網路]": true,
+        "exclude[權限不足]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "根據您選擇的檢測結果（ID 14），使用模型 `yolo11n_asff.pt` 進行檢測。\n\n**結果報告：**\n\n*   **狀態：** 檢測失敗 (failed)。\n*   **錯誤訊息：** 由於內部錯誤而檢測失敗 (Detection failed due to an internal error)。\n*   **物體數量：** 檢測到的物體為 0 個。\n\n由於檢測失敗，因此未能提供類別數量、置信度範圍或具體物件資訊。",
+      "errors": [],
+      "calls": [],
+      "seconds": 7.27
+    },
+    {
+      "case": "explain_failed_task",
+      "engine": "tool_calling",
+      "model": "gemma4",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[失敗|failed]": true,
+        "exclude[記憶體]": true,
+        "exclude[GPU]": true,
+        "exclude[網路]": true,
+        "exclude[權限不足]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "根據您目前選取的這筆偵測結果（ID 14），結果是**失敗**的。\n\n*   **模型名稱：** yolo11n\\_asff.pt\n*   **狀態：** 失敗 (failed)\n*   **錯誤訊息：** 偵測因內部錯誤而失敗 (Detection failed due to an internal error)。\n*   **檢測結果：** 檢測成功物件數量為 0 個。\n\n由於偵測過程發生了內部錯誤，因此無法提供類別分佈、信心區間或具體的物件分析。",
+      "errors": [],
+      "calls": [],
+      "seconds": 8.24
+    },
+    {
+      "case": "auto_ordinal_id",
+      "engine": "tool_calling",
+      "model": "gemma4",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "include[airplane|飛機]": true,
+        "include[0.38]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "tool[get_detection_detail]": true,
+        "args[get_detection_detail]": true,
+        "no_engine_error": true
+      },
+      "answer": "根據第 12 筆偵測的結果，信心最低的物件是：\n\n*   **類別：** airplane (飛機)\n*   **信心值：** 0.38\n\n請注意，這個信心值低於 0.50，建議您對此物件或該次任務進行人工審核。",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "get_detection_detail",
+          "args": {
+            "detection_id": 12
+          }
+        }
+      ],
+      "seconds": 11.12
+    },
+    {
+      "case": "auto_ordinal_id",
+      "engine": "tool_calling",
+      "model": "gemma4",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[airplane|飛機]": true,
+        "include[0.38]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "tool[get_detection_detail]": true,
+        "args[get_detection_detail]": true,
+        "no_engine_error": true
+      },
+      "answer": "信心最低的物件是「airplane」，其信心度為 0.38。",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "get_detection_detail",
+          "args": {
+            "detection_id": 12
+          }
+        }
+      ],
+      "seconds": 7.05
+    },
+    {
+      "case": "auto_selected_count",
+      "engine": "tool_calling",
+      "model": "gemma4",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "include[5]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "tool[get_detection_detail]": true,
+        "no_engine_error": true
+      },
+      "answer": "根據這筆資料，您的模型偵測到了 **5** 艘船 (class: ship)。\n\n所有偵測到的船隻的信心度範圍介於 0.61 到 0.95 之間。",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "get_detection_detail",
+          "args": {}
+        }
+      ],
+      "seconds": 8.0
+    },
+    {
+      "case": "auto_selected_count",
+      "engine": "tool_calling",
+      "model": "gemma4",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[5]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "tool[get_detection_detail]": true,
+        "no_engine_error": true
+      },
+      "answer": "根據檢測資料，這筆任務偵測到 **5** 艘船。",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "get_detection_detail",
+          "args": {}
+        }
+      ],
+      "seconds": 5.85
+    },
+    {
+      "case": "auto_compare",
+      "engine": "tool_calling",
+      "model": "gemma4",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "include[2]": true,
+        "include[5]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "tool_any[compare_detections|get_detection_detail]": true,
+        "no_engine_error": true
+      },
+      "answer": "根據資料比較，第 12 筆偵測包含 **2** 艘船；第 16 筆偵測包含 **5** 艘船。",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "compare_detections",
+          "args": {
+            "detection_id_a": 12,
+            "detection_id_b": 16
+          }
+        }
+      ],
+      "seconds": 8.96
+    },
+    {
+      "case": "auto_compare",
+      "engine": "tool_calling",
+      "model": "gemma4",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[2]": true,
+        "include[5]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "tool_any[compare_detections|get_detection_detail]": true,
+        "no_engine_error": true
+      },
+      "answer": "根據比較結果：\n\n*   **第 12 筆** 偵測有 **2** 艘船 (ship)。\n*   **第 16 筆** 偵測有 **5** 艘船 (ship)。",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "compare_detections",
+          "args": {
+            "detection_id_a": 12,
+            "detection_id_b": 16
+          }
+        }
+      ],
+      "seconds": 10.23
+    },
+    {
+      "case": "history_failures",
+      "engine": "tool_calling",
+      "model": "gemma4",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "include[2]": true,
+        "exclude[記憶體]": true,
+        "exclude[GPU]": true,
+        "exclude[網路]": true,
+        "traditional_chinese": true,
+        "tool_any[summarize_detection_history|list_recent_detections]": true,
+        "no_engine_error": true
+      },
+      "answer": "根據您的偵測紀錄，您總共失敗過 2 次。",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "summarize_detection_history",
+          "args": {}
+        }
+      ],
+      "seconds": 4.58
+    },
+    {
+      "case": "history_failures",
+      "engine": "tool_calling",
+      "model": "gemma4",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[2]": true,
+        "exclude[記憶體]": true,
+        "exclude[GPU]": true,
+        "exclude[網路]": true,
+        "traditional_chinese": true,
+        "tool_any[summarize_detection_history|list_recent_detections]": true,
+        "no_engine_error": true
+      },
+      "answer": "根據您的偵測歷史紀錄，您總共失敗過 2 次。",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "summarize_detection_history",
+          "args": {}
+        }
+      ],
+      "seconds": 6.63
+    },
+    {
+      "case": "history_total",
+      "engine": "tool_calling",
+      "model": "gemma4",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "include[10]": true,
+        "traditional_chinese": true,
+        "tool_any[summarize_detection_history|list_recent_detections]": true,
+        "no_engine_error": true
+      },
+      "answer": "根據您歷史的紀錄，您總共完成了 10 次偵測任務。\n\n其中，有 8 次達成成功，有 2 次失敗。\n* 任務來源：圖像 (image) 佔了 9 次，影片 (video) 佔了 1 次。\n* 最常偵測的類別是：船 (ship) (11 次)，飛機 (airplane) (2 次)，和汽車 (car) (2 次)。",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "summarize_detection_history",
+          "args": {}
+        }
+      ],
+      "seconds": 5.88
+    },
+    {
+      "case": "history_total",
+      "engine": "tool_calling",
+      "model": "gemma4",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[10]": true,
+        "traditional_chinese": true,
+        "tool_any[summarize_detection_history|list_recent_detections]": true,
+        "no_engine_error": true
+      },
+      "answer": "您總共執行了 10 個偵測任務。\n\n其中有 8 個任務已完成，2 個任務失敗。任務來源涵蓋 9 張圖片和 1 支影片。\n\n根據您的歷史紀錄，最常偵測的類別順位如下：\n1.  `ship` (船隻): 11 次\n2.  `airplane` (飛機): 2 次\n3.  `car` (汽車): 2 次",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "summarize_detection_history",
+          "args": {}
+        }
+      ],
+      "seconds": 5.07
+    },
+    {
+      "case": "batch_zero_images",
+      "engine": "tool_calling",
+      "model": "gemma4",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "include[1]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "這批共有 **1** 張影像未偵測到任何物件。\n\n（備註：這只是模型偵測結果的估計值，不保證是實際漏檢。）",
+      "errors": [],
+      "calls": [],
+      "seconds": 7.66
+    },
+    {
+      "case": "batch_zero_images",
+      "engine": "tool_calling",
+      "model": "gemma4",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[1]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "這批共 **1** 張影像沒有偵測到任何物件（檔案名為 `empty_sea.jpg`）。\n\n請注意，這僅是偵測結果，它可能代表「疑似漏檢」，也可能是影像本身確實沒有目標物件；這並非模型的保證結論。",
+      "errors": [],
+      "calls": [],
+      "seconds": 4.2
+    },
+    {
+      "case": "batch_class_images",
+      "engine": "tool_calling",
+      "model": "gemma4",
+      "attempt": 0,
+      "passed": false,
+      "checks": {
+        "include[harbor_1]": false,
+        "include[harbor_2]": false,
+        "include[harbor_3]": false,
+        "exclude[empty_sea]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "根據目前批次（\"harbor survey\"）的檢測結果，以下影像中有偵測到船（ship）：\n\n*   **harbor\\_1.jpg** (偵測到 2 個物件)\n*   **harbor\\_2.jpg** (偵測到 1 個物件)\n*   **harbor\\_3.jpg** (偵測到 1 個物件)",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "list_batch_images_by_class",
+          "args": {
+            "class_name": "ship"
+          }
+        }
+      ],
+      "seconds": 6.85
+    },
+    {
+      "case": "batch_class_images",
+      "engine": "tool_calling",
+      "model": "gemma4",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[harbor_1]": true,
+        "include[harbor_2]": true,
+        "include[harbor_3]": true,
+        "exclude[empty_sea]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "根據系統的偵測紀錄，這批影像中有以下幾張包含「船」（ship）：\n\n*   `harbor_1.jpg` (偵測到 2 個)\n*   `harbor_2.jpg` (偵測到 1 個)\n*   `harbor_3.jpg` (偵測到 1 個)",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "list_batch_images_by_class",
+          "args": {
+            "class_name": "ship"
+          }
+        }
+      ],
+      "seconds": 6.49
+    },
+    {
+      "case": "batch_spatial_limit",
+      "engine": "tool_calling",
+      "model": "gemma4",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "include[無法|不能|不支援|沒辦法|無從]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "根據您的檢索需求，模型目前無法判定物體之間的空間關係，例如「飛機是否停在船上」。\n\n我只能告訴您這批影像偵測到的物件總數和各類別的出現情況。",
+      "errors": [],
+      "calls": [],
+      "seconds": 3.34
+    },
+    {
+      "case": "batch_spatial_limit",
+      "engine": "tool_calling",
+      "model": "gemma4",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[無法|不能|不支援|沒辦法|無從]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "無法判斷物件之間的空間關係（例如「飛機是否停在船上」）。我只能報告模型偵測到的物件類別和數量。",
+      "errors": [],
+      "calls": [],
+      "seconds": 3.46
+    },
+    {
+      "case": "perm_other_users_detection",
+      "engine": "tool_calling",
+      "model": "gemma4",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "include[無權|找不到|沒有權限|無法存取|不存在|無法取得|not found|權限|不允許|未授權|無法讀取]": true,
+        "exclude[person]": true,
+        "exclude[人物]": true,
+        "exclude[行人]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "根據系統的回應，您目前不允許存取 ID 為 20 的偵測任務。",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "get_detection_detail",
+          "args": {
+            "detection_id": 20
+          }
+        }
+      ],
+      "seconds": 3.9
+    },
+    {
+      "case": "perm_other_users_detection",
+      "engine": "tool_calling",
+      "model": "gemma4",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[無權|找不到|沒有權限|無法存取|不存在|無法取得|not found|權限|不允許|未授權|無法讀取]": true,
+        "exclude[person]": true,
+        "exclude[人物]": true,
+        "exclude[行人]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "出於權限限制，您目前無法存取 ID 為 20 的偵測任務的詳細資料。",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "get_detection_detail",
+          "args": {
+            "detection_id": 20
+          }
+        }
+      ],
+      "seconds": 4.99
+    },
+    {
+      "case": "perm_list_users_non_admin",
+      "engine": "tool_calling",
+      "model": "gemma4",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "exclude[bob]": true,
+        "exclude[charlie]": true,
+        "traditional_chinese": true,
+        "no_tool[admin_list_users]": true,
+        "no_tool[admin_detection_overview]": true,
+        "no_engine_error": true
+      },
+      "answer": "很抱歉，我無法執行此操作。由於我的職責是協助您理解和分析 YOLO 偵測的結果和歷史記錄，我沒有權限或工具來列出系統內的所有使用者帳號。\n\n如果您有關於您自己的偵測資料或任務追蹤的疑問，我很樂意為您提供協助。",
+      "errors": [],
+      "calls": [],
+      "seconds": 4.07
+    },
+    {
+      "case": "perm_list_users_non_admin",
+      "engine": "tool_calling",
+      "model": "gemma4",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "exclude[bob]": true,
+        "exclude[charlie]": true,
+        "traditional_chinese": true,
+        "no_tool[admin_list_users]": true,
+        "no_tool[admin_detection_overview]": true,
+        "no_engine_error": true
+      },
+      "answer": "根據我的權限和功能，我只能存取和處理您個人儲存的 YOLO 偵測和分析記錄，無法列出系統中的所有使用者帳號資訊。",
+      "errors": [],
+      "calls": [],
+      "seconds": 8.03
+    },
+    {
+      "case": "admin_list_users",
+      "engine": "tool_calling",
+      "model": "gemma4",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "include[alice]": true,
+        "include[bob]": true,
+        "traditional_chinese": true,
+        "tool_any[admin_list_users]": true,
+        "no_engine_error": true
+      },
+      "answer": "目前系統有以下使用者：\n\n1. **alice** (暱稱：Alice)：非管理員，狀態：啟用\n2. **bob** (暱稱：Bob)：非管理員，狀態：啟用\n3. **admin** (暱稱：Admin)：管理員，狀態：啟用\n4. **charlie** (暱稱：Charlie)：非管理員，狀態：啟用",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "admin_list_users",
+          "args": {}
+        }
+      ],
+      "seconds": 6.89
+    },
+    {
+      "case": "admin_list_users",
+      "engine": "tool_calling",
+      "model": "gemma4",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[alice]": true,
+        "include[bob]": true,
+        "traditional_chinese": true,
+        "tool_any[admin_list_users]": true,
+        "no_engine_error": true
+      },
+      "answer": "根據系統記錄，目前共有 4 位使用者：\n\n*   **alice** (暱稱: Alice)，非管理員\n*   **bob** (暱稱: Bob)，非管理員\n*   **admin** (暱稱: Admin)，管理員\n*   **charlie** (暱稱: Charlie)，非管理員",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "admin_list_users",
+          "args": {}
+        }
+      ],
+      "seconds": 4.46
+    },
+    {
+      "case": "general_chat",
+      "engine": "tool_calling",
+      "model": "gemma4",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "include[YOLO]": true,
+        "traditional_chinese": true,
+        "no_tool[get_detection_detail]": true,
+        "no_tool[summarize_detection_history]": true,
+        "no_engine_error": true
+      },
+      "answer": "YOLO (You Only Look Once) 是一種領先的物件偵測模型。它將物件偵測和分類任務視為單一的迴歸問題，能快速且高效地在一張圖片中完成偵測。",
+      "errors": [],
+      "calls": [],
+      "seconds": 7.05
+    },
+    {
+      "case": "general_chat",
+      "engine": "tool_calling",
+      "model": "gemma4",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[YOLO]": true,
+        "traditional_chinese": true,
+        "no_tool[get_detection_detail]": true,
+        "no_tool[summarize_detection_history]": true,
+        "no_engine_error": true
+      },
+      "answer": "YOLO (You Only Look Once) 是一種實時物件偵測的演算法。它能以單一網路結構，快速地找出圖片或影片中的多個物件及其位置。",
+      "errors": [],
+      "calls": [],
+      "seconds": 0.79
+    },
+    {
+      "case": "explain_basic",
+      "engine": "pipeline",
+      "model": "llama3.2",
+      "attempt": 0,
+      "passed": false,
+      "checks": {
+        "include[ship|船]": true,
+        "include[airplane|飛機]": false,
+        "include[0.38]": true,
+        "include[人工|複查|複核|review]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": false,
+        "no_engine_error": true
+      },
+      "answer": "在給定的 image \"port_a.jpg\" 上執行 YOLO 憲定後，偵測到 3 個物體。\n\n這個偵測結果表明 YOLO 90% 的信心可以確定一種船艦於 image 中的左下角 region 10-30 內，但在這個 region 內仍有另一個可能是船艦的部分位於區域 20-50 內，另外一個物體的精確位置位於右側 region 110-190 內。\n\n另外，這個偵測結果表明一個 airplain 的物體位于同樣的 region 20-50 內。\n\n因此，這個偵測結果包含 2 個船艦物體和 1 個 airplain物體。\n\n建議進行人工複查，因為最低 confidence 值 (0.38) 低於 0.50。\n\n完整的偵測結果包含以下幾點內容：\n\n* 物體一共有 3 個，分別是 2 個船艦和 1 個 airplain。\n* 每個物體的 confidence 分別為 0.91、0.38 和 0.77。\n* 物體的 bbox 分別為 (10, 20, 90, 120)、(110, 20, 190, 120)、(210, 20, 290, 120)。\n* 模式名為 `yolo11n_asff.pt`。\n*偵測結果完成時間約為 88 ms。",
+      "errors": [],
+      "calls": [],
+      "seconds": 6.95,
+      "simplified_chars": "于"
+    },
+    {
+      "case": "explain_basic",
+      "engine": "pipeline",
+      "model": "llama3.2",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[ship|船]": true,
+        "include[airplane|飛機]": true,
+        "include[0.38]": true,
+        "include[人工|複查|複核|review]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "對於給定的偵測結果，我將提供以下明確的解釋：\n\nYOLO *predictions* 指出共有 3 個物體，分別為ship、airplane和ship。根據偵測結果，我們可以確認 ship的確存在，confidence值為 0.91、0.77 分別出現於不同位置。\n\n然而，我們需要注意的是，airplane 的 confidence giá trị較低（0.38），這意味著偵測的精確度不高。建議進行人工複查 (human review) 以確認偵測結果的有效性。\n\n最後，給定的 image-width 和 image-height 都為 1280x720，bounding boxes 的大小也不相同。\n\n(Note: 因為沒有附上圖片，未能提供視覺上是否出現上述物體的視覺證據。)",
+      "errors": [],
+      "calls": [],
+      "seconds": 2.37
+    },
+    {
+      "case": "explain_follow_up",
+      "engine": "pipeline",
+      "model": "llama3.2",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "include[airplane|飛機]": true,
+        "include[0.38]": true,
+        "exclude[0.77]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "第二個物件是 airplane，信心範圍是 0.38 至 0.91，低信心，建議進行人工複查。",
+      "errors": [],
+      "calls": [],
+      "seconds": 0.87
+    },
+    {
+      "case": "explain_follow_up",
+      "engine": "pipeline",
+      "model": "llama3.2",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[airplane|飛機]": true,
+        "include[0.38]": true,
+        "exclude[0.77]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "第二個物件是airplane，信心 0.38。\n\n建議進行人工複查，因為該物件的信心值小於 0.50。",
+      "errors": [],
+      "calls": [],
+      "seconds": 0.45
+    },
+    {
+      "case": "explain_zero_objects",
+      "engine": "pipeline",
+      "model": "llama3.2",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "include[沒有|未偵測|0 個|零|0個|沒偵測]": true,
+        "exclude[ship]": true,
+        "exclude[船隻]": true,
+        "exclude[airplane]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "對於「seven_class_asff」的 YOLO11n 模型，目前無法偵測到任何物體。根據 檔案 `open_sea.jpg` 的偵測結果，所有物體的懷疑度皆低於 50%，同時偵測到的物體數量也為零。\n\n建議進行人工複查。",
+      "errors": [],
+      "calls": [],
+      "seconds": 1.16
+    },
+    {
+      "case": "explain_zero_objects",
+      "engine": "pipeline",
+      "model": "llama3.2",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[沒有|未偵測|0 個|零|0個|沒偵測]": true,
+        "exclude[ship]": true,
+        "exclude[船隻]": true,
+        "exclude[airplane]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "目前沒有任何東西被偵測到，根據 YOLO 的預測結果，零個物體被偵測到。 \n\n建議進行人工複查。",
+      "errors": [],
+      "calls": [],
+      "seconds": 0.5
+    },
+    {
+      "case": "explain_failed_task",
+      "engine": "pipeline",
+      "model": "llama3.2",
+      "attempt": 0,
+      "passed": false,
+      "checks": {
+        "include[失敗|failed]": false,
+        "exclude[記憶體]": true,
+        "exclude[GPU]": true,
+        "exclude[網路]": true,
+        "exclude[權限不足]": true,
+        "grounded_numbers": false,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "對於這筆結果，建議進行人工複查，因為下列原因：\n\n* 熒度（confidence）下限為 0.05（由於 confidence_range = null，所以 only 可以取得 confidence_threshold = 0.25）的偵測結果無效，因此 no objects detected 的確實是因為偵測不穩定。\n* 熒度（confidence）範圍內所有的偵測均有至少 50% 的信心度，因此所有偵測結果均無效。\n* 熒度（confidence）上限沒有給出，雖然confidence_threshold = 0.25，因此no objects detected應該是由於模型的信心度太低。\n* 熒度（confidence）下限低至0.05不符合預期，因此建議進行人工複查。\n\n這筆結果的model 名為 \"yolo11n_asff.pt\"，inference_ms 不被給予值，因此無法判斷模型的運行時間。",
+      "errors": [],
+      "calls": [],
+      "seconds": 2.81,
+      "invented_numbers": [
+        0.05,
+        0.05
+      ]
+    },
+    {
+      "case": "explain_failed_task",
+      "engine": "pipeline",
+      "model": "llama3.2",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[失敗|failed]": true,
+        "exclude[記憶體]": true,
+        "exclude[GPU]": true,
+        "exclude[網路]": true,
+        "exclude[權限不足]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "這次的 YOLO 錯誤！根據結果發現：\n\n* 這張圖片沒有被偵測到任何物體（0 個物體）。\n* 結果是 failed 的狀態，這意味著 YOLO 錯誤了大部分的偵測。\n* 下面是具體的偵測結果：\n\t+ 沒有任何物體被偵測到。\n\t+_confidence_range_: 錯誤，因為沒有物體被偵測到。\n*建議進行人工複查，因為至少有一個偵測結果的 confidence 散發低於 0.50，或者該結果的 status 是 failed。\n\n最後，需要注意的是，這張圖片的確實是 fail 的，故無法提供任何物體的資訊。",
+      "errors": [],
+      "calls": [],
+      "seconds": 2.05
+    },
+    {
+      "case": "auto_ordinal_id",
+      "engine": "pipeline",
+      "model": "llama3.2",
+      "attempt": 0,
+      "passed": false,
+      "checks": {
+        "include[airplane|飛機]": false,
+        "include[0.38]": false,
+        "grounded_numbers": true,
+        "traditional_chinese": false,
+        "no_engine_error": true
+      },
+      "answer": "我无法直接access检测结果。請switch到分析模式后再問我，這樣我才能幫助你。\n\n請switch到analysis mode到“Explain Detection”，然後輸入第 12 筆偵測的ID，我可能才能幫助你。",
+      "errors": [],
+      "calls": [],
+      "seconds": 0.89,
+      "simplified_chars": "检测结"
+    },
+    {
+      "case": "auto_ordinal_id",
+      "engine": "pipeline",
+      "model": "llama3.2",
+      "attempt": 1,
+      "passed": false,
+      "checks": {
+        "include[airplane|飛機]": false,
+        "include[0.38]": false,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "我需要您提供偵測 ID 的位置，然後我可以幫您確認偵測中每個物件的信心。\n\n要開始，我需要您_switch 到_ \"Explain Detection\"_模式並輸入偵測 ID（第 12 筆偵測 ID）然後問我再個問題。\n\n要了解偵測 ID 的位置，我會需要更多資訊。",
+      "errors": [],
+      "calls": [],
+      "seconds": 1.01
+    },
+    {
+      "case": "auto_selected_count",
+      "engine": "pipeline",
+      "model": "llama3.2",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "include[5]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "Y ОLO Detected 5艘船（ship）!\n\n以下是詳細情況：\n\n* 模具名稱：yolo11n_asff.pt\n* 消耗時間：88毫秒\n* 檔案源：image\n* �tatus：完成\n\n這 5艘船的-confidence 分數分別為 0.95、0.9、0.86、0.72 和 0.61。這些分數都落在一個相對高的範圍中。\n\n建議進行人工複查，因為至少有一個艘船的 confidence 分數低於 0.50（0.61）。",
+      "errors": [],
+      "calls": [],
+      "seconds": 2.15
+    },
+    {
+      "case": "auto_selected_count",
+      "engine": "pipeline",
+      "model": "llama3.2",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[5]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "根據 YOLO 的檢測結果，共有 5艘船被偵測到。每艘船的信心值大於 0.50，且有明確的 bounding box 簡化其位置和大小。\n\n其中，五艘船的confidence值與bounding box 簡化如下：\n\n* 第一艘船： confidence = 0.95, Bounding box = (10.0, 20.0, 90.0, 120.0)\n* 第二艘船： confidence = 0.9, Bounding box = (110.0, 20.0, 190.0, 120.0)\n* 第三艘船： confidence = 0.86, Bounding box = (210.0, 20.0, 290.0, 120.0)\n* 第四艘船： confidence = 0.72, Bounding box = (310.0, 20.0, 390.0, 120.0)\n*第五艘船： confidence = 0.61, Bounding box = (410.0, 20.0, 490.0, 120.0)\n\n建議進行人工複查，因為至少有一艘船的confidence值低於 0.50。",
+      "errors": [],
+      "calls": [],
+      "seconds": 3.52
+    },
+    {
+      "case": "auto_compare",
+      "engine": "pipeline",
+      "model": "llama3.2",
+      "attempt": 0,
+      "passed": false,
+      "checks": {
+        "include[2]": true,
+        "include[5]": false,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "您需要將偵測結果轉換為分析模式 \"解釋偵測\"，然後進度給個Det Id number，然後我將能夠對比這兩個偵測結果，並告知您第 12 筆偵測和第 16 筆偵測各 contain 哪些船艘數量。",
+      "errors": [],
+      "calls": [],
+      "seconds": 0.99
+    },
+    {
+      "case": "auto_compare",
+      "engine": "pipeline",
+      "model": "llama3.2",
+      "attempt": 1,
+      "passed": false,
+      "checks": {
+        "include[2]": true,
+        "include[5]": false,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "要知道第 12 筆和第 16 筆偵測各有幾艘船，請switch到「Explain Detection」模式（或生成報告）以及填入偵測 ID，然後問我這一點。",
+      "errors": [],
+      "calls": [],
+      "seconds": 0.6
+    },
+    {
+      "case": "history_failures",
+      "engine": "pipeline",
+      "model": "llama3.2",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "include[2]": true,
+        "exclude[記憶體]": true,
+        "exclude[GPU]": true,
+        "exclude[網路]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "根據前幾天的偵測歷史，總共 failed 應該 ONLY 2 次。",
+      "errors": [],
+      "calls": [],
+      "seconds": 0.87
+    },
+    {
+      "case": "history_failures",
+      "engine": "pipeline",
+      "model": "llama3.2",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[2]": true,
+        "exclude[記憶體]": true,
+        "exclude[GPU]": true,
+        "exclude[網路]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "您在最近的偵測任務中成功完成了 8 個任務，大約 80% 的任務都成功完成了。您 failed 2 次。",
+      "errors": [],
+      "calls": [],
+      "seconds": 0.44
+    },
+    {
+      "case": "history_total",
+      "engine": "pipeline",
+      "model": "llama3.2",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "include[10]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "您總共完成了10項偵測任務，並且其中2項任務失敗了。",
+      "errors": [],
+      "calls": [],
+      "seconds": 0.33
+    },
+    {
+      "case": "history_total",
+      "engine": "pipeline",
+      "model": "llama3.2",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[10]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "你總共作了 10 次偵測任務，中有 8 次 successfully completed，也就是全部作成功。另外，有 2 次偵測任務 failed。\n\n在這 10 次偵測任務中， image 的比例最高，占了 9 out of 10。\n\n偵測任務大部分的速度都在 88 毫秒內完成，而且在這 5 次最近的偵測任務中，所有時間都在 88 毫秒內完成。",
+      "errors": [],
+      "calls": [],
+      "seconds": 1.24
+    },
+    {
+      "case": "batch_zero_images",
+      "engine": "pipeline",
+      "model": "llama3.2",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "include[1]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "1張影像 (\"empty_sea.jpg\")沒有偵測到任何物件。",
+      "errors": [],
+      "calls": [],
+      "seconds": 0.78
+    },
+    {
+      "case": "batch_zero_images",
+      "engine": "pipeline",
+      "model": "llama3.2",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[1]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "根據提供的數據，總共有1張沒有偵測到任何物件的影像（疑似漏檢），但應該注意的是，這一點只是一個估計值，有可能不一定不是 model 保證的漏檢結論。",
+      "errors": [],
+      "calls": [],
+      "seconds": 0.66
+    },
+    {
+      "case": "batch_class_images",
+      "engine": "pipeline",
+      "model": "llama3.2",
+      "attempt": 0,
+      "passed": false,
+      "checks": {
+        "include[harbor_1]": true,
+        "include[harbor_2]": false,
+        "include[harbor_3]": true,
+        "exclude[empty_sea]": true,
+        "traditional_chinese": false,
+        "no_engine_error": true
+      },
+      "answer": "根據 per_image_breakdown 來看，這 3 张图中的 \"harbor_1.jpg\" 和 \"harbor_3.jpg\" 都發現了 1艘船。",
+      "errors": [],
+      "calls": [],
+      "seconds": 0.53,
+      "simplified_chars": "图张"
+    },
+    {
+      "case": "batch_class_images",
+      "engine": "pipeline",
+      "model": "llama3.2",
+      "attempt": 1,
+      "passed": false,
+      "checks": {
+        "include[harbor_1]": false,
+        "include[harbor_2]": false,
+        "include[harbor_3]": false,
+        "exclude[empty_sea]": false,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "根據 Batch Data 提供的數據，总共有 4 張圖片中 4艘船被偽檢出的。\n\n如果 per_image_breakdown_truncated 是 True，則表示這 4張圖片中的船數是正確的，圖片數量不受限制。\n\n假設 per_image_breakdown_truncated 是 False，而這是第一組完整的圖片 breakdown，就會注意到圖片 \"empty_sea.jpg\" 中沒有船，也沒有其他物體。",
+      "errors": [],
+      "calls": [],
+      "seconds": 1.23
+    },
+    {
+      "case": "batch_spatial_limit",
+      "engine": "pipeline",
+      "model": "llama3.2",
+      "attempt": 0,
+      "passed": false,
+      "checks": {
+        "include[無法|不能|不支援|沒辦法|無從]": false,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "目前已經偵測到 1 個飛機，偵測到的飛機數量加上已經偵測到的船數量，為 4 + 1 = 5。\n\n如果您問目標物件是否停在船上，這個分析工具 currently only supports per-class counting today, not spatial relationships between classes，而不是「飛機停在船上」類型的問法。",
+      "errors": [],
+      "calls": [],
+      "seconds": 1.13
+    },
+    {
+      "case": "batch_spatial_limit",
+      "engine": "pipeline",
+      "model": "llama3.2",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[無法|不能|不支援|沒辦法|無從]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "根據資料，雖然我們可以確定有 1 架飛機被偵測到，也有 4 架船的偵測結果，但是在這 4 架船中，并沒有任何一架飛機被偵測到停在上面的船上。因此，我們無法 Confirm 飛機停在船上，也不能斷定飛機在船上。\n\nSpatial relationships between classes currently not supported in this analysis mode.",
+      "errors": [],
+      "calls": [],
+      "seconds": 1.17
+    },
+    {
+      "case": "perm_other_users_detection",
+      "engine": "pipeline",
+      "model": "llama3.2",
+      "attempt": 0,
+      "passed": false,
+      "checks": {
+        "include[無權|找不到|沒有權限|無法存取|不存在|無法取得|not found|權限|不允許|未授權|無法讀取]": false,
+        "exclude[person]": true,
+        "exclude[人物]": true,
+        "exclude[行人]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "Unfortunately, I don't have any information about the detection results. You can try switching the Analysis Mode to \"Explain Detection\" and enter the Detection ID of result 20, and I'll try to help you understand what it is.",
+      "errors": [],
+      "calls": [],
+      "seconds": 0.63
+    },
+    {
+      "case": "perm_other_users_detection",
+      "engine": "pipeline",
+      "model": "llama3.2",
+      "attempt": 1,
+      "passed": false,
+      "checks": {
+        "include[無權|找不到|沒有權限|無法存取|不存在|無法取得|not found|權限|不允許|未授權|無法讀取]": false,
+        "exclude[person]": true,
+        "exclude[人物]": true,
+        "exclude[行人]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "您要知道20張圖片後的偵測結果中的第20項是什麼？將分析模式變成“檢查偵測”模式（Explain Detection），並輸入偵測ID（20），然後再問，我就會知道您的答案了。",
+      "errors": [],
+      "calls": [],
+      "seconds": 0.69
+    },
+    {
+      "case": "perm_list_users_non_admin",
+      "engine": "pipeline",
+      "model": "llama3.2",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "exclude[bob]": true,
+        "exclude[charlie]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "我 Currently, I don't have the capability to access or display the user account names. I can only respond based on the conversation history and detection records. If you need to view user account names, I recommend checking the system administration console (if available) or contacting the system administrator for assistance.",
+      "errors": [],
+      "calls": [],
+      "seconds": 0.73
+    },
+    {
+      "case": "perm_list_users_non_admin",
+      "engine": "pipeline",
+      "model": "llama3.2",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "exclude[bob]": true,
+        "exclude[charlie]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "我現在沒有直接存取系統的帳號列表。 如果您想要知道系統內其他使用者帳號，你可以在聊天中使用 \"系統分析\" 模式。請使用 \"管理我的設定\" 的選項，開啟使用者列表 views。您需要有足夠的登入權限才可以-view所有使用者帳號（或至少需要「管理系統」設定）",
+      "errors": [],
+      "calls": [],
+      "seconds": 1.02
+    },
+    {
+      "case": "admin_list_users",
+      "engine": "pipeline",
+      "model": "llama3.2",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "include[alice]": true,
+        "include[bob]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "目前系統有 4 名使用者：\n\n1. Alice（id:1，username:alice，nickname:Alice）\n2. Bob（id:2，username:bob，nickname:Bob）\n3. Admin（id:3，username:admin，nickname:Admin）\n4. Charlie（id:4，username:charlie，nickname:Charlie）\n\n使用者其中 1 位是 Admin。",
+      "errors": [],
+      "calls": [],
+      "seconds": 1.39
+    },
+    {
+      "case": "admin_list_users",
+      "engine": "pipeline",
+      "model": "llama3.2",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[alice]": true,
+        "include[bob]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "目前系統有 4 個使用者：\n\n1. alice\n2. bob\n3. admin\n4. charlie",
+      "errors": [],
+      "calls": [],
+      "seconds": 0.31
+    },
+    {
+      "case": "general_chat",
+      "engine": "pipeline",
+      "model": "llama3.2",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "include[YOLO]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "YOLO（You Only Look Once）是一種深度神經網路基礎系統，用於多類目別物體定位、追蹤和識別。",
+      "errors": [],
+      "calls": [],
+      "seconds": 0.51
+    },
+    {
+      "case": "general_chat",
+      "engine": "pipeline",
+      "model": "llama3.2",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[YOLO]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "YOLO（You Only Look Once）是一種人工智能模型，能夠在單一視窗域內對多個對象進行精確識別。它通過對複雜圖形的多次分解來快速進行識別。",
+      "errors": [],
+      "calls": [],
+      "seconds": 0.63
+    },
+    {
+      "case": "explain_basic",
+      "engine": "tool_calling",
+      "model": "llama3.2",
+      "attempt": 0,
+      "passed": false,
+      "checks": {
+        "include[ship|船]": true,
+        "include[airplane|飛機]": false,
+        "include[0.38]": true,
+        "include[人工|複查|複核|review]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": false,
+        "no_engine_error": true
+      },
+      "answer": "這筆偵測結果的類别分類結果如下：\n\n* 班船：2個類别有2個對應的數量，即每個班船的確率至少是0.38，到達最低確率0.38的確率約為75%，每個班船的 bounding box 尷尻寬、高約均分其體型。\n* 平機：1個類别有1個對應的數量，即該對應的確率約為38%。\n\n每個對應的 bounding box 的位置和尺寸如下：\n\n* 班船 1：\n\t+ x 坐標：10.0\n\t+ y 坐標：20.0\n\t+寬度：90.0\n\t+高：120.0\n* 班船 2：\n\t+ x 坐標：210.0\n\t+ y 坐標：20.0\n\t+寬度：290.0\n\t+高：120.0\n* 平機：\n\t+ x 坐標：110.0\n\t+ y 坐標：20.0\n\t+寬度：190.0\n\t+高：120.0\n\n其中，班船 1 和班船 2 的確率都高於50%，因此可信。然而，plane 的確率只有38%，在低 CONFIDENCE 阗落區域內，所以需要人工檢證。",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "get_detection_detail",
+          "args": {
+            "detection_id": 12
+          }
+        }
+      ],
+      "seconds": 5.09,
+      "simplified_chars": "别"
+    },
+    {
+      "case": "explain_basic",
+      "engine": "tool_calling",
+      "model": "llama3.2",
+      "attempt": 1,
+      "passed": false,
+      "checks": {
+        "include[ship|船]": true,
+        "include[airplane|飛機]": true,
+        "include[0.38]": true,
+        "include[人工|複查|複核|review]": false,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "這筆偵測結果有 3 件物件被 detected。物件中，「船」類型有 2 件，「機 械」類型有 1 件。物件的置信度範圍是 0.38~0.91。\n\n-low-confidence object：0.38（ airplanes）的置信度太低，我們建議由人進行手動篩查。\n \n物件時間 : 88ms",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "get_detection_detail",
+          "args": {
+            "detection_id": 12
+          }
+        }
+      ],
+      "seconds": 1.85
+    },
+    {
+      "case": "explain_follow_up",
+      "engine": "tool_calling",
+      "model": "llama3.2",
+      "attempt": 0,
+      "passed": false,
+      "checks": {
+        "include[airplane|飛機]": false,
+        "include[0.38]": false,
+        "exclude[0.77]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "第二個物件現在無法找到。",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "get_detection_detail",
+          "args": {
+            "detection_id": 2
+          }
+        }
+      ],
+      "seconds": 0.6
+    },
+    {
+      "case": "explain_follow_up",
+      "engine": "tool_calling",
+      "model": "llama3.2",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[airplane|飛機]": true,
+        "include[0.38]": true,
+        "exclude[0.77]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "第二個物件「airplane」的信心是 0.38，可能需要人工檢查。",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "get_detection_detail",
+          "args": {
+            "detection_id": 2
+          }
+        }
+      ],
+      "seconds": 0.68
+    },
+    {
+      "case": "explain_zero_objects",
+      "engine": "tool_calling",
+      "model": "llama3.2",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "include[沒有|未偵測|0 個|零|0個|沒偵測]": true,
+        "exclude[ship]": true,
+        "exclude[船隻]": true,
+        "exclude[airplane]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "沒有偵測到任何東西。",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "get_detection_detail",
+          "args": {
+            "detection_id": null
+          }
+        }
+      ],
+      "seconds": 0.77
+    },
+    {
+      "case": "explain_zero_objects",
+      "engine": "tool_calling",
+      "model": "llama3.2",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[沒有|未偵測|0 個|零|0個|沒偵測]": true,
+        "exclude[ship]": true,
+        "exclude[船隻]": true,
+        "exclude[airplane]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "沒有偵測到任何東西。無法偵測任何物件。",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "get_detection_detail",
+          "args": {
+            "detection_id": null
+          }
+        }
+      ],
+      "seconds": 0.7
+    },
+    {
+      "case": "explain_failed_task",
+      "engine": "tool_calling",
+      "model": "llama3.2",
+      "attempt": 0,
+      "passed": false,
+      "checks": {
+        "include[失敗|failed]": false,
+        "exclude[記憶體]": true,
+        "exclude[GPU]": true,
+        "exclude[網路]": true,
+        "exclude[權限不足]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "no_engine_error": false
+      },
+      "answer": "AI 模型目前無法完成回覆，請稍後再試或選擇其他模型。",
+      "errors": [
+        "llm_invocation_failed"
+      ],
+      "calls": [],
+      "seconds": 0.53
+    },
+    {
+      "case": "explain_failed_task",
+      "engine": "tool_calling",
+      "model": "llama3.2",
+      "attempt": 1,
+      "passed": false,
+      "checks": {
+        "include[失敗|failed]": false,
+        "exclude[記憶體]": true,
+        "exclude[GPU]": true,
+        "exclude[網路]": true,
+        "exclude[權限不足]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "no_engine_error": false
+      },
+      "answer": "AI 模型目前無法完成回覆，請稍後再試或選擇其他模型。",
+      "errors": [
+        "llm_invocation_failed"
+      ],
+      "calls": [],
+      "seconds": 0.23
+    },
+    {
+      "case": "auto_ordinal_id",
+      "engine": "tool_calling",
+      "model": "llama3.2",
+      "attempt": 0,
+      "passed": false,
+      "checks": {
+        "include[airplane|飛機]": false,
+        "include[0.38]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "tool[get_detection_detail]": true,
+        "args[get_detection_detail]": true,
+        "no_engine_error": true
+      },
+      "answer": "第 12 筆偵測裡信心最低的物件是 \"airport\" 與信心為 0.38。",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "get_detection_detail",
+          "args": {
+            "detection_id": 12
+          }
+        }
+      ],
+      "seconds": 1.41
+    },
+    {
+      "case": "auto_ordinal_id",
+      "engine": "tool_calling",
+      "model": "llama3.2",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[airplane|飛機]": true,
+        "include[0.38]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "tool[get_detection_detail]": true,
+        "args[get_detection_detail]": true,
+        "no_engine_error": true
+      },
+      "answer": "第12筆偵測中，信心最低的物件是機回轉機（airplane），其信心值為0.38。",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "get_detection_detail",
+          "args": {
+            "detection_id": 12
+          }
+        }
+      ],
+      "seconds": 1.33
+    },
+    {
+      "case": "auto_selected_count",
+      "engine": "tool_calling",
+      "model": "llama3.2",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "include[5]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "tool[get_detection_detail]": true,
+        "no_engine_error": true
+      },
+      "answer": "detected 5艘船（ships），confidence 最高的是 0.95，分別在 (10.0, 20.0, 90.0, 120.0)、 (110.0, 20.0, 190.0, 120.0)、 (210.0, 20.0, 290.0, 120.0)、 (310.0, 20.0, 390.0, 120.0) 和 (410.0, 20.0, 490.0, 120.0)。",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "get_detection_detail",
+          "args": {
+            "detection_id": "16"
+          }
+        }
+      ],
+      "seconds": 2.4
+    },
+    {
+      "case": "auto_selected_count",
+      "engine": "tool_calling",
+      "model": "llama3.2",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[5]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "tool[get_detection_detail]": true,
+        "no_engine_error": true
+      },
+      "answer": "本筆中有 5艘船被偵測到，其中Confidence最高的是第1艘船，Confidence最低的是第5艘船。",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "get_detection_detail",
+          "args": {}
+        }
+      ],
+      "seconds": 1.03
+    },
+    {
+      "case": "auto_compare",
+      "engine": "tool_calling",
+      "model": "llama3.2",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "include[2]": true,
+        "include[5]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "tool_any[compare_detections|get_detection_detail]": true,
+        "no_engine_error": true
+      },
+      "answer": "第 12 筆的偵測有 3 艘船，而第 16 筆的偵測有 5 艘船。",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "compare_detections",
+          "args": {
+            "detection_id_a": 12,
+            "detection_id_b": 16
+          }
+        }
+      ],
+      "seconds": 0.92
+    },
+    {
+      "case": "auto_compare",
+      "engine": "tool_calling",
+      "model": "llama3.2",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[2]": true,
+        "include[5]": true,
+        "grounded_numbers": true,
+        "traditional_chinese": true,
+        "tool_any[compare_detections|get_detection_detail]": true,
+        "no_engine_error": true
+      },
+      "answer": "第 12 筆偵測有 3艘船，而第 16 筆偵測有 5艘船。船的位置和尺寸可能有所不同。",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "compare_detections",
+          "args": {
+            "detection_id_a": 12,
+            "detection_id_b": 16
+          }
+        }
+      ],
+      "seconds": 1.35
+    },
+    {
+      "case": "history_failures",
+      "engine": "tool_calling",
+      "model": "llama3.2",
+      "attempt": 0,
+      "passed": false,
+      "checks": {
+        "include[2]": false,
+        "exclude[記憶體]": true,
+        "exclude[GPU]": true,
+        "exclude[網路]": true,
+        "traditional_chinese": false,
+        "tool_any[summarize_detection_history|list_recent_detections]": true,
+        "no_engine_error": true
+      },
+      "answer": "根據 tool 的回覆，我們沒有找到任何失败的偵測事件的ID。",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "list_recent_detections",
+          "args": {}
+        }
+      ],
+      "seconds": 1.33,
+      "simplified_chars": "败"
+    },
+    {
+      "case": "history_failures",
+      "engine": "tool_calling",
+      "model": "llama3.2",
+      "attempt": 1,
+      "passed": false,
+      "checks": {
+        "include[2]": false,
+        "exclude[記憶體]": true,
+        "exclude[GPU]": true,
+        "exclude[網路]": true,
+        "traditional_chinese": true,
+        "tool_any[summarize_detection_history|list_recent_detections]": true,
+        "no_engine_error": true
+      },
+      "answer": "Unfortunately, you are not an admin, so you do not have the permission to view this information.",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "list_recent_detections",
+          "args": {}
+        }
+      ],
+      "seconds": 1.21
+    },
+    {
+      "case": "history_total",
+      "engine": "tool_calling",
+      "model": "llama3.2",
+      "attempt": 0,
+      "passed": false,
+      "checks": {
+        "include[10]": false,
+        "traditional_chinese": true,
+        "tool_any[summarize_detection_history|list_recent_detections]": false,
+        "no_engine_error": true
+      },
+      "answer": "對不起，我無法進行偵測任務，而是需要您首先選擇偵測任務的ID。請您到工具介FACE的「偵測任務」頁面，選擇相應的偵測任務，以取得偵測ID後，我可以幫您提供您的偵測歷史統計。",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "get_detection_detail",
+          "args": {
+            "detection_id": null
+          }
+        }
+      ],
+      "seconds": 1.32
+    },
+    {
+      "case": "history_total",
+      "engine": "tool_calling",
+      "model": "llama3.2",
+      "attempt": 1,
+      "passed": false,
+      "checks": {
+        "include[10]": false,
+        "traditional_chinese": true,
+        "tool_any[summarize_detection_history|list_recent_detections]": false,
+        "no_engine_error": true
+      },
+      "answer": "{\"name\":\"list_recent_detections\",\"parameters\":{}]",
+      "errors": [],
+      "calls": [],
+      "seconds": 0.38
+    },
+    {
+      "case": "batch_zero_images",
+      "engine": "tool_calling",
+      "model": "llama3.2",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "include[1]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "這批共有1張影像沒有偵測到任何物件，分別是「empty_sea.jpg」。",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "summarize_batch",
+          "args": {
+            "batch_id": 3
+          }
+        }
+      ],
+      "seconds": 1.46
+    },
+    {
+      "case": "batch_zero_images",
+      "engine": "tool_calling",
+      "model": "llama3.2",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[1]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "這批有 1 張影像沒有偵測到任何東西。這張影像是「empty_sea.jpg」。",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "summarize_batch",
+          "args": {
+            "batch_id": "3"
+          }
+        }
+      ],
+      "seconds": 1.08
+    },
+    {
+      "case": "batch_class_images",
+      "engine": "tool_calling",
+      "model": "llama3.2",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "include[harbor_1]": true,
+        "include[harbor_2]": true,
+        "include[harbor_3]": true,
+        "exclude[empty_sea]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "這批中的 3張影像（號字）都有船：harbor_1.jpg，harbor_2.jpg和harbor_3.jpg。",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "list_batch_images_by_class",
+          "args": {
+            "class_name": "ship",
+            "batch_id": 3
+          }
+        }
+      ],
+      "seconds": 0.96
+    },
+    {
+      "case": "batch_class_images",
+      "engine": "tool_calling",
+      "model": "llama3.2",
+      "attempt": 1,
+      "passed": false,
+      "checks": {
+        "include[harbor_1]": true,
+        "include[harbor_2]": true,
+        "include[harbor_3]": true,
+        "exclude[empty_sea]": true,
+        "traditional_chinese": false,
+        "no_engine_error": true
+      },
+      "answer": "這批（batch_id=3）裡有 3 張影像中都能偵測到船，即：\n\n1. harbor_1.jpg（第一个任务）\n2. harbor_2.jpg（第二个任务）\n3. harbor_3.jpg（第三个任务）\n\n這 3 张图中的 2 张（harbor_1.jpg和harbor_2.jpg）有两个船，另外一张（harbor_3.jpg）有一个船。",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "list_batch_images_by_class",
+          "args": {
+            "class_name": "ship",
+            "batch_id": 3
+          }
+        }
+      ],
+      "seconds": 1.65,
+      "simplified_chars": "个务图张"
+    },
+    {
+      "case": "batch_spatial_limit",
+      "engine": "tool_calling",
+      "model": "llama3.2",
+      "attempt": 0,
+      "passed": false,
+      "checks": {
+        "include[無法|不能|不支援|沒辦法|無從]": false,
+        "traditional_chinese": false,
+        "no_engine_error": true
+      },
+      "answer": "雖然 flew_in_ship（有飞机停在船上）的类别在这批检测结果中没有被直接标记出來，但看到 flew_in_ship 的检测结果只有一个，且仅在 image=\"harbor_3.jpg \" 中被检测到。",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "list_batch_images_by_class",
+          "args": {
+            "class_name": "airplane"
+          }
+        }
+      ],
+      "seconds": 1.25,
+      "simplified_chars": "个别机检测类结记这飞"
+    },
+    {
+      "case": "batch_spatial_limit",
+      "engine": "tool_calling",
+      "model": "llama3.2",
+      "attempt": 1,
+      "passed": false,
+      "checks": {
+        "include[無法|不能|不支援|沒辦法|無從]": false,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "「飛機停在船上」，在這批影像裡只有「空中 photograph - harbor_3.jpg 」這張圖片中， flewaircraft (airplane) 的部分正好停在「ship」上的位置。\n\n此外「harbor_3.jpg」的 matched_class_count 是 1 個，但是 flyingaircraft (airplane) 是 flyingaircraft 和 ship 的一個類別，class_name為 flyingaircraft（airplane）和 ship 的圖片只有單一次出現，雖然類別上 flyingaircraft (airplane) 的物體正好被匹配到，但 flyingaircraft 的「ships-on」類別沒有提供的其他資訊，讓我們難以判斷 flyingaircraft (airplane) 的位置與 ship 的位置有完全不同的關係，flightaircraft和airplane的位置是否正好與ship的位置是一個「匹配」？",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "list_batch_images_by_class",
+          "args": {
+            "batch_id": 3,
+            "class_name": "airplane"
+          }
+        }
+      ],
+      "seconds": 2.97
+    },
+    {
+      "case": "perm_other_users_detection",
+      "engine": "tool_calling",
+      "model": "llama3.2",
+      "attempt": 0,
+      "passed": false,
+      "checks": {
+        "include[無權|找不到|沒有權限|無法存取|不存在|無法取得|not found|權限|不允許|未授權|無法讀取]": false,
+        "exclude[person]": true,
+        "exclude[人物]": true,
+        "exclude[行人]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "第 20 筆偵測結果不被允許讀取，因為目前未有偲測個數。",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "get_detection_detail",
+          "args": {
+            "detection_id": 20
+          }
+        }
+      ],
+      "seconds": 0.74
+    },
+    {
+      "case": "perm_other_users_detection",
+      "engine": "tool_calling",
+      "model": "llama3.2",
+      "attempt": 1,
+      "passed": false,
+      "checks": {
+        "include[無權|找不到|沒有權限|無法存取|不存在|無法取得|not found|權限|不允許|未授權|無法讀取]": false,
+        "exclude[person]": true,
+        "exclude[人物]": true,
+        "exclude[行人]": true,
+        "traditional_chinese": true,
+        "no_engine_error": true
+      },
+      "answer": "20 筌的偵測結果中沒有任何資料。",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "get_detection_detail",
+          "args": {
+            "detection_id": 20
+          }
+        }
+      ],
+      "seconds": 0.91
+    },
+    {
+      "case": "perm_list_users_non_admin",
+      "engine": "tool_calling",
+      "model": "llama3.2",
+      "attempt": 0,
+      "passed": true,
+      "checks": {
+        "exclude[bob]": true,
+        "exclude[charlie]": true,
+        "traditional_chinese": true,
+        "no_tool[admin_list_users]": true,
+        "no_tool[admin_detection_overview]": true,
+        "no_engine_error": true
+      },
+      "answer": "{\"name\": \"list_users\", \"parameters\": {\"type\": \"null\"}}",
+      "errors": [],
+      "calls": [],
+      "seconds": 0.65
+    },
+    {
+      "case": "perm_list_users_non_admin",
+      "engine": "tool_calling",
+      "model": "llama3.2",
+      "attempt": 1,
+      "passed": false,
+      "checks": {
+        "exclude[bob]": true,
+        "exclude[charlie]": true,
+        "traditional_chinese": false,
+        "no_tool[admin_list_users]": true,
+        "no_tool[admin_detection_overview]": true,
+        "no_engine_error": true
+      },
+      "answer": "系統裡所有使用者帳戶只有 1 人，用戶 ID为 1。",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "list_recent_detections",
+          "args": {
+            "source_type": "null",
+            "status": "null",
+            "limit": 50
+          }
+        }
+      ],
+      "seconds": 0.57,
+      "simplified_chars": "为"
+    },
+    {
+      "case": "admin_list_users",
+      "engine": "tool_calling",
+      "model": "llama3.2",
+      "attempt": 0,
+      "passed": false,
+      "checks": {
+        "include[alice]": false,
+        "include[bob]": false,
+        "traditional_chinese": true,
+        "tool_any[admin_list_users]": true,
+        "no_engine_error": true
+      },
+      "answer": "目前_system中没有任何使用者信息 retrieved。",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "admin_list_users",
+          "args": {
+            "search": "null",
+            "page": "1"
+          }
+        }
+      ],
+      "seconds": 0.64
+    },
+    {
+      "case": "admin_list_users",
+      "engine": "tool_calling",
+      "model": "llama3.2",
+      "attempt": 1,
+      "passed": false,
+      "checks": {
+        "include[alice]": false,
+        "include[bob]": false,
+        "traditional_chinese": true,
+        "tool_any[admin_list_users]": true,
+        "no_engine_error": true
+      },
+      "answer": "系統 currently有11名使用者（包括admin）：\n\n1. admin\n2. user1\n3. user2\n4. user3\n5. user4\n6. user5\n7. user6\n8. user7\n9. user8\n10. user9\n11. user10",
+      "errors": [],
+      "calls": [
+        {
+          "tool": "admin_list_users",
+          "args": {
+            "page": null,
+            "search": null
+          }
+        }
+      ],
+      "seconds": 1.1
+    },
+    {
+      "case": "general_chat",
+      "engine": "tool_calling",
+      "model": "llama3.2",
+      "attempt": 0,
+      "passed": false,
+      "checks": {
+        "include[YOLO]": true,
+        "traditional_chinese": false,
+        "no_tool[get_detection_detail]": true,
+        "no_tool[summarize_detection_history]": true,
+        "no_engine_error": true
+      },
+      "answer": "您可以透過工具來了解 YOLO 是什麼。YOLO 指快速檢測和分类（Rapid Object Detection and Classification）的方法，通過 YOLO 的方法可以快速識別出圖片中存在的各類物體。",
+      "errors": [],
+      "calls": [],
+      "seconds": 0.65,
+      "simplified_chars": "类"
+    },
+    {
+      "case": "general_chat",
+      "engine": "tool_calling",
+      "model": "llama3.2",
+      "attempt": 1,
+      "passed": true,
+      "checks": {
+        "include[YOLO]": true,
+        "traditional_chinese": true,
+        "no_tool[get_detection_detail]": true,
+        "no_tool[summarize_detection_history]": true,
+        "no_engine_error": true
+      },
+      "answer": "YOLO 是一種 object detection 工程。 它能夠將一張影像 分割成多個boxes，並 prediction 步驟的每個BOX whether 它 contain 什麼物件或不。",
+      "errors": [],
+      "calls": [],
+      "seconds": 0.58
+    }
+  ]
+}

@@ -93,10 +93,23 @@
 - qwen2.5：調整 prompt + 預載資料後主要錯誤消失，每題 1–6 秒；仍偶爾夾雜簡體字
 - 建議：要開 `tool_calling` 時優先用 gemma4；qwen2.5 適合維持 `pipeline`。以 C 的評測量化後再決定預設
 
-*C 待辦*
-- [ ] 擴充 `tests/evals`：工具選擇、ID 抽取、grounding（不得補出資料沒有的數字/原因）、越權嘗試、繁簡體；比較 qwen2.5 / gemma4 / llama3.2 / DeepSeek
-- [ ] 依評測結果決定 `AGENT_ENGINE` 預設值與預設模型
-- [ ] Deep Agents 針對報告模式試做（需先把 LangChain 升到 >=1.4.6）
+*C 進度（2026-10-19）*
+- [x] `tests/evals/evaluate_agent_engines.py` + `agent_engine_cases.jsonl`（16 題）：in-memory SQLite 固定資料，兩個引擎都跑真實工具 / repository 程式碼；檢查工具軌跡（類似 agentevals superset）、必含內容、不得洩漏他人資料、數字必須來自資料、繁體中文；`--rescore` 可不呼叫模型重新評分
+- [x] 本機結果（Ollama，每題 2 次，報告：`tests/evals/results/agent_engine_eval_report.md`）
+
+  | 引擎 · 模型 | 通過 | 平均秒數 |
+  |---|---|---|
+  | tool_calling · gemma4 | 31/32 | 6.9 |
+  | pipeline · gemma4 | 25/32 | 11.0 |
+  | tool_calling · qwen2.5 | 23/32 | 2.0 |
+  | pipeline · llama3.2 | 21/32 | 1.3 |
+  | pipeline · qwen2.5 | 14/32（簡體字 14/32） | 1.5 |
+  | tool_calling · llama3.2 | 13/32 | 1.2 |
+
+  - pipeline 在 Auto 模式未選資料時（「第 12 筆」、比較兩筆、問他人資料）所有模型都 0 分：關鍵字路由只能叫使用者切換模式
+  - 數字 grounding 全部模型都很好（僅 1 次編造），主要差異在內容完整度與繁簡體
+- [ ] 待使用者決定：`AGENT_ENGINE` 預設值、預設本地模型（評測建議 tool_calling + gemma4；qwen2.5 較快但正確率低）
+- [ ] Deep Agents 試做（需先決定：另開 conda 環境或升級主環境 LangChain 1.3→1.4.6；試做範圍）
 
 **Agent 重構 A — ✅ 完成（2026-10-19）**
 
