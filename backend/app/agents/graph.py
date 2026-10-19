@@ -240,9 +240,9 @@ def _call_tools_or_subagent_node(state: AgentState, *, db: Session, current_user
 
     except PermissionError as exc:
         state["errors"] = (state.get("errors") or []) + [str(exc)]
-    except Exception as exc:  # pragma: no cover - defensive
+    except Exception:  # pragma: no cover - defensive
         logger.exception("subagent dispatch failed")
-        state["errors"] = (state.get("errors") or []) + [f"unexpected error: {exc}"]
+        state["errors"] = (state.get("errors") or []) + ["internal_error"]
 
     state["tool_results"] = tool_results
     state["references"] = references
@@ -299,7 +299,9 @@ def _handle_error_node(state: AgentState) -> AgentState:
     elif any("not found" in err for err in errors):
         state["final_answer"] = "找不到指定的偵測任務，請確認 detection_id 是否正確。"
     else:
-        state["final_answer"] = f"Agent 執行失敗：{errors[0]}"
+        # Unknown error strings may carry internal details; they stay in the
+        # server log (see the logger calls at the failure sites).
+        state["final_answer"] = "Agent 執行失敗，請稍後再試。"
 
     state.pop("llm_messages", None)
     state.pop("report_markdown", None)
@@ -503,9 +505,9 @@ def stream_graph(
             if delta:
                 full_parts.append(delta)
                 yield ("answer_chunk", delta)
-    except Exception as exc:  # pragma: no cover - defensive
+    except Exception:  # pragma: no cover - defensive
         logger.exception("LLM streaming failed in stream_graph")
-        yield ("error", f"LLM streaming failed: {exc}")
+        yield ("error", "AI 模型目前無法完成回覆，請稍後再試或選擇其他模型。")
         return
 
     final_answer = "".join(full_parts).strip()

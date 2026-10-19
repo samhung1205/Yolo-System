@@ -34,7 +34,11 @@ Authorization: Bearer <jwt_token>
 | 404 | 資源不存在 |
 | 409 | 資源衝突 |
 | 422 | 驗證錯誤 |
+| 429 | LLM 請求超過頻率 / 每日額度（附 `Retry-After` header，單位秒） |
 | 500 | 伺服器錯誤 |
+
+> 500 / 502 / 503 與 SSE `error` 事件的 `detail` / `message` 一律是固定的對外訊息；
+> 上游回應內容、檔案路徑、例外字串只寫進後端 log，不會回傳給 client。
 
 ### 靜態資源（`/static/*`）
 
@@ -47,6 +51,12 @@ GET /static/detections/results/task_12_a1b2c3d4.jpg?sig=<hmac>&exp=<unix_ts>
 - `sig`：以 `SECRET_KEY` 對 `v1:{relative_path}:{exp}` 做 HMAC-SHA256
 - `exp`：Unix 秒級到期時間；預設由 `.env` 的 `STATIC_URL_EXPIRE_SECONDS` 控制（預設 3600 秒）
 - 程式化下載也可改用 `Authorization: Bearer <jwt>` 直接存取 `/static/...`（不需 query），後端會依資源類型檢查擁有權
+
+**回應標頭與檔案類型**
+- 只有影像（jpg/png/webp/gif/bmp）與影片（mp4/mov/avi/mkv/flv/webm）會以對應的 media type inline 回傳
+- 其他副檔名一律回 `application/octet-stream` + `Content-Disposition: attachment`，不會在瀏覽器渲染
+- 一律帶 `X-Content-Type-Options: nosniff` 與 `Content-Security-Policy: default-src 'none'; img-src 'self'; media-src 'self'; sandbox`
+- 所有 API 回應另帶 `X-Content-Type-Options: nosniff`、`Referrer-Policy: no-referrer`
 
 **Response 欄位**
 - `UserRead.avatar`：仍為 DB 內的檔名（供更新用）
@@ -198,6 +208,7 @@ GET /static/detections/results/task_12_a1b2c3d4.jpg?sig=<hmac>&exp=<unix_ts>
 ### POST /api/upload/avatar
 **Request Body**
 - `file`: JPEG / PNG / GIF / WEBP，大小限制 5 MB
+- 實際以 Pillow 解碼驗證；**儲存的副檔名由解碼出的影像格式決定**，不採用 client 檔名的副檔名。無法解碼的檔案回 400
 
 **Response 200**
 ```json
@@ -403,7 +414,9 @@ data: {"type":"error","message":"錯誤訊息"}
 - `model_key` (string, optional)
 
 **Request Body**
-- `file`: 圖片檔案
+- `file`: 圖片檔案（JPEG / PNG / WEBP / GIF / BMP，10 MB 內）。後端以 Pillow 解碼驗證，儲存副檔名由實際影像格式決定；
+  無法解碼回 400。批次上傳的每張影像套用相同規則（單張失敗只影響該張）。影片則只接受 mp4/mov/avi/mkv/flv 副檔名
+  或對應的 content type，其他一律 400
 - `class_thresholds` (string, optional)：各類別自訂閾值，JSON 字串，以 class id 為 key。
   未列出的類別沿用上面的 `conf` / `iou`。詳見「各類別閾值」一節。
 
@@ -794,10 +807,19 @@ Desktop 端使用 `DesktopApiClient.stream_agent_chat()`（`AICSMain.py → Agen
 > 需要 JWT 驗證。回傳目前環境中可用的 LLM providers 與其模型清單，由前端模型選單用於動態渲染選項。
 
 **決策邏輯：**
-- `openai`：`.env` 中 `OPENAI_API_KEY` 有設定才回傳
-- `deepseek`：`.env` 中 `DEEPSEEK_API_KEY` 有設定才回傳
-- `ollama`：一律回傳；模型清單從 `OLLAMA_BASE_URL/api/tags` 即時查詢，若 Ollama 未啟動則 fallback 到 `OLLAMA_MODEL` 設定值
-- `mock`：不出現在回傳清單（僅內部測試用）
+- 回傳的模型清單與 `/api/chat`、`/api/agent/chat*` 實際允許的白名單**同一份**（`app/services/llm_policy.py`）
+- `openai`：一律列出；`available` 依 `OPENAI_API_KEY` 是否設定。模型 = `OPENAI_CHAT_MODEL` + `OPENAI_ALLOWED_MODELS`（未設定時預設 `gpt-4.1-mini`、`gpt-4o`）
+- `deepseek`：同上，模型 = `DEEPSEEK_CHAT_MODEL` + `DEEPSEEK_ALLOWED_MODELS`（預設 `deepseek-chat`、`deepseek-reasoner`）
+- `ollama`：一律回傳；模型清單為本機已安裝模型（`OLLAMA_BASE_URL/api/tags`，快取 30 秒），Ollama 未啟動時 fallback 到 `OLLAMA_MODEL`
+- `mock`：不出現在回傳清單（僅內部測試用；`APP_ENV=production` 時請求也會被拒絕）
+
+**LLM 存取政策（`/api/chat`、`/api/chat/stream`、`/api/agent/chat`、`/api/agent/chat/stream`）**
+- `provider` / `model` 不在白名單 → 400
+- 只換 `provider` 未指定 `model` → 使用該 provider 自己的預設模型（不會把另一個 provider 的模型名稱帶過去）
+- 每位使用者每分鐘最多 `LLM_RATE_LIMIT_PER_MINUTE` 次（預設 20，所有 provider 合計）
+- 付費 provider（openai / deepseek）每位使用者每日最多 `LLM_PAID_DAILY_LIMIT` 次（預設 200，UTC 換日）；用完後仍可使用 Ollama
+- 超過 → 429 + `Retry-After`；被拒絕的請求不計入額度
+- 限流狀態存在單一行程記憶體內：多 worker 部署時每個 worker 各自計算，需改用 Redis 等共用儲存
 
 **Response 200**
 ```json
@@ -805,17 +827,20 @@ Desktop 端使用 `DesktopApiClient.stream_agent_chat()`（`AICSMain.py → Agen
   {
     "provider": "openai",
     "label": "OpenAI GPT",
-    "models": ["gpt-4.1-mini", "gpt-4o", "gpt-4-turbo", "gpt-4"]
+    "models": ["gpt-4.1-mini", "gpt-4o"],
+    "available": true
   },
   {
     "provider": "deepseek",
     "label": "DeepSeek",
-    "models": ["deepseek-chat", "deepseek-coder", "deepseek-reasoner"]
+    "models": ["deepseek-chat", "deepseek-reasoner"],
+    "available": true
   },
   {
     "provider": "ollama",
     "label": "Ollama (本地)",
-    "models": ["llama3.2", "gemma2:9b"]
+    "models": ["llama3.2", "gemma2:9b"],
+    "available": true
   }
 ]
 ```

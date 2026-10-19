@@ -11,12 +11,16 @@ Important security notes:
 """
 from __future__ import annotations
 
+import logging
+
 from typing import Any, Optional
 
 from sqlalchemy.orm import Session
 
 from app.models.user import User
 from app.services import user_service
+
+logger = logging.getLogger(__name__)
 
 
 def get_current_user_profile_tool(
@@ -39,8 +43,9 @@ def get_current_user_profile_tool(
             else None,
             "last_login": current_user.last_login.isoformat() if current_user.last_login else None,
         }
-    except Exception as exc:  # pragma: no cover - defensive
-        return {"ok": False, "error": f"unexpected error: {exc}"}
+    except Exception:  # pragma: no cover - defensive
+        logger.exception("agent tool failed")
+        return {"ok": False, "error": "internal_error"}
 
 
 def admin_list_users_tool(
@@ -86,5 +91,6 @@ def admin_list_users_tool(
             "limit": result.get("limit", limit),
             "items": items,
         }
-    except Exception as exc:  # pragma: no cover - defensive
-        return {"ok": False, "error": f"unexpected error: {exc}"}
+    except Exception:  # pragma: no cover - defensive
+        logger.exception("agent tool failed")
+        return {"ok": False, "error": "internal_error"}

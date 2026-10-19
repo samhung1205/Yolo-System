@@ -14,11 +14,23 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.agents import service as agent_service
+from app.core.config import settings
 from app.core.deps import get_current_user, get_db
 from app.models.user import User
 from app.schemas.agent import AgentChatRequest, AgentChatResponse, AgentModeRead
+from app.services.llm_policy import LlmSelection, authorize_llm_request
 
 router = APIRouter()
+
+
+def _authorize(payload: AgentChatRequest, current_user: User) -> LlmSelection:
+    return authorize_llm_request(
+        user_id=current_user.id,
+        provider_override=payload.provider,
+        model_override=payload.model,
+        default_provider=settings.agent_effective_provider,
+        default_model=settings.agent_effective_model,
+    )
 
 
 AGENT_MODES: list[AgentModeRead] = [
@@ -74,6 +86,7 @@ def agent_chat(
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> AgentChatResponse:
     """Run a single agent turn and persist it to ``chat_logs``."""
+    selection = _authorize(payload, current_user)
     return agent_service.create_agent_reply(
         db,
         current_user=current_user,
@@ -82,8 +95,8 @@ def agent_chat(
         mode=payload.mode or "auto",
         detection_id=payload.detection_id,
         batch_id=payload.batch_id,
-        provider_name=payload.provider,
-        model_name_override=payload.model,
+        provider_name=selection.provider,
+        model_name_override=selection.model,
     )
 
 
@@ -98,6 +111,7 @@ def stream_agent_chat(
     Emits ``start`` → one or more ``chunk`` → ``done`` (or ``error``).
     The final turn is also persisted to ``chat_logs`` at the ``done`` event.
     """
+    selection = _authorize(payload, current_user)
     return StreamingResponse(
         agent_service.stream_agent_reply(
             db,
@@ -107,8 +121,8 @@ def stream_agent_chat(
             mode=payload.mode or "auto",
             detection_id=payload.detection_id,
             batch_id=payload.batch_id,
-            provider_name=payload.provider,
-            model_name_override=payload.model,
+            provider_name=selection.provider,
+            model_name_override=selection.model,
         ),
         media_type="text/event-stream",
         headers={

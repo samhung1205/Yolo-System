@@ -293,8 +293,8 @@ def stream_agent_reply(
                 elif phase == "error":
                     yield _sse_event({"type": "error", "message": str(data)})
 
-        except Exception as exc:
+        except Exception:
             logger.exception("stream_agent_reply pipeline failure")
-            yield _sse_event({"type": "error", "message": f"Agent streaming failed: {exc}"})
+            yield _sse_event({"type": "error", "message": "Agent 暫時無法回覆，請稍後再試。"})
 
     return event_stream()

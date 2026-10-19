@@ -3,6 +3,8 @@ Detection-history analytics tools (read-only).
 """
 from __future__ import annotations
 
+import logging
+
 from collections import Counter
 from typing import Any, Optional
 
@@ -10,6 +12,8 @@ from sqlalchemy.orm import Session
 
 from app.models.user import User
 from app.repositories import detection_repository
+
+logger = logging.getLogger(__name__)
 
 # Upper bound of tasks scanned by the aggregate tools. The repository default
 # (100) silently skewed statistics for active users; 1000 keeps memory bounded
@@ -68,8 +72,9 @@ def list_recent_detections_tool(
             "count": len(tasks),
             "items": [_summarize_task(task) for task in tasks],
         }
-    except Exception as exc:  # pragma: no cover - defensive
-        return {"ok": False, "error": f"unexpected error: {exc}"}
+    except Exception:  # pragma: no cover - defensive
+        logger.exception("agent tool failed")
+        return {"ok": False, "error": "internal_error"}
 
 
 def summarize_detection_history_tool(
@@ -116,8 +121,9 @@ def summarize_detection_history_tool(
             },
             "most_recent": _summarize_task(tasks[0]) if tasks else None,
         }
-    except Exception as exc:  # pragma: no cover - defensive
-        return {"ok": False, "error": f"unexpected error: {exc}"}
+    except Exception:  # pragma: no cover - defensive
+        logger.exception("agent tool failed")
+        return {"ok": False, "error": "internal_error"}
 
 
 def filter_detections_by_status_or_type_tool(
@@ -155,5 +161,6 @@ def filter_detections_by_status_or_type_tool(
             "count": len(filtered),
             "items": [_summarize_task(task) for task in filtered],
         }
-    except Exception as exc:  # pragma: no cover - defensive
-        return {"ok": False, "error": f"unexpected error: {exc}"}
+    except Exception:  # pragma: no cover - defensive
+        logger.exception("agent tool failed")
+        return {"ok": False, "error": "internal_error"}

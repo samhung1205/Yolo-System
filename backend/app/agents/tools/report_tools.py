@@ -8,6 +8,8 @@ the LLM.
 """
 from __future__ import annotations
 
+import logging
+
 from collections import Counter
 from typing import Any
 
@@ -17,6 +19,8 @@ from app.models.user import User
 from app.repositories import detection_repository
 
 from .detection_tools import explain_detection_objects_tool, get_detection_detail_tool
+
+logger = logging.getLogger(__name__)
 
 
 def generate_detection_report_markdown_tool(
@@ -201,5 +205,6 @@ def summarize_model_performance_tool(
             "total_tasks": len(tasks),
             "models": result,
         }
-    except Exception as exc:  # pragma: no cover - defensive
-        return {"ok": False, "error": f"unexpected error: {exc}"}
+    except Exception:  # pragma: no cover - defensive
+        logger.exception("agent tool failed")
+        return {"ok": False, "error": "internal_error"}

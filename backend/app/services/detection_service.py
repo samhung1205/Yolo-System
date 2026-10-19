@@ -3,6 +3,7 @@ Detection business logic for media inference.
 """
 import io
 import json
+import logging
 import os
 import zipfile
 from pathlib import Path
@@ -14,6 +15,11 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.static_tokens import build_signed_static_url
+from app.core.uploads import (
+    InvalidUploadError,
+    image_extension_for_file,
+    video_extension_for_upload,
+)
 from app.db.session import SessionLocal
 from app.integrations.model_registry import (
     YoloModelRegistryError,
@@ -35,14 +41,13 @@ from app.schemas.detection import (
 )
 
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif", "image/bmp"}
-ALLOWED_VIDEO_TYPES = {
-    "video/mp4",
-    "video/quicktime",
-    "video/x-msvideo",
-    "video/x-matroska",
-    "video/x-flv",
-}
-ALLOWED_VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv", ".flv"}
+logger = logging.getLogger(__name__)
+
+# Unexpected exceptions can include file system paths or library internals;
+# the API and the stored task row only ever carry this message, while the
+# full traceback goes to the server log.
+DETECTION_INTERNAL_ERROR_MESSAGE = "Detection failed due to an internal error"
+
 MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10 MB
 MAX_VIDEO_SIZE = 200 * 1024 * 1024  # 200 MB
 
@@ -221,11 +226,14 @@ def create_image_detection(
         detection_repository.update_task(db, task, status="failed", error_message=exc.detail)
         raise
     except Exception as exc:
+        logger.exception("Image detection failed for task %s", task.id)
         _cleanup_files(source_fs_path, result_fs_path)
-        detection_repository.update_task(db, task, status="failed", error_message=str(exc))
+        detection_repository.update_task(
+            db, task, status="failed", error_message=DETECTION_INTERNAL_ERROR_MESSAGE
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Detection failed: {exc}",
+            detail=DETECTION_INTERNAL_ERROR_MESSAGE,
         ) from exc
 
 
@@ -268,11 +276,14 @@ def create_video_detection_task(
         raise
     except Exception as exc:
         source_fs_path = _static_root() / task.source_video_path if task.source_video_path else None
+        logger.exception("Video upload failed for task %s", task.id)
         _cleanup_files(source_fs_path)
-        detection_repository.update_task(db, task, status="failed", error_message=str(exc))
+        detection_repository.update_task(
+            db, task, status="failed", error_message=DETECTION_INTERNAL_ERROR_MESSAGE
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Detection failed: {exc}",
+            detail=DETECTION_INTERNAL_ERROR_MESSAGE,
         ) from exc
 
 
@@ -341,9 +352,12 @@ def process_video_detection_task(*, task_id: int, conf: float = 0.25, iou: float
     except HTTPException as exc:
         _cleanup_files(result_video_fs_path, preview_fs_path)
         detection_repository.update_task(db, task, status="failed", error_message=exc.detail)
-    except Exception as exc:
+    except Exception:
+        logger.exception("Video detection failed for task %s", task_id)
         _cleanup_files(result_video_fs_path, preview_fs_path)
-        detection_repository.update_task(db, task, status="failed", error_message=str(exc))
+        detection_repository.update_task(
+            db, task, status="failed", error_message=DETECTION_INTERNAL_ERROR_MESSAGE
+        )
     finally:
         db.close()
 
@@ -431,9 +445,12 @@ def create_image_batch(
         except HTTPException as exc:
             upload_failed_count += 1
             detection_repository.update_task(db, task, status="failed", error_message=exc.detail)
-        except Exception as exc:  # pragma: no cover - defensive
+        except Exception:  # pragma: no cover - defensive
+            logger.exception("Batch upload failed for task %s", task.id)
             upload_failed_count += 1
-            detection_repository.update_task(db, task, status="failed", error_message=str(exc))
+            detection_repository.update_task(
+                db, task, status="failed", error_message=DETECTION_INTERNAL_ERROR_MESSAGE
+            )
 
     if upload_failed_count >= len(valid_files):
         detection_repository.update_batch(
@@ -473,12 +490,13 @@ def process_image_batch_task(*, batch_id: int, conf: float = 0.25, iou: float = 
 
         try:
             engine = YoloEngine(model_key=batch.model_key)
-        except Exception as exc:
+        except Exception:
+            logger.exception("Failed to load model for batch %s", batch_id)
             detection_repository.update_batch(
                 db,
                 batch,
                 status="failed",
-                error_message=f"Failed to load model for batch: {exc}",
+                error_message="Failed to load model for batch",
             )
             for task in pending_tasks:
                 detection_repository.update_task(db, task, status="failed", error_message="Batch model load failed")
@@ -539,10 +557,13 @@ def process_image_batch_task(*, batch_id: int, conf: float = 0.25, iou: float = 
                 task_ok = False
                 _cleanup_files(result_fs_path)
                 detection_repository.update_task(db, task, status="failed", error_message=exc.detail)
-            except Exception as exc:  # pragma: no cover - defensive
+            except Exception:  # pragma: no cover - defensive
+                logger.exception("Batch detection failed for task %s", task.id)
                 task_ok = False
                 _cleanup_files(result_fs_path)
-                detection_repository.update_task(db, task, status="failed", error_message=str(exc))
+                detection_repository.update_task(
+                    db, task, status="failed", error_message=DETECTION_INTERNAL_ERROR_MESSAGE
+                )
 
             processed_count += 1
             if not task_ok:
@@ -735,64 +756,78 @@ def resolve_model(model_key: str | None) -> YoloModelSpec:
 
 
 def _validate_video_upload(file: UploadFile) -> None:
-    extension = Path(file.filename or "").suffix.lower()
-    if file.content_type not in ALLOWED_VIDEO_TYPES and extension not in ALLOWED_VIDEO_EXTENSIONS:
+    try:
+        video_extension_for_upload(file.filename, file.content_type)
+    except InvalidUploadError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Only MP4, MOV, AVI, MKV, and FLV video uploads are supported",
-        )
+            detail=str(exc),
+        ) from exc
+
+
+def _stream_upload_to_path(file: UploadFile, full_path: Path, *, max_size: int, too_large_detail: str) -> None:
+    full_path.parent.mkdir(parents=True, exist_ok=True)
+    total_size = 0
+    try:
+        with full_path.open("wb") as buffer:
+            while True:
+                chunk = file.file.read(1024 * 1024)
+                if not chunk:
+                    break
+                total_size += len(chunk)
+                if total_size > max_size:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=too_large_detail,
+                    )
+                buffer.write(chunk)
+    except BaseException:
+        full_path.unlink(missing_ok=True)
+        raise
+    finally:
+        file.file.close()
 
 
 def _store_original_image(task_id: int, file: UploadFile) -> tuple[Path, str]:
-    extension = Path(file.filename or "").suffix or ".jpg"
-    full_path = Path(settings.DETECTION_SOURCE_DIR) / f"task_{task_id}_{uuid4().hex[:8]}{extension}"
-    relative_path = _to_static_relative_path(full_path)
-    full_path.parent.mkdir(parents=True, exist_ok=True)
+    # Land the bytes under a neutral name first: the stored extension is
+    # derived from the decoded image format, never from the client filename,
+    # because /static serves files with a media type guessed from it.
+    staging_path = Path(settings.DETECTION_SOURCE_DIR) / f"task_{task_id}_{uuid4().hex[:8]}.upload"
+    _stream_upload_to_path(
+        file,
+        staging_path,
+        max_size=MAX_IMAGE_SIZE,
+        too_large_detail="Image size must not exceed 10 MB",
+    )
 
-    total_size = 0
-    with full_path.open("wb") as buffer:
-        while True:
-            chunk = file.file.read(1024 * 1024)
-            if not chunk:
-                break
-            total_size += len(chunk)
-            if total_size > MAX_IMAGE_SIZE:
-                buffer.close()
-                if full_path.exists():
-                    full_path.unlink()
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Image size must not exceed 10 MB",
-                )
-            buffer.write(chunk)
-    file.file.close()
-    return full_path, relative_path
+    try:
+        extension = image_extension_for_file(staging_path)
+    except InvalidUploadError as exc:
+        staging_path.unlink(missing_ok=True)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uploaded file is not a supported image (JPEG, PNG, WEBP, GIF, BMP)",
+        ) from exc
+
+    full_path = staging_path.with_suffix(extension)
+    staging_path.replace(full_path)
+    return full_path, _to_static_relative_path(full_path)
 
 
 def _store_original_video(task_id: int, file: UploadFile) -> tuple[Path, str]:
-    extension = Path(file.filename or "").suffix.lower() or ".mp4"
-    full_path = Path(settings.DETECTION_VIDEO_SOURCE_DIR) / f"task_{task_id}_{uuid4().hex[:8]}{extension}"
-    relative_path = _to_static_relative_path(full_path)
-    full_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        extension = video_extension_for_upload(file.filename, file.content_type)
+    except InvalidUploadError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
-    total_size = 0
-    with full_path.open("wb") as buffer:
-        while True:
-            chunk = file.file.read(1024 * 1024)
-            if not chunk:
-                break
-            total_size += len(chunk)
-            if total_size > MAX_VIDEO_SIZE:
-                buffer.close()
-                if full_path.exists():
-                    full_path.unlink()
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Video size must not exceed 200 MB",
-                )
-            buffer.write(chunk)
-    file.file.close()
-    return full_path, relative_path
+    full_path = Path(settings.DETECTION_VIDEO_SOURCE_DIR) / f"task_{task_id}_{uuid4().hex[:8]}{extension}"
+    _stream_upload_to_path(
+        file,
+        full_path,
+        max_size=MAX_VIDEO_SIZE,
+        too_large_detail="Video size must not exceed 200 MB",
+    )
+    return full_path, _to_static_relative_path(full_path)
 
 
 def _store_result_image(task_id: int, image) -> tuple[Path, str]:

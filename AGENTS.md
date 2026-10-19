@@ -75,7 +75,29 @@
 
 ## 當前 Phase
 
-> **目前已完成至「各類別閾值 Phase 1」（per-class conf/IOU，image + batch，Web UI）。下一步：批次上限提高（輪詢瘦身 → 分片上傳 → 1000 張）、批次分析 Phase 2（空間關係推論），或 Phase 6（Docker、測試、部署文件完善），視優先順序決定。**
+> **目前已完成至「安全強化 P0」（上傳白名單、static nosniff、LLM 白名單與限流、隱藏內部錯誤），前一階段為「各類別閾值 Phase 1」。下一步：批次上限提高（輪詢瘦身 → 分片上傳 → 1000 張）、批次分析 Phase 2（空間關係推論），或 Phase 6（Docker、測試、部署文件完善），視優先順序決定。**
+
+**安全強化 P0 — ✅ 完成（2026-10-19）**
+
+*背景*：全面安全審查後先處理四項 P0。審查同時確認：`.env`、`mysql/dataDB.py`、`utils/deepseek.py` 從未進入 git 歷史；擁有權檢查、static 路徑穿越防護、signed URL、agent admin 硬檢查、checkpoint SHA 校驗皆正確。
+
+- [x] **上傳副檔名白名單**：新增 `app/core/uploads.py`。偵測影像先以中性檔名落地，再用 Pillow 解碼決定副檔名（`.jpg/.png/.webp/.gif/.bmp`），無法解碼回 400 並清掉暫存檔；影片只接受白名單副檔名或對應 content type；頭像同樣以解碼格式決定副檔名。原本 `evil.html` + `image/png` 會被存成 `.html` 並由 `/static` 以 `text/html` 回傳（同源部署時可竊取 localStorage token）
+- [x] **nosniff / static 防護**：`/static` 只對影像/影片以正確 media type inline 回傳，其他一律 `application/octet-stream` + attachment；並加 `X-Content-Type-Options: nosniff` 與 `CSP: ... sandbox`。新增純 ASGI `SecurityHeadersMiddleware`（不影響 SSE）讓所有回應帶 nosniff
+- [x] **LLM provider/model 白名單與限流**：新增 `app/services/llm_policy.py`，`/api/chat*` 與 `/api/agent/chat*` 在 route 層呼叫 `authorize_llm_request()`；`/api/models` 改用同一份白名單。新增設定 `OPENAI_ALLOWED_MODELS` / `DEEPSEEK_ALLOWED_MODELS` / `LLM_RATE_LIMIT_PER_MINUTE=20` / `LLM_PAID_DAILY_LIMIT=200`。順手修正：agent 只換 provider 時原本會沿用另一個 provider 的模型名稱
+- [x] **隱藏內部錯誤訊息**：chat provider 錯誤、agent 串流/工具例外、偵測失敗、YOLO 模型載入失敗一律改為固定對外訊息（含 DB `error_message` 欄位），細節改寫入 log
+- [x] **npm audit fix**：axios 升至 1.20.0（只動 `package-lock.json`）
+- [x] 測試：`tests/test_upload_hardening.py`、`tests/test_llm_policy.py`、`tests/test_error_sanitization.py`（新增 31 項，全套 82 項通過）
+
+*審查發現、尚未處理（依優先順序）*
+- [ ] npm 剩餘：vite 5 → 需 vite 8（dev server 漏洞，high）、react-router-dom 6 → 需 v7（moderate），皆為 breaking upgrade
+- [ ] 登入無頻率限制 / 帳號鎖定；註冊開放 + `APP_HOST=0.0.0.0` 時區網內任何人可註冊使用
+- [ ] JWT 24h 且無撤銷；改密碼不需舊密碼、舊 token 不失效；token 存於 localStorage
+- [ ] `python-jose` 已停止維護 → 改用 PyJWT
+- [ ] migration `0002` seed admin 預設密碼公開於 repo，需確認已改；DB 使用 `root` 帳號
+- [ ] 密碼規則 `[A-Za-z\d]` 禁止特殊字元（反而降低強度）
+- [ ] development 環境 SQLAlchemy `echo=True` 會把查詢參數寫進 log；`/docs` 公開
+- [ ] 頭像上傳不綁定使用者、無清理機制；`SECRET_KEY` 啟動檢查只比對一個預設值
+- [ ] LLM 限流為單行程記憶體；多 worker 部署需改 Redis
 
 **各類別閾值（per-class conf / IOU）— ✅ 完成（2026-09-04）**
 
@@ -500,4 +522,4 @@ cd backend && uvicorn main:app --reload --port 8000
 
 ---
 
-*最後更新: Web detection / analyst UI 對齊與可縮放影像檢視器 — 2026-09-04*
+*最後更新: 安全強化 P0 — 2026-10-19*

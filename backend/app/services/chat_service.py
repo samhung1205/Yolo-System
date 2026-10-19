@@ -2,6 +2,7 @@
 Chat business logic using provider-based cloud integrations.
 """
 import json
+import logging
 from uuid import uuid4
 
 from fastapi import HTTPException, status
@@ -23,6 +24,14 @@ from app.models.user import User
 from app.repositories import chat_repository
 from app.schemas.chat import ChatConversationRead, ChatConversationSummaryRead, ChatRead
 
+logger = logging.getLogger(__name__)
+
+# Provider errors can carry upstream response bodies, URLs or key hints, so
+# clients only ever see these fixed messages; details go to the server log.
+PROVIDER_NOT_CONFIGURED_MESSAGE = "所選的模型供應商尚未設定完成，請改用其他模型。"
+PROVIDER_REQUEST_FAILED_MESSAGE = "AI 模型暫時無法回覆，請稍後再試或改用其他模型。"
+STREAM_FAILED_MESSAGE = "對話暫時無法完成，請稍後再試。"
+
 
 def create_chat_reply(
     db: Session,
@@ -43,14 +52,16 @@ def create_chat_reply(
         )
         completion = provider.chat(question, history=history)
     except ChatProviderConfigurationError as exc:
+        logger.warning("Chat provider not configured: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=str(exc),
+            detail=PROVIDER_NOT_CONFIGURED_MESSAGE,
         ) from exc
     except ChatProviderRequestError as exc:
+        logger.warning("Chat provider request failed: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=str(exc),
+            detail=PROVIDER_REQUEST_FAILED_MESSAGE,
         ) from exc
 
     turn_index = chat_repository.get_next_turn_index(
@@ -149,11 +160,14 @@ def stream_chat_reply(
                 }
             )
         except ChatProviderConfigurationError as exc:
-            yield _sse_event({"type": "error", "message": str(exc)})
+            logger.warning("Chat provider not configured: %s", exc)
+            yield _sse_event({"type": "error", "message": PROVIDER_NOT_CONFIGURED_MESSAGE})
         except ChatProviderRequestError as exc:
-            yield _sse_event({"type": "error", "message": str(exc)})
-        except Exception as exc:
-            yield _sse_event({"type": "error", "message": f"Streaming chat failed: {exc}"})
+            logger.warning("Chat provider stream failed: %s", exc)
+            yield _sse_event({"type": "error", "message": PROVIDER_REQUEST_FAILED_MESSAGE})
+        except Exception:
+            logger.exception("Streaming chat failed")
+            yield _sse_event({"type": "error", "message": STREAM_FAILED_MESSAGE})
         finally:
             db.close()
 

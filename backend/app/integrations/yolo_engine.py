@@ -387,20 +387,19 @@ class YoloEngine:
             return _MODEL_CACHE[model_key]
 
         if not self.model_path.exists():
+            logger.error("YOLO checkpoint missing for %s: %s", self.model_spec.key, self.model_path)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"YOLO model not found: {self.model_path}",
+                detail=f"YOLO model '{self.model_spec.key}' checkpoint is missing",
             )
 
         try:
             install_legacy_checkpoint_modules(self.model_spec.key)
         except LegacyCheckpointCompatibilityError as exc:
+            logger.exception("Unable to prepare YOLO model %s", self.model_spec.key)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=(
-                    f"Unable to prepare registered YOLO model '{self.model_spec.key}': "
-                    f"{exc}"
-                ),
+                detail=f"Unable to prepare registered YOLO model '{self.model_spec.key}'",
             ) from exc
 
         try:
@@ -414,12 +413,10 @@ class YoloEngine:
         try:
             model = YOLO(str(self.model_path))
         except Exception as exc:
+            logger.exception("Unable to load YOLO model %s", self.model_spec.key)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=(
-                    f"Unable to load registered YOLO model '{self.model_spec.key}': "
-                    f"{exc}"
-                ),
+                detail=f"Unable to load registered YOLO model '{self.model_spec.key}'",
             ) from exc
 
         loaded_names = {int(key): str(value) for key, value in model.names.items()}

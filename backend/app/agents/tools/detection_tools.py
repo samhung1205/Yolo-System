@@ -7,6 +7,8 @@ trigger YOLO inference (that remains the responsibility of
 """
 from __future__ import annotations
 
+import logging
+
 import base64
 from pathlib import Path
 from typing import Any
@@ -16,6 +18,8 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.models.user import User
 from app.repositories import detection_repository
+
+logger = logging.getLogger(__name__)
 
 _STATIC_ROOT = Path("static")
 _MIME_TYPES_BY_EXT = {
@@ -101,8 +105,9 @@ def get_detection_detail_tool(
         }
     except (LookupError, PermissionError) as exc:
         return {"ok": False, "error": str(exc), "detection_id": detection_id}
-    except Exception as exc:  # pragma: no cover - defensive
-        return {"ok": False, "error": f"unexpected error: {exc}", "detection_id": detection_id}
+    except Exception:  # pragma: no cover - defensive
+        logger.exception("agent tool failed")
+        return {"ok": False, "error": "internal_error", "detection_id": detection_id}
 
 
 def load_detection_image_tool(

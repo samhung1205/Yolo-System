@@ -16,10 +16,19 @@ from sqlalchemy.orm import Session
 from app.core.deps import get_db
 from app.core.security import decode_access_token
 from app.core.static_tokens import verify_static_signature
+from app.core.uploads import STATIC_INLINE_MEDIA_TYPES
 from app.models.user import User
 from app.services.static_access_service import resolve_static_file, user_can_access_static_path
 
 router = APIRouter(tags=["Static"])
+
+# Static assets are user-uploaded media. Even if a non-media file ever lands
+# under static/, it must not render as a document on this origin: browsers
+# must not sniff it, and a direct navigation runs in a script-less sandbox.
+STATIC_SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "Content-Security-Policy": "default-src 'none'; img-src 'self'; media-src 'self'; sandbox",
+}
 
 
 @router.get("/static/{file_path:path}")
@@ -47,7 +56,15 @@ def serve_static_file(
             )
 
     full_path = resolve_static_file(relative_path)
-    return FileResponse(full_path)
+    media_type = STATIC_INLINE_MEDIA_TYPES.get(full_path.suffix.lower())
+    if media_type is None:
+        return FileResponse(
+            full_path,
+            media_type="application/octet-stream",
+            filename=full_path.name,
+            headers=STATIC_SECURITY_HEADERS,
+        )
+    return FileResponse(full_path, media_type=media_type, headers=STATIC_SECURITY_HEADERS)
 
 
 def _get_user_from_authorization(db: Session, authorization: Optional[str]) -> User:

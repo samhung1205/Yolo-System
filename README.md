@@ -210,6 +210,7 @@ Python module path，由
 | Phase 6A-6 | IME 輸入修復 + 對話滾動 + Agent Vision | ✅ **已完成**（中文輸入法送出誤判修復、對話 thread 滾動修復、`AGENT_ENABLE_VISION` 唯讀圖片附加） |
 | 批次影像分析 Phase 1 | 多圖 / 資料夾批次上傳 + 類別總數聚合 + Agent `batch_analysis` | ✅ **已完成**（`POST /api/detections/batch`、`detection_batches` 表、Web `/detections/batch` 頁面、Agent 新模式） |
 | 各類別閾值 Phase 1 | 各類別獨立 conf / IOU 閾值（image + batch） | ✅ **已完成**（migration `0011`、`class_thresholds` Form 欄位、Web `ClassThresholdEditor`；影片與 Desktop 未支援） |
+| 安全強化 P0 | 上傳白名單 + static nosniff、LLM 白名單與限流、隱藏內部錯誤 | ✅ **已完成**（`app/core/uploads.py`、`app/services/llm_policy.py`；其餘審查發現見 AGENTS.md） |
 | 批次上限 1000 張 | 分片上傳 + 輪詢瘦身 + 中斷復原 | ⏳ 待辦（已完成瓶頸分析，見 AGENTS.md） |
 | Phase 6 | Docker、測試、部署文件完善 | ⏳ 待辦 |
 

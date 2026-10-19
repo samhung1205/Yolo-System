@@ -46,6 +46,18 @@ class Settings(BaseSettings):
     OPENAI_BASE_URL: str = "https://api.openai.com/v1"
     OPENAI_CHAT_MODEL: str = "gpt-4.1-mini"
 
+    # LLM access policy (applies to /api/chat and /api/agent).
+    # Per-request model overrides must be on these allowlists; the configured
+    # default model of each provider is always allowed. Empty = built-in
+    # defaults (see app/services/llm_policy.py). Ollama is limited to the
+    # models actually installed on the local daemon.
+    OPENAI_ALLOWED_MODELS: Annotated[List[str], NoDecode] = []
+    DEEPSEEK_ALLOWED_MODELS: Annotated[List[str], NoDecode] = []
+    # Per-user request budget across every LLM endpoint (0 disables).
+    LLM_RATE_LIMIT_PER_MINUTE: int = 20
+    # Per-user daily cap for paid providers (openai / deepseek; 0 disables).
+    LLM_PAID_DAILY_LIMIT: int = 200
+
     # Agent (Phase 6A-1)
     # Empty values fall back to CHAT_PROVIDER / OPENAI_CHAT_MODEL via the
     # agent_effective_provider / agent_effective_model properties.
@@ -101,9 +113,9 @@ class Settings(BaseSettings):
         "http://localhost:3000",
     ]
 
-    @field_validator("CORS_ORIGINS", mode="before")
+    @field_validator("CORS_ORIGINS", "OPENAI_ALLOWED_MODELS", "DEEPSEEK_ALLOWED_MODELS", mode="before")
     @classmethod
-    def parse_cors_origins(cls, v: Any) -> List[str]:
+    def parse_comma_separated_list(cls, v: Any) -> List[str]:
         if isinstance(v, str):
             raw = v.strip()
             if not raw:

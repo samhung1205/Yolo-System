@@ -8,12 +8,16 @@ Deterministic aggregate statistics across every image in a
 """
 from __future__ import annotations
 
+import logging
+
 from typing import Any
 
 from sqlalchemy.orm import Session
 
 from app.models.user import User
 from app.repositories import detection_repository
+
+logger = logging.getLogger(__name__)
 
 # Per-image breakdown is capped so very large batches (100+ images) don't blow
 # up the LLM context; totals themselves are always computed over every image
@@ -87,8 +91,9 @@ def summarize_batch_tool(
             "per_image_breakdown": per_image,
             "per_image_breakdown_truncated": len(tasks) > PER_IMAGE_BREAKDOWN_LIMIT,
         }
-    except Exception as exc:  # pragma: no cover - defensive
-        return {"ok": False, "error": f"unexpected error: {exc}"}
+    except Exception:  # pragma: no cover - defensive
+        logger.exception("agent tool failed")
+        return {"ok": False, "error": "internal_error"}
 
 
 def list_batch_images_by_class_tool(
@@ -128,5 +133,6 @@ def list_batch_images_by_class_tool(
             "matches": matches[:PER_IMAGE_BREAKDOWN_LIMIT],
             "truncated": len(matches) > PER_IMAGE_BREAKDOWN_LIMIT,
         }
-    except Exception as exc:  # pragma: no cover - defensive
-        return {"ok": False, "error": f"unexpected error: {exc}"}
+    except Exception:  # pragma: no cover - defensive
+        logger.exception("agent tool failed")
+        return {"ok": False, "error": "internal_error"}
