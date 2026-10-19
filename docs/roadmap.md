@@ -1,5 +1,9 @@
 # 開發路線圖
 
+> 本文件保留原始執行計畫與階段性 checklist，未勾選項目不等同目前功能缺失。
+> 當前可執行範圍與限制以 [`README.md`](../README.md) 的 Phase 狀態表及
+> [`architecture.md`](architecture.md) 為準。
+
 > **最後更新**: 2026-04-18  
 > **目標**: 漸進式重構 legacy PySide6 專案為桌面版 + Web 版雙軌架構
 
@@ -25,7 +29,7 @@ Phase 0 ✅  →  Phase 1 🔜  →  Phase 2  →  Phase 3  →  Phase 4  →  P
 - [x] 識別所有關鍵問題（SQL injection, 明文密碼, 硬編碼設定）
 - [x] 建立 `README.md`
 - [x] 建立 `AGENTS.md`
-- [x] 建立 `docs/current-system-analysis.md`
+- [x] 建立 legacy 現況分析（後併入 `README.md`，獨立檔案已移除）
 - [x] 建立 `docs/architecture.md`
 - [x] 建立 `docs/api-spec.md`
 - [x] 建立 `docs/database-design.md`
@@ -249,7 +253,7 @@ Phase 0 ✅  →  Phase 1 🔜  →  Phase 2  →  Phase 3  →  Phase 4  →  P
 - [x] LangChain / LangGraph / DeepAgents 全部 lazy import，缺套件時 backend 仍可啟動
 - [x] Mock LLM fallback（缺 `OPENAI_API_KEY` 時自動降級）
 - [x] 同步 README / AGENTS.md / docs/architecture.md / docs/api-spec.md
-- [ ] 視需求補上 agent streaming
+- [x] Agent streaming（於 Phase 6A-3 完成）
 
 ---
 
@@ -286,7 +290,7 @@ Phase 0 ✅  →  Phase 1 🔜  →  Phase 2  →  Phase 3  →  Phase 4  →  P
 - [x] Desktop：`desktop-app/api_client.py` 已包含 `agent_chat()` / `list_agent_modes()`（Phase 6A-1 完成）
 - [x] Desktop：`AgentApiThread` + `enable_agent_mode()` / `disable_agent_mode()` helper（Phase 6A-3）
 - [x] Agent SSE streaming（Phase 6A-3）
-- [ ] Desktop PySide6 完整 Agent 對話視窗（獨立 AgentWindow）— 下一階段
+- [x] Desktop PySide6 完整 Agent 對話視窗（獨立 AgentWindow；於 Phase 6A-3b 完成）
 
 ---
 

@@ -47,3 +47,5 @@ python Login.py
 - Webcam / RTSP 仍在本機跑 YOLO，不經 backend，也不會存進偵測紀錄
 - 登入資訊存在 `QSettings("Organization", "Application")`（明文 JWT）
 - 只在 macOS 開發機上驗證；Windows 高 DPI 邏輯沿用 legacy 寫法
+
+詳細架構與階段狀態見 [architecture.md](../docs/architecture.md) 與 [roadmap.md](../docs/roadmap.md)。

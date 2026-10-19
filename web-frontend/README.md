@@ -1,12 +1,12 @@
 # Web Frontend
 
-> **狀態**: Phase 5 Web MVP 已建立，API / runtime 驗證完成，待人工瀏覽器最終驗收。
+> **狀態**: Phase 5 已完成，Phase 6A 的 Agent Console 與批次分析頁亦已併入。
 
 ## 技術選型
 
 - React 18
 - Vite
-- React Router v6
+- React Router v7
 - Axios
 - 簡單 CSS
 
@@ -16,10 +16,11 @@
 - `RegisterPage`
 - `DashboardPage`
 - `DetectionPage`
+- `BatchDetectionPage`
 - `DetectionHistoryPage`
 - `ProfilePage`
 - `ChatPage`
-- `AgentPage`（與一般對話共用 AI 助理入口，維持獨立頁面）
+- `AgentPage`（`/agent`，使用 SSE streaming；與一般對話共用 AI 助理入口，維持獨立頁面）
 - `admin/UserManagementPage`
 
 ## 啟動方式
