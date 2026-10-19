@@ -20,30 +20,11 @@ from ui.UserLogin.register import Ui_registerWindow as registerWindow
 import re
 from utils.message import DialogOver
 
-USERNAME_RE = re.compile(r"^[A-Za-z0-9]{3,32}$")
-EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
-PASSWORD_RE = re.compile(r"^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,64}$")
+from validation import EMAIL_RE, PASSWORD_RE, PASSWORD_RULE_TEXT, USERNAME_RE
+from avatar_cache import cache_avatar_file
 
-py_minor = sys.version_info.minor
-if py_minor == 9:
-    from utils.py39.main_utils import (
+from utils.main_utils import (
         set_border_avatar, save_avatar_file, upload_avatar,get_windows_scaling_factor, get_screen_resolution)
-elif py_minor == 10:
-    from utils.py310.main_utils import (
-        set_border_avatar, save_avatar_file, upload_avatar,get_windows_scaling_factor, get_screen_resolution)
-elif py_minor == 11:
-    from utils.py311.main_utils import (
-        set_border_avatar, save_avatar_file, upload_avatar,get_windows_scaling_factor, get_screen_resolution)
-elif py_minor == 7:
-    from utils.py37.main_utils import (
-        set_border_avatar, save_avatar_file, upload_avatar,get_windows_scaling_factor, get_screen_resolution)
-elif py_minor == 8:
-    from utils.py38.main_utils import (
-        set_border_avatar, save_avatar_file, upload_avatar,get_windows_scaling_factor, get_screen_resolution)
-else:
-    raise RuntimeError(
-        f"请使用python版本为3.9"
-    )
 
 # 登录
 class RegisterClient(QMainWindow,registerWindow):
@@ -135,7 +116,7 @@ class RegisterClient(QMainWindow,registerWindow):
             DialogOver(parent=self, text="账号只能包含英文字母和数字，长度 3-32 位", title="错误", flags="warning")
             return
         if not PASSWORD_RE.match(password):
-            DialogOver(parent=self, text="密码必须至少 8 位，且同时包含英文与数字", title="错误", flags="warning")
+            DialogOver(parent=self, text=PASSWORD_RULE_TEXT, title="错误", flags="warning")
             return
 
 
@@ -154,9 +135,35 @@ class RegisterClient(QMainWindow,registerWindow):
                 DialogOver(parent=self, text=exc.message, title="错误", flags="warning")
                 return
 
-            DialogOver(parent=self, text="恭喜您注册成功", title="成功", flags="success")
+            if self._attach_avatar(username, password):
+                DialogOver(parent=self, text="恭喜您注册成功", title="成功", flags="success")
+            else:
+                DialogOver(
+                    parent=self,
+                    text="注册成功，但头像上传失败，可登录后在个人中心重新上传",
+                    title="成功",
+                    flags="warning",
+                )
             SI.loginWin.show()
             self.hide()
+
+    def _attach_avatar(self, username, password):
+        """Upload the chosen avatar for the account that was just created.
+
+        Uploading needs a token, so log in once here. The token is only used
+        for this call and is not saved as a session; the user still logs in
+        normally afterwards.
+        """
+        try:
+            session = self.api_client.login(username, password)
+            access_token = session["access_token"]
+            uploaded = self.api_client.upload_avatar(access_token=access_token, file_path=self.avatar_file_path)
+            avatar_filename = uploaded.get("filename", "")
+            self.api_client.update_profile(access_token=access_token, avatar=avatar_filename)
+            cache_avatar_file(self.avatar_file_path, avatar_filename)
+        except (ApiError, KeyError, OSError):
+            return False
+        return True
 
 
 

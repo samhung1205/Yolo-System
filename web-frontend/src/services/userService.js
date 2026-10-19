@@ -16,7 +16,7 @@ const userService = {
     return response.data;
   },
 
-  /** Self-service: update own nickname / password. */
+  /** Self-service: update own nickname / avatar / password (password needs current_password). */
   async updateProfile(payload) {
     const response = await api.put("/api/auth/profile", payload);
     return response.data;

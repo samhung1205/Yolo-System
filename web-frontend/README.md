@@ -25,7 +25,7 @@
 ## 啟動方式
 
 ```bash
-cd /Users/SAM/Desktop/Agents/Yolo_system/web-frontend
+cd web-frontend
 npm install
 npm run dev
 ```

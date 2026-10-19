@@ -63,11 +63,30 @@ class UserRead(BaseModel):
     model_config = {"from_attributes": True}
 
 
+AVATAR_FILENAME_RE = re.compile(r"^\d{14}_[0-9a-f]{8}\.(jpg|png|gif|webp)$")
+
+
 class ProfileUpdate(BaseModel):
-    """Self-service profile update — only nickname and password allowed."""
+    """Self-service profile update — nickname, avatar and password only.
+
+    ``current_password`` is required whenever ``password`` is set, so a stolen
+    token alone cannot lock the owner out of their account.
+    """
 
     nickname: Optional[str] = None
+    avatar: Optional[str] = None
     password: Optional[str] = None
+    current_password: Optional[str] = None
+
+    @field_validator("avatar")
+    @classmethod
+    def validate_avatar(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return None
+        text = v.strip()
+        if not AVATAR_FILENAME_RE.match(text):
+            raise ValueError("頭像檔名無效，請重新上傳頭像")
+        return text
 
     @field_validator("password")
     @classmethod

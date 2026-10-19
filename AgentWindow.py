@@ -449,16 +449,8 @@ class AgentWindow(QDialog):
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    py_minor = sys.version_info.minor
     try:
-        if py_minor == 11:
-            from utils.py311.main_utils import get_screen_resolution, get_windows_scaling_factor
-        elif py_minor == 10:
-            from utils.py310.main_utils import get_screen_resolution, get_windows_scaling_factor
-        elif py_minor == 9:
-            from utils.py39.main_utils import get_screen_resolution, get_windows_scaling_factor
-        else:
-            raise ImportError
+        from utils.main_utils import get_screen_resolution, get_windows_scaling_factor
     except ImportError:
         get_screen_resolution = lambda: (1920, 1080)  # noqa: E731
         get_windows_scaling_factor = lambda: 1.0  # noqa: E731

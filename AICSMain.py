@@ -17,26 +17,8 @@ from PySide6.QtCore import QDateTime, QSize, Qt, QEvent, QThread, Signal
 from PySide6.QtWidgets import QMainWindow, QListWidgetItem
 from utils.UserInfo import UserInfo
 from utils.message import DialogOver
-py_minor = sys.version_info.minor
-if py_minor == 9:
-    from utils.py39.main_utils import (
+from utils.main_utils import (
         get_windows_scaling_factor, get_screen_resolution)
-elif py_minor == 10:
-    from utils.py310.main_utils import (
-        get_windows_scaling_factor, get_screen_resolution)
-elif py_minor == 11:
-    from utils.py311.main_utils import (
-        get_windows_scaling_factor, get_screen_resolution)
-elif py_minor == 7:
-    from utils.py37.main_utils import (
-        get_windows_scaling_factor, get_screen_resolution)
-elif py_minor == 8:
-    from utils.py38.main_utils import (
-        get_windows_scaling_factor, get_screen_resolution)
-else:
-    raise RuntimeError(
-        f"请使用python版本为3.9"
-    )
 
 
 # Threads detached from a closed window are parked here until they finish, so

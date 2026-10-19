@@ -414,6 +414,30 @@ class DesktopApiClient:
             },
         )
 
+    def update_profile(self, access_token, nickname=None, avatar=None, password=None, current_password=None):
+        """Self-service update (PUT /api/auth/profile); works for non-admin users.
+
+        Changing the password requires ``current_password``; the backend
+        verifies it and rejects the request otherwise.
+        """
+        payload = {}
+        if nickname is not None:
+            payload["nickname"] = nickname
+        if avatar is not None:
+            payload["avatar"] = avatar
+        if password is not None:
+            payload["password"] = password
+            payload["current_password"] = current_password or ""
+
+        return self._request(
+            "PUT",
+            "/api/auth/profile",
+            payload=payload,
+            headers={
+                "Authorization": f"Bearer {access_token}",
+            },
+        )
+
     def _request(self, method, path, payload=None, headers=None, timeout=None, return_headers=False):
         url = f"{self.base_url}{path}"
         data = None
@@ -432,6 +456,8 @@ class DesktopApiClient:
     def _multipart_request(self, endpoint, access_token, file_path, timeout=None):
         url = f"{self.base_url}{endpoint}"
         filename = os.path.basename(file_path)
+        # Quotes / CR / LF would break the multipart header line.
+        header_filename = filename.replace("\\", "_").replace('"', "_").replace("\r", "_").replace("\n", "_")
         content_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
         boundary = f"----CodexBoundary{uuid.uuid4().hex}"
 
@@ -441,7 +467,7 @@ class DesktopApiClient:
         body = b"".join(
             [
                 f"--{boundary}\r\n".encode("utf-8"),
-                f'Content-Disposition: form-data; name="file"; filename="{filename}"\r\n'.encode("utf-8"),
+                f'Content-Disposition: form-data; name="file"; filename="{header_filename}"\r\n'.encode("utf-8"),
                 f"Content-Type: {content_type}\r\n\r\n".encode("utf-8"),
                 file_bytes,
                 b"\r\n",

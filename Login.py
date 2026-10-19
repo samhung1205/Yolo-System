@@ -14,26 +14,8 @@ from api_client import ApiError, DesktopApiClient
 from ui_state import SI
 from utils.message import DialogOver
 from utils.UserInfo import UserInfo
-py_minor = sys.version_info.minor
-if py_minor == 9:
-    from utils.py39.main_utils import (
+from utils.main_utils import (
         get_windows_scaling_factor, get_screen_resolution)
-elif py_minor == 10:
-    from utils.py310.main_utils import (
-        get_windows_scaling_factor, get_screen_resolution)
-elif py_minor == 11:
-    from utils.py311.main_utils import (
-        get_windows_scaling_factor, get_screen_resolution)
-elif py_minor == 7:
-    from utils.py37.main_utils import (
-        get_windows_scaling_factor, get_screen_resolution)
-elif py_minor == 8:
-    from utils.py38.main_utils import (
-        get_windows_scaling_factor, get_screen_resolution)
-else:
-    raise RuntimeError(
-        f"請使用python版本為3.9以上"
-    )
 class Win_Login(QMainWindow, Ui_LoginMainWindow):
     def __init__(self, parent=None):
         super(Win_Login, self).__init__(parent)

@@ -3,19 +3,21 @@ Auth API routes:
   POST /api/auth/register
   POST /api/auth/login
   GET  /api/auth/me
-  PUT  /api/auth/profile  (self-service: nickname / password)
+  PUT  /api/auth/profile  (self-service: nickname / avatar / password)
 """
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_user, get_db
+from app.core.security import verify_password
 from app.models.user import User
 from app.schemas.auth import LoginRequest, TokenResponse
 from app.schemas.user import ProfileUpdate, UserCreate, UserRead, UserUpdate
 from app.services.auth_service import login_user, register_user
 from app.services import user_service
+from app.services.user_service import AVATAR_DIR
 from app.services.user_response_service import to_user_read
 
 router = APIRouter()
@@ -59,9 +61,24 @@ def update_my_profile(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ):
-    """Self-service profile update: change nickname and/or password."""
+    """Self-service profile update: nickname, avatar and/or password."""
+    if profile_in.password is not None:
+        if not profile_in.current_password or not verify_password(
+            profile_in.current_password, current_user.password_hash
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="目前密碼不正確",
+            )
+    if profile_in.avatar is not None and not (AVATAR_DIR / profile_in.avatar).is_file():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="找不到上傳的頭像，請重新上傳",
+        )
+
     update_data = UserUpdate(
         nickname=profile_in.nickname,
+        avatar=profile_in.avatar,
         password=profile_in.password,
     )
     updated = user_service.update_user(db, current_user.id, update_data)

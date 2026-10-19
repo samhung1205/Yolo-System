@@ -119,9 +119,9 @@ Yolo_system/
 
 ## 啟動方式
 
-### Legacy 桌面版（目前可用）
+### Legacy 桌面版（維護模式，詳見 [desktop-app/README.md](desktop-app/README.md)）
 ```bash
-# 需要 Python 3.9-3.11, PySide6, pymysql, ultralytics
+# 建議直接用 yolo-backend conda 環境（已含 PySide6 / ultralytics）；不再限制 Python 3.9-3.11
 cd /path/to/Yolo_system
 # 可選：若 backend 不在 http://127.0.0.1:8000，先設定 API base URL
 # export YOLO_API_BASE_URL=http://127.0.0.1:8000
@@ -166,11 +166,11 @@ npm run dev
 本地驗證若沿用目前專案的 mock chat / detection 測試組合，建議直接用：
 ```bash
 # backend
-cd /Users/SAM/Desktop/Agents/Yolo_system/backend
+cd backend
 conda run -n yolo-backend uvicorn main:app --reload --host 127.0.0.1 --port 8000
 
 # frontend
-cd /Users/SAM/Desktop/Agents/Yolo_system/web-frontend
+cd web-frontend
 npm run dev -- --host 127.0.0.1 --port 5173
 ```
 
@@ -197,7 +197,7 @@ Python module path，由
 |-------|------|------|
 | Phase 0 | 盤點現有專案、建立文件 | ✅ 已完成 |
 | Phase 1 | 建立 Backend 骨架與 Auth | ✅ **已完成** |
-| Phase 2 | 桌面版改接 Backend API | ✅ **已完成**（註冊前頭像仍沿用本地暫存流程） |
+| Phase 2 | 桌面版改接 Backend API | ✅ **已完成**（2026-10-19 起維護模式：註冊頭像上傳、個資/改密碼改走 `/api/auth/profile`） |
 | Phase 3 | 重構 YOLO Detection Service | ✅ **已完成**（image/video MVP；webcam/RTSP 為 Phase 3+ 待辦） |
 | Phase 4 | 重構 AI Chat Service | ✅ **已完成**（provider-based chat + history/context + streaming） |
 | Phase 5 | 建立 React Web 前端 MVP | ✅ **已完成**（所有主流程頁面可用，API/runtime 驗證通過） |
@@ -273,7 +273,7 @@ Python module path，由
   - 原始影片：`static/detections/videos/originals`
   - 結果影片：`static/detections/videos/results`
   - preview 圖：`static/detections/previews`
-- 桌面端 [MainUI.py](/Users/SAM/Desktop/Agents/Yolo_system/MainUI.py) 已改為：
+- 桌面端 [MainUI.py](MainUI.py) 已改為：
   - 單張圖片走 backend image detection
   - 本地影片檔走 backend video detection
   - detection history 可讀 backend
@@ -281,8 +281,8 @@ Python module path，由
 
 ## Phase 3 已知限制
 
-- webcam 偵測仍走 legacy [detect_mainui.py](/Users/SAM/Desktop/Agents/Yolo_system/detect_mainui.py)
-- RTSP / 串流仍走 legacy [detect_mainui.py](/Users/SAM/Desktop/Agents/Yolo_system/detect_mainui.py)
+- webcam 偵測仍走 legacy [detect_mainui.py](detect_mainui.py)
+- RTSP / 串流仍走 legacy [detect_mainui.py](detect_mainui.py)
 - video detection 目前只保存 preview frame 的 detection objects，不是每一幀都入庫
 - 桌面端影片 detection 目前仍以輪詢等待完成，尚未做真正非阻塞 UI 任務管理
 - history UI 目前是動態 dialog，尚未做完整篩選/分頁/刪除
@@ -311,7 +311,7 @@ Python module path，由
 - provider 選擇改由 `.env` 控制：
   - `CHAT_PROVIDER=openai`
   - `CHAT_PROVIDER=deepseek`
-- Desktop [AICSMain.py](/Users/SAM/Desktop/Agents/Yolo_system/AICSMain.py) 已改為：
+- Desktop [AICSMain.py](AICSMain.py) 已改為：
   - 使用 backend `/api/chat`
   - 使用 backend `/api/chat/stream` 逐段更新 assistant bubble
   - 同一視窗內自動沿用 `conversation_id`
@@ -365,7 +365,7 @@ Python module path，由
   - image detection / detection history
   - profile
   - chat（`CHAT_PROVIDER=mock`）
-- desktop 的 [Register.py](/Users/SAM/Desktop/Agents/Yolo_system/Register.py)、[AdminAddUser.py](/Users/SAM/Desktop/Agents/Yolo_system/AdminAddUser.py)、[AdminEditUser.py](/Users/SAM/Desktop/Agents/Yolo_system/AdminEditUser.py) 已同步改為相同帳號規則：
+- desktop 的 [Register.py](Register.py)、[AdminAddUser.py](AdminAddUser.py)、[AdminEditUser.py](AdminEditUser.py) 已同步改為相同帳號規則：
   - `username`：英數字 `3-32` 位
   - `email`：合法 Email
   - `password`：至少 `8` 位，且需同時包含英文與數字
@@ -394,13 +394,13 @@ Python module path，由
   - `video_predict()`
   - detection history 讀取
 - 本輪執行層驗證額外修正：
-  - [backend/requirements.txt](/Users/SAM/Desktop/Agents/Yolo_system/backend/requirements.txt) 補上 `opencv-python-headless`
-  - [PersonFormMain.py](/Users/SAM/Desktop/Agents/Yolo_system/PersonFormMain.py) 改用 [ui_state.py](/Users/SAM/Desktop/Agents/Yolo_system/desktop-app/ui_state.py)，移除對 legacy `mysql.dataDB.SI` 的依賴
-  - [MainUI.py](/Users/SAM/Desktop/Agents/Yolo_system/MainUI.py) 修正動態按鈕建立順序，避免 `pushButton_history` / `pushButton_open_result` 尚未建立就先綁定事件
+  - [backend/requirements.txt](backend/requirements.txt) 補上 `opencv-python-headless`
+  - [PersonFormMain.py](PersonFormMain.py) 改用 [ui_state.py](desktop-app/ui_state.py)，移除對 legacy `mysql.dataDB.SI` 的依賴
+  - [MainUI.py](MainUI.py) 修正動態按鈕建立順序，避免 `pushButton_history` / `pushButton_open_result` 尚未建立就先綁定事件
 
 ## Phase 4 手動驗證方式
 
-1. 在 [backend/.env](/Users/SAM/Desktop/Agents/Yolo_system/backend/.env) 設定：
+1. 在 [backend/.env](backend/.env) 設定：
 ```bash
 CHAT_PROVIDER=openai
 OPENAI_API_KEY=sk-...
@@ -409,16 +409,16 @@ CHAT_CONTEXT_MAX_TURNS=10
 ```
 2. 啟 backend：
 ```bash
-cd /Users/SAM/Desktop/Agents/Yolo_system/backend
+cd backend
 conda run -n yolo-backend alembic upgrade head
 conda run -n yolo-backend uvicorn main:app --reload --port 8000
 ```
 3. 啟 desktop：
 ```bash
-cd /Users/SAM/Desktop/Agents/Yolo_system
+cd /path/to/Yolo_system
 python Login.py
 ```
-4. 登入後開啟 [AICSMain.py](/Users/SAM/Desktop/Agents/Yolo_system/AICSMain.py) 對話視窗
+4. 登入後開啟 [AICSMain.py](AICSMain.py) 對話視窗
 5. 送出一則問題，確認：
    - user bubble 正常顯示
    - assistant bubble 會逐段顯示 backend 串流回覆
@@ -707,11 +707,11 @@ per-class 同時保住了全域 0.50 會漏掉的 2 架 airplane，又把 small-
 
 1. 啟 backend：
 ```bash
-conda run -n yolo-backend bash -lc 'cd /Users/SAM/Desktop/Agents/Yolo_system/backend && YOLO_DEFAULT_MODEL=../yolo11n.pt uvicorn main:app --host 127.0.0.1 --port 8001'
+conda run -n yolo-backend bash -lc 'cd backend && YOLO_DEFAULT_MODEL=../yolo11n.pt uvicorn main:app --host 127.0.0.1 --port 8001'
 ```
 2. 另開 terminal 啟桌面端：
 ```bash
-cd /Users/SAM/Desktop/Agents/Yolo_system
+cd /path/to/Yolo_system
 export YOLO_API_BASE_URL=http://127.0.0.1:8001
 conda run -n yolo-backend python Login.py
 ```

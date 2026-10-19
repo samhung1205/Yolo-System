@@ -20,34 +20,14 @@ from PySide6.QtGui import QIcon, Qt, QPalette, QBrush, QPixmap, QGuiApplication,
 from PySide6.QtWidgets import QMainWindow, QMessageBox, QApplication, QFileDialog, QLabel, QLineEdit
 from ui.admin.admin_add_dialog import Ui_add
 from api_client import ApiError, DesktopApiClient
+from validation import EMAIL_RE, PASSWORD_RE, PASSWORD_RULE_TEXT, USERNAME_RE
 from avatar_cache import cache_avatar_file
 from ui_state import SI
 from utils.UserInfo import UserInfo
 
-USERNAME_RE = re.compile(r"^[A-Za-z0-9]{3,32}$")
-EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
-PASSWORD_RE = re.compile(r"^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,64}$")
 
-py_minor = sys.version_info.minor
-if py_minor == 9:
-    from utils.py39.main_utils import (
+from utils.main_utils import (
         save_avatar_file, upload_avatar, get_windows_scaling_factor, get_screen_resolution)
-elif py_minor == 10:
-    from utils.py310.main_utils import (
-        save_avatar_file, upload_avatar, get_windows_scaling_factor, get_screen_resolution)
-elif py_minor == 11:
-    from utils.py311.main_utils import (
-        save_avatar_file, upload_avatar, get_windows_scaling_factor, get_screen_resolution)
-elif py_minor == 7:
-    from utils.py37.main_utils import (
-        save_avatar_file, upload_avatar, get_windows_scaling_factor, get_screen_resolution)
-elif py_minor == 8:
-    from utils.py38.main_utils import (
-        save_avatar_file, upload_avatar, get_windows_scaling_factor, get_screen_resolution)
-else:
-    raise RuntimeError(
-        f"请使用python版本为3.9"
-    )
 
 class AddUserWindow(QMainWindow, Ui_add):
     add_user_updated = Signal()
@@ -107,7 +87,7 @@ class AddUserWindow(QMainWindow, Ui_add):
             DialogOver(parent=self, text="账号只能包含英文字母和数字，长度 3-32 位", title="错误", flags="warning")
             return
         if not PASSWORD_RE.match(password):
-            DialogOver(parent=self, text="密码必须至少 8 位，且同时包含英文与数字", title="错误", flags="warning")
+            DialogOver(parent=self, text=PASSWORD_RULE_TEXT, title="错误", flags="warning")
             return
 
         # 检查头像是否上传

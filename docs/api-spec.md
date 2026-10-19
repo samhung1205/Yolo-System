@@ -139,6 +139,24 @@ GET /static/detections/results/task_12_a1b2c3d4.jpg?sig=<hmac>&exp=<unix_ts>
 }
 ```
 
+### PUT /api/auth/profile
+> 一般使用者自助更新（Web 個人資料頁、Desktop 個人中心都用這支；`PUT /api/users/{id}` 僅限管理員）
+
+**Request Body**（欄位皆為選填，只送要改的）
+```json
+{
+  "nickname": "新暱稱",
+  "avatar": "20261019120000_ab12cd34.png",
+  "password": "Newpass123",
+  "current_password": "Oldpass123"
+}
+```
+
+- `avatar`：必須是 `POST /api/upload/avatar` 回傳的 `filename`（格式 `YYYYMMDDhhmmss_xxxxxxxx.{jpg,png,gif,webp}`），且檔案存在；格式不符 422，檔案不存在 400
+- `password`：規則同註冊；**必須同時提供 `current_password`**，缺少或錯誤回 400「目前密碼不正確」
+
+**Response 200**：`UserRead`
+
 ---
 
 ## Users 端點

@@ -19,28 +19,11 @@ from PySide6.QtGui import QImage, QPixmap, QColor, QCursor, QAction, QGuiApplica
 from PySide6.QtCore import QTimer, QThread, Signal, QObject, Qt, QEvent
 from ui.admin.admin_ui_v2 import Ui_MainWindow as AdminMainWindow
 from api_client import ApiError, DesktopApiClient
+from validation import PASSWORD_RE, PASSWORD_RULE_TEXT
 from avatar_cache import cache_avatar_file
 from ui_state import SI
-py_minor = sys.version_info.minor
-if py_minor == 9:
-    from utils.py39.main_utils import (
+from utils.main_utils import (
         set_circular_avatar, save_avatar_file, upload_avatar,get_windows_scaling_factor, get_screen_resolution)
-elif py_minor == 10:
-    from utils.py310.main_utils import (
-        set_circular_avatar, save_avatar_file, upload_avatar,get_windows_scaling_factor, get_screen_resolution)
-elif py_minor == 11:
-    from utils.py311.main_utils import (
-        set_circular_avatar, save_avatar_file, upload_avatar,get_windows_scaling_factor, get_screen_resolution)
-elif py_minor == 7:
-    from utils.py37.main_utils import (
-        set_circular_avatar, save_avatar_file, upload_avatar,get_windows_scaling_factor, get_screen_resolution)
-elif py_minor == 8:
-    from utils.py38.main_utils import (
-        set_circular_avatar, save_avatar_file, upload_avatar,get_windows_scaling_factor, get_screen_resolution)
-else:
-    raise RuntimeError(
-        f"请使用python版本为3.9"
-    )
 
 
 
@@ -463,17 +446,18 @@ class AdminWindow(QMainWindow, AdminMainWindow):
             cache_avatar_file(self.upload_avatar_path, avatar_filename)
 
         try:
-            current_admin = self._get_current_admin_user()
-            self.api_client.update_user(
+            # Self-service endpoint: PUT /api/users/{id} is admin-only, so
+            # regular users could never save their own profile through it.
+            self.api_client.update_profile(
                 access_token=self._get_admin_access_token(),
-                user_id=current_admin["id"],
                 nickname=new_nickname,
-                avatar=avatar_filename,
+                avatar=avatar_filename if self.upload_avatar_path else None,
             )
         except ApiError as exc:
             DialogOver(parent=self, text=exc.message, title="提交失败", flags="warning")
             return
 
+        self.upload_avatar_path = None  # 已上傳，避免下次只改暱稱時重複上傳
         user_info.save_admin_user_info(username, new_nickname, avatar_filename, register_time)
         self.set_admin_user_info()  # 更新界面
         DialogOver(parent=self, text="修改已保存！", title="提交成功", flags="success")
@@ -484,30 +468,24 @@ class AdminWindow(QMainWindow, AdminMainWindow):
         check_password = self.lineEdit_check_password.text().strip()
 
 
-        ret_psd = re.match("^(?![A-Za-z]+$)(?![A-Z0-9]+$)(?![a-z0-9]+$)(?![a-z\W]+$)(?![A-Z\W]+$)(?![0-9\W]+$)[a-zA-Z0-9\W]{6,16}$",new_password)
+        if not old_password:
+            DialogOver(parent=self, text="请输入原密码", title="错误", flags="warning")
+            return
 
-        if not ret_psd:
-            DialogOver(parent=self, text="密码不符合要求，必须包含字母、数字、特殊字符", title="错误", flags="warning")
+        if not PASSWORD_RE.match(new_password):
+            DialogOver(parent=self, text=PASSWORD_RULE_TEXT, title="错误", flags="warning")
             return
 
         if str(new_password) != str(check_password):
             DialogOver(parent=self, text="两次输入密码不一致", title="错误", flags="warning")
             return
 
-        user_info = UserInfo()
-        username, _, _, _ = user_info.load_admin_user_info()  # 获取账号
+        # The backend verifies the current password itself (PUT /api/auth/profile).
         try:
-            self.api_client.login(username, old_password)
-        except ApiError:
-            DialogOver(parent=self, text="原密码不正确", title="错误", flags="warning")
-            return
-
-        try:
-            current_admin = self._get_current_admin_user()
-            self.api_client.update_user(
+            self.api_client.update_profile(
                 access_token=self._get_admin_access_token(),
-                user_id=current_admin["id"],
                 password=new_password,
+                current_password=old_password,
             )
         except ApiError as exc:
             DialogOver(parent=self, text=exc.message, title="错误", flags="warning")

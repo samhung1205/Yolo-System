@@ -11,6 +11,7 @@ export default function ProfilePage() {
   // Edit form state
   const [editing, setEditing] = useState(false);
   const [nickname, setNickname] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [saving, setSaving] = useState(false);
@@ -29,6 +30,7 @@ export default function ProfilePage() {
 
   function openEdit() {
     setNickname(user?.nickname || "");
+    setCurrentPassword("");
     setNewPassword("");
     setConfirmPassword("");
     setSaveError("");
@@ -45,10 +47,17 @@ export default function ProfilePage() {
       setSaveError("兩次密碼輸入不一致");
       return;
     }
+    if (newPassword && !currentPassword) {
+      setSaveError("變更密碼前請先輸入目前密碼");
+      return;
+    }
 
     const payload = {};
     if (nickname.trim() !== (user?.nickname || "")) payload.nickname = nickname.trim() || null;
-    if (newPassword) payload.password = newPassword;
+    if (newPassword) {
+      payload.password = newPassword;
+      payload.current_password = currentPassword;
+    }
 
     if (!Object.keys(payload).length) {
       setEditing(false);
@@ -152,6 +161,19 @@ export default function ProfilePage() {
                   autoComplete="new-password"
                 />
               </label>
+
+              {newPassword ? (
+                <label className="field">
+                  <span>Current Password</span>
+                  <input
+                    type="password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    placeholder="輸入目前密碼以確認變更"
+                    autoComplete="current-password"
+                  />
+                </label>
+              ) : null}
 
               {newPassword ? (
                 <label className="field">

@@ -75,7 +75,21 @@
 
 ## 當前 Phase
 
-> **目前已完成至「安全強化 P0」（上傳白名單、static nosniff、LLM 白名單與限流、隱藏內部錯誤），前一階段為「各類別閾值 Phase 1」。下一步：批次上限提高（輪詢瘦身 → 分片上傳 → 1000 張）、批次分析 Phase 2（空間關係推論），或 Phase 6（Docker、測試、部署文件完善），視優先順序決定。**
+> **目前已完成至「桌面版維護模式 + Bug 修復」，前一階段為「安全強化 P0」。下一步：Agent 重構 A → B → C（先讀 Deep Agents 官方文件並與使用者討論）；之後再排批次上限提高（輪詢瘦身 → 分片上傳 → 1000 張）、批次分析 Phase 2（空間關係推論），或 Phase 6（Docker、測試、部署文件完善），視優先順序決定。**
+
+**桌面版維護模式 + Bug 修復 — ✅ 完成（2026-10-19）**
+
+桌面版改為維護模式（只修 bug、不加功能），細節見 `desktop-app/README.md`。
+- [x] 一般使用者在個人中心改暱稱 / 頭像 / 密碼一律 403：原本呼叫管理員限定的 `PUT /api/users/{id}`。改走 `PUT /api/auth/profile`（新增 `avatar`、`current_password` 欄位），`api_client.update_profile()`
+- [x] 改密碼改由 backend 驗證 `current_password`（Web 個人資料頁同步新增「Current Password」欄位）；移除桌面版用 `login()` 驗舊密碼的作法
+- [x] 改密碼規則與 backend 不一致（桌面版要求特殊字元、6-16 位；backend 禁止特殊字元、8-64 位）→ 新增 `desktop-app/validation.py` 統一規則
+- [x] 註冊強制選頭像卻從未上傳 → 建立帳號後登入一次、上傳頭像並寫入 profile（失敗時仍算註冊成功並提示）
+- [x] Python 3.12+ 直接 `RuntimeError`：8 個 UI 檔依 Python 版本分派 `utils/py3X/main_utils.py`（5 份內容相同）→ 合併為 `utils/main_utils.py`，舊路徑保留為 re-export shim
+- [x] Webcam / RTSP 停止後無法再次開始：`stop()` 先設 `stop_dtc` 再 `quit()` + `wait(3000)`；關窗與登出時先停止執行緒
+- [x] Webcam 預設模型 `yolo11n.pt` 不存在時 Ultralytics 會自動下載 → 預設改用 `backend/pt/yolo11n.pt`（`YOLO_DESKTOP_MODEL` 可覆寫）
+- [x] multipart 檔名含 `"` / 換行會破壞 header → 上傳前清理
+- [x] 文件：重寫 `desktop-app/README.md`；README / docs 移除本機絕對路徑；`docs/api-spec.md` 補 `PUT /api/auth/profile`
+- [x] 測試：`tests/test_profile_update.py`（7 項）
 
 **安全強化 P0 — ✅ 完成（2026-10-19）**
 
@@ -91,7 +105,7 @@
 *審查發現、尚未處理（依優先順序）*
 - [ ] npm 剩餘：vite 5 → 需 vite 8（dev server 漏洞，high）、react-router-dom 6 → 需 v7（moderate），皆為 breaking upgrade
 - [ ] 登入無頻率限制 / 帳號鎖定；註冊開放 + `APP_HOST=0.0.0.0` 時區網內任何人可註冊使用
-- [ ] JWT 24h 且無撤銷；改密碼不需舊密碼、舊 token 不失效；token 存於 localStorage
+- [ ] JWT 24h 且無撤銷；改密碼後舊 token 不失效；token 存於 localStorage（改密碼需舊密碼已於桌面版修復時完成）
 - [ ] `python-jose` 已停止維護 → 改用 PyJWT
 - [ ] migration `0002` seed admin 預設密碼公開於 repo，需確認已改；DB 使用 `root` 帳號
 - [ ] 密碼規則 `[A-Za-z\d]` 禁止特殊字元（反而降低強度）
