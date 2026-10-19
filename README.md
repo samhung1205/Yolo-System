@@ -210,6 +210,8 @@ Python module path，由
 | Phase 6A-6 | IME 輸入修復 + 對話滾動 + Agent Vision | ✅ **已完成**（中文輸入法送出誤判修復、對話 thread 滾動修復、`AGENT_ENABLE_VISION` 唯讀圖片附加） |
 | 批次影像分析 Phase 1 | 多圖 / 資料夾批次上傳 + 類別總數聚合 + Agent `batch_analysis` | ✅ **已完成**（`POST /api/detections/batch`、`detection_batches` 表、Web `/detections/batch` 頁面、Agent 新模式） |
 | 各類別閾值 Phase 1 | 各類別獨立 conf / IOU 閾值（image + batch） | ✅ **已完成**（migration `0011`、`class_thresholds` Form 欄位、Web `ClassThresholdEditor`；影片與 Desktop 未支援） |
+| Agent 重構 B | tool-calling 引擎（LangChain `create_agent`） | ✅ **已完成**（`AGENT_ENGINE=tool_calling` 開啟，預設仍為 `pipeline`；Web 顯示工具進度） |
+| Agent 重構 A | 單一 graph 執行路徑 + 全模式對話歷史 + 明確錯誤 | ✅ **已完成**（graph compile 一次、runtime context、`invoke`/`stream` 同一 graph；B 用 `create_agent`、Deep Agents 延到 C） |
 | 安全強化 P0 | 上傳白名單 + static nosniff、LLM 白名單與限流、隱藏內部錯誤 | ✅ **已完成**（`app/core/uploads.py`、`app/services/llm_policy.py`；其餘審查發現見 AGENTS.md） |
 | 批次上限 1000 張 | 分片上傳 + 輪詢瘦身 + 中斷復原 | ⏳ 待辦（已完成瓶頸分析，見 AGENTS.md） |
 | Phase 6 | Docker、測試、部署文件完善 | ⏳ 待辦 |
@@ -444,7 +446,7 @@ curl -N -X POST "http://127.0.0.1:8000/api/chat/stream" \
 
 - YOLO 推論仍由 `detection_service` 觸發；agent **只讀**現有 `DetectionTask` / `DetectionObject`。
 - `chat_logs` 表共用，agent 寫入時 `provider="langgraph-agent"`，與 chat provider 不衝突，無需 migration。
-- LangChain / LangGraph / DeepAgents 一律 lazy import；任一缺套件或缺 API key 時 backend 仍能啟動，並回傳 mock 回覆。
+- LangChain / LangGraph / DeepAgents 一律 lazy import；缺套件時 backend 仍能啟動。缺 API key 時回傳明確的「模型供應商尚未設定」錯誤（2026-10-19 起不再偷偷回 mock 回覆）。
 - DeepAgents 為 **optional enhancement**，預設關閉。`requirements.txt` 中保留註解，需手動啟用。
 
 ### 新增端點

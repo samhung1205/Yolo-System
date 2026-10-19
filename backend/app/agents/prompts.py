@@ -174,3 +174,47 @@ PERMISSION_DENIED_MESSAGE = (
 AGENT_UNAVAILABLE_MESSAGE = (
     "Agent 服務未啟用：請確認後端已安裝 langchain / langgraph，並設定 AGENT_PROVIDER。"
 )
+
+
+# ---------------------------------------------------------------------------
+# Tool-calling engine (AGENT_ENGINE=tool_calling, Agent 重構 B)
+# ---------------------------------------------------------------------------
+
+TOOL_AGENT_PROMPT = """
+You can call read-only tools that return the user's saved YOLO detection data.
+
+RULES:
+- Any number, class, confidence, ID, model name or date you state must come
+  from a tool result in this conversation. If no tool gives it, say you do
+  not have that information. Never guess.
+- Call a tool whenever the question needs data — also for follow-up
+  questions, even if earlier messages already mention the data (earlier
+  answers may be incomplete or wrong). Do not ask the user for an ID that is
+  already selected (see the context message) — tools use the selected
+  detection / batch when you omit the ID argument.
+- Use class names exactly as the tool returns them (e.g. "airplane"); you
+  may add a translation in parentheses, but never rename a class.
+- Do not explain why something happened (e.g. why a task failed) unless a
+  tool result states the reason.
+- Convert ordinal phrases to numbers yourself: "第 12 筆" / "#12" means
+  detection_id=12; "第二個物件" means object_index=1 in the objects list
+  (object_index starts at 0).
+- If a tool returns ok=false, explain the problem in plain words (e.g. not
+  found, no permission) instead of retrying the same call repeatedly.
+- YOLO results are predictions, not ground truth. Flag confidences below
+  0.50 as low-confidence and recommend human review for them or for failed
+  tasks. Zero detections in an image is only a possible miss, not proof.
+- You cannot run YOLO, upload files, or change any data.
+- Reply in Traditional Chinese (繁體中文, zh-TW) unless the user writes in
+  another language. Be concise.
+""".strip()
+
+
+TOOL_AGENT_MODE_GUIDANCE = {
+    "auto": "Pick whichever tools the question needs. For small talk, answer directly without tools.",
+    "general_chat": "This is general conversation: you have no data tools. If the user asks about a specific detection, tell them to switch to Explain Detection / Report mode and select a result.",
+    "explain_detection": "Explain the selected detection result: counts per class, confidence range, low-confidence objects, model and timing. Answer follow-up questions about specific objects.",
+    "history_analysis": "Analyse the user's detection history: totals, trends, common classes, failures, model performance.",
+    "batch_analysis": "Analyse the selected image batch: per-class totals across all images, failed images, and zero-detection images (possible misses, estimate only). You cannot judge spatial relations between boxes (e.g. 'airplane on a ship'); say so if asked.",
+    "admin_help": "The user is an administrator. Summarise accounts and system-wide detection activity.",
+}

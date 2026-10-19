@@ -272,7 +272,7 @@ React Web        ──future──>                     │
 
 - YOLO 推論仍然由 `app/integrations/yolo_engine.py` 透過 `detection_service` 觸發，agent **只讀** 既有 `DetectionTask` / `DetectionObject`。
 - `/api/chat` 與 `/api/agent/chat` 完全分開；兩者寫入同一張 `chat_logs`，但 agent 路徑使用 `provider="langgraph-agent"` 作為區隔，不需要 migration。
-- LangChain / LangGraph / DeepAgents 一律以 lazy import + 友善 fallback 包裝；缺套件或缺 API key 時 agent 仍可回 mock 回覆，FastAPI 不會啟動失敗。
+- LangChain / LangGraph / DeepAgents 一律以 lazy import 包裝，缺套件時 FastAPI 不會啟動失敗。所選 provider 無法使用（缺 API key / 缺套件）時回傳明確錯誤 `llm_not_configured`，**不會**偷偷改用 mock（mock 只在明確指定 `provider=mock` 時使用）。
 - DeepAgents 為 optional enhancement，預設 `AGENT_ENABLE_DEEPAGENTS=false`。
 
 ### 8.2 LangGraph workflow
@@ -284,8 +284,30 @@ classify_intent ──> call_tools_or_subagent ──┬──> compose_answer �
 
 - `classify_intent`：若 request.mode != `auto` 直接套用該 mode；否則依使用者訊息與 `detection_id` 做關鍵字啟發式判斷。
 - `call_tools_or_subagent`：依 intent 呼叫對應 subagent helper 取得 deterministic payload，並組出要餵給 LLM 的 message list。
-- `compose_answer`：呼叫 `agents/llm.get_chat_model()` 產生最終回覆；若是 `generate_report`，保證 deterministic markdown 不會被 LLM 改寫，會放在 LLM 解讀文字之前。
+- `compose_answer`：呼叫 `agents/llm.get_chat_model()` 並**一律以 stream 方式**取得回覆，每段文字透過 LangGraph `get_stream_writer()` 送出；若是 `generate_report`，保證 deterministic markdown 不會被 LLM 改寫，會放在 LLM 解讀文字之前。
 - `handle_error`：把 `permission_denied` / `detection not found` / `requires detection_id` 等錯誤映射為使用者可見訊息。
+
+**執行方式（Agent 重構 A，2026-10-19）**
+
+- graph 每個行程只 compile 一次（`_get_compiled_graph()`）；DB session 與 `current_user` 透過 LangGraph runtime context（`AgentRuntimeContext`）傳入節點，不再用 closure 綁在 graph 上。
+- `run_graph()` = `graph.invoke(...)`；`stream_graph()` = 同一個 graph 的 `graph.stream(stream_mode=["updates", "custom"])`：`updates` 事件在工具節點完成後轉成 SSE `start`，`custom` 事件就是 `compose_answer` 寫出的文字片段（SSE `chunk`）。兩條路徑執行完全相同的節點，不再有第二套手寫流程。
+- 所有模式都把 `history`（最近 `AGENT_MAX_HISTORY_TURNS` 輪）插在 system prompt 之後、最新使用者訊息之前。
+- 未安裝 LangGraph 時，同一組節點函式以 plain Python pipeline 依序執行。
+
+**Tool-calling 引擎（Agent 重構 B，`AGENT_ENGINE=tool_calling`）**
+
+```text
+agent service ──> use_tool_agent()? ──yes──> tool_agent.stream_tool_agent()
+                        │                      └─ create_agent(model, tools=mode 子集, context_schema=AgentToolContext)
+                        │                            ├─ ToolCallLimitMiddleware / ModelCallLimitMiddleware
+                        │                            └─ langchain_tools.* (@tool + ToolRuntime) ──> app/agents/tools/*（既有唯讀工具）
+                        └──no───> graph.stream_graph()（pipeline）
+```
+
+- 兩個引擎產生相同的 `(phase, data)`，service 轉成同一套 SSE；tool 引擎多一個 `tool` phase（工具進度）。
+- compiled agent 依 `(provider, model, mode, is_admin)` 快取；每次請求的 DB session、使用者、選取 ID 走 runtime context。
+- 同一輪模型可能並行呼叫多個工具（ToolNode 會用執行緒），`AgentToolContext.db_lock` 確保 SQLAlchemy session 不被同時使用。
+- 工具回傳的物件清單上限 50 筆（`MAX_OBJECTS_IN_TOOL_RESULT`），每類別統計永遠完整。
 
 ### 8.3 Agent 工具邊界
 

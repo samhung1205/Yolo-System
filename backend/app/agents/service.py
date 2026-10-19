@@ -16,6 +16,7 @@ from uuid import uuid4
 from sqlalchemy.orm import Session
 
 from app.agents.graph import describe_runtime, run_graph, stream_graph
+from app.agents.tool_agent import run_tool_agent, stream_tool_agent, use_tool_agent
 from app.agents.llm import langchain_available, langgraph_available
 from app.core.config import settings
 from app.models.user import User
@@ -103,7 +104,8 @@ def create_agent_reply(
     )
 
     try:
-        result = run_graph(
+        run = run_tool_agent if use_tool_agent(mode=safe_mode, provider_name=provider_name) else run_graph
+        result = run(
             db=db,
             current_user=current_user,
             message=message,
@@ -190,6 +192,8 @@ def stream_agent_reply(
     * ``{"type": "start", "conversation_id": ..., "mode": ..., "tool_calls": [...], "references": [...]}``
     * ``{"type": "chunk", "delta": "..."}``  — one or more times
     * ``{"type": "done",  "conversation_id": ..., "answer": "...", "mode": ..., "tool_calls": [...], "references": [...]}``
+    * ``{"type": "tool", "tool": "...", "status": "running" | "done", ...}`` —
+      tool-calling engine only (AGENT_ENGINE=tool_calling); clients may ignore it
     * ``{"type": "error", "message": "..."}``  — only on failure
     """
     normalized_conversation_id = (conversation_id or "").strip() or uuid4().hex
@@ -228,7 +232,12 @@ def stream_agent_reply(
         references: list[dict] = []
 
         try:
-            for phase, data in stream_graph(
+            stream = (
+                stream_tool_agent
+                if use_tool_agent(mode=safe_mode, provider_name=provider_name)
+                else stream_graph
+            )
+            for phase, data in stream(
                 db=db,
                 current_user=current_user,
                 message=message,
@@ -250,6 +259,10 @@ def stream_agent_reply(
                         "tool_calls": tool_results,
                         "references": references,
                     })
+
+                elif phase == "tool":
+                    # Tool-calling engine only: live progress of each tool call.
+                    yield _sse_event({"type": "tool", **data})
 
                 elif phase == "answer_chunk":
                     delta = data or ""

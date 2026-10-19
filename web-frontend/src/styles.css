@@ -1357,6 +1357,32 @@ th {
   gap: 6px;
 }
 
+.agent-tool-progress {
+  list-style: none;
+  margin: 4px 0 8px;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.agent-tool-progress-item {
+  font-size: 0.78rem;
+  color: var(--muted);
+  background: var(--panel-alt);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  padding: 2px 8px;
+}
+
+.agent-tool-progress-item.is-running {
+  color: var(--text);
+}
+
+.agent-tool-progress-item.is-failed {
+  color: var(--danger);
+}
+
 .agent-tool-call-item {
   background: var(--panel-alt);
   border: 1px solid var(--line);

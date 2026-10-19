@@ -64,6 +64,11 @@ class Settings(BaseSettings):
     AGENT_PROVIDER: str = ""
     AGENT_MODEL: str = ""
     AGENT_ENABLE_DEEPAGENTS: bool = False
+    # "pipeline" (default): keyword/mode routing + one LLM call (graph.py).
+    # "tool_calling": LangChain create_agent picks read-only tools itself
+    # (tool_agent.py); falls back to the pipeline for mock / report / vision.
+    AGENT_ENGINE: str = "pipeline"
+    AGENT_MAX_TOOL_CALLS: int = 8
     AGENT_MAX_HISTORY_TURNS: int = 10
     AGENT_RECURSION_LIMIT: int = 25
     # When true, explain_detection / report modes attach the annotated result
@@ -137,6 +142,16 @@ class Settings(BaseSettings):
     def normalize_chat_provider(cls, v: Any) -> str:
         if isinstance(v, str):
             return v.strip().lower()
+        return v
+
+    @field_validator("AGENT_ENGINE", mode="before")
+    @classmethod
+    def normalize_agent_engine(cls, v: Any) -> str:
+        if isinstance(v, str):
+            value = v.strip().lower() or "pipeline"
+            if value not in ("pipeline", "tool_calling"):
+                raise ValueError("AGENT_ENGINE must be 'pipeline' or 'tool_calling'")
+            return value
         return v
 
     @field_validator("AGENT_PROVIDER", mode="before")

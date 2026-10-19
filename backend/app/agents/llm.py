@@ -1,11 +1,14 @@
 """
 LLM factory for the agentic layer.
 
-This module returns an object exposing a minimal ``invoke(messages)`` API so
-the rest of the agent layer can stay decoupled from LangChain / LangGraph
-specifics. When LangChain (or an API key) is unavailable it transparently
-returns a :class:`MockChatModel` so the graph can still produce useful
-deterministic responses for local validation, CI, or smoke testing.
+This module returns an object exposing minimal ``invoke(messages)`` /
+``stream(messages)`` APIs so the rest of the agent layer can stay decoupled
+from LangChain / LangGraph specifics.
+
+:class:`MockChatModel` is only used when the provider is explicitly ``mock``.
+A real provider that cannot be built (missing API key, missing package,
+unknown name) raises :class:`AgentLLMConfigurationError` instead of quietly
+answering with mock text that looks like a successful reply.
 """
 from __future__ import annotations
 
@@ -29,6 +32,10 @@ class AgentLLMResponse:
 
 class AgentLLMInvocationError(RuntimeError):
     """Raised when a configured real LLM cannot complete a request."""
+
+
+class AgentLLMConfigurationError(RuntimeError):
+    """Raised when the requested provider cannot be used (missing key/package)."""
 
 
 class _BaseAgentChatModel:
@@ -105,9 +112,7 @@ class MockChatModel(_BaseAgentChatModel):
         if tool_payload:
             sections.append("以下是工具回傳的摘要：")
             sections.append(tool_payload.strip()[:1500])
-        sections.append(
-            "提示：未設定 OPENAI_API_KEY 或 langchain 未安裝時，agent 會回傳此 mock 內容。"
-        )
+        sections.append("提示：目前使用 mock provider（僅供本地測試），不會呼叫真實模型。")
         return AgentLLMResponse(
             content="\n".join(sections),
             provider=self.provider,
@@ -134,6 +139,11 @@ class _LangChainChatModel(_BaseAgentChatModel):
         self._model = langchain_model
         self.provider = provider
         self.model_name = model_name
+
+    @property
+    def langchain_model(self) -> Any:
+        """The underlying LangChain chat model (used by the tool-calling engine)."""
+        return self._model
 
     def invoke(self, messages: list[dict[str, str]]) -> AgentLLMResponse:
         if not messages:
@@ -172,6 +182,7 @@ class _LangChainChatModel(_BaseAgentChatModel):
         """Delegate to LangChain's native streaming interface."""
         if not messages:
             raise AgentLLMInvocationError("Agent message payload is empty.")
+        emitted = False
         try:
             lc_messages = _to_langchain_messages(messages)
             if not lc_messages:
@@ -185,6 +196,7 @@ class _LangChainChatModel(_BaseAgentChatModel):
                 if not isinstance(delta, str):
                     delta = str(delta)
                 if delta:
+                    emitted = True
                     yield AgentLLMResponse(
                         content=delta,
                         provider=self.provider,
@@ -193,6 +205,13 @@ class _LangChainChatModel(_BaseAgentChatModel):
         except AgentLLMInvocationError:
             raise
         except Exception as exc:  # pragma: no cover - defensive
+            if emitted:
+                # Part of the answer already reached the client; re-running
+                # invoke() would send the whole answer a second time.
+                logger.warning("LangChain streaming failed mid-answer: %s", exc)
+                raise AgentLLMInvocationError(
+                    f"{self.provider}/{self.model_name} stream interrupted"
+                ) from exc
             logger.warning("LangChain streaming failed: %s; falling back to invoke", exc)
             yield self.invoke(messages)
 
@@ -271,15 +290,17 @@ def _build_ollama_model(model_name: str) -> _BaseAgentChatModel:
     except ImportError:
         pass  # fall through to mock
 
-    logger.warning(
-        "Neither langchain-ollama nor langchain-openai is installed; "
-        "Ollama agent falling back to mock. Run: pip install langchain-openai"
+    raise AgentLLMConfigurationError(
+        "Neither langchain-ollama nor langchain-openai is installed (pip install langchain-openai)"
     )
-    return MockChatModel(model_name=effective_model)
 
 
 def get_chat_model(provider: Optional[str] = None, model_name: Optional[str] = None) -> _BaseAgentChatModel:
-    """Return an LLM wrapper, falling back to :class:`MockChatModel` on error."""
+    """Return an LLM wrapper for ``provider``.
+
+    Raises :class:`AgentLLMConfigurationError` when the provider cannot be
+    used; only an explicit ``mock`` provider returns :class:`MockChatModel`.
+    """
     effective_provider = (provider or settings.agent_effective_provider or "mock").lower()
     effective_model = model_name or settings.agent_effective_model or "mock-agent"
 
@@ -288,13 +309,11 @@ def get_chat_model(provider: Optional[str] = None, model_name: Optional[str] = N
 
     if effective_provider == "openai":
         if not settings.OPENAI_API_KEY.strip():
-            logger.info("OPENAI_API_KEY missing; agent LLM falling back to mock")
-            return MockChatModel(model_name=effective_model)
+            raise AgentLLMConfigurationError("OPENAI_API_KEY is not configured")
         try:
             from langchain_openai import ChatOpenAI  # type: ignore import-not-found
         except ImportError as exc:
-            logger.warning("langchain-openai not installed (%s); falling back to mock", exc)
-            return MockChatModel(model_name=effective_model)
+            raise AgentLLMConfigurationError("langchain-openai is not installed") from exc
         try:
             model = ChatOpenAI(
                 api_key=settings.OPENAI_API_KEY,
@@ -303,19 +322,16 @@ def get_chat_model(provider: Optional[str] = None, model_name: Optional[str] = N
                 timeout=settings.CHAT_REQUEST_TIMEOUT,
             )
         except Exception as exc:  # pragma: no cover - defensive
-            logger.warning("Failed to construct ChatOpenAI: %s", exc)
-            return MockChatModel(model_name=effective_model)
+            raise AgentLLMConfigurationError("Failed to construct ChatOpenAI") from exc
         return _LangChainChatModel(model, provider="openai", model_name=effective_model)
 
     if effective_provider == "deepseek":
         if not settings.DEEPSEEK_API_KEY.strip():
-            logger.info("DEEPSEEK_API_KEY missing; agent LLM falling back to mock")
-            return MockChatModel(model_name=effective_model)
+            raise AgentLLMConfigurationError("DEEPSEEK_API_KEY is not configured")
         try:
             from langchain_openai import ChatOpenAI  # type: ignore import-not-found
         except ImportError as exc:
-            logger.warning("langchain-openai not installed (%s); falling back to mock", exc)
-            return MockChatModel(model_name=effective_model)
+            raise AgentLLMConfigurationError("langchain-openai is not installed") from exc
         try:
             model = ChatOpenAI(
                 api_key=settings.DEEPSEEK_API_KEY,
@@ -326,8 +342,7 @@ def get_chat_model(provider: Optional[str] = None, model_name: Optional[str] = N
                 timeout=settings.CHAT_REQUEST_TIMEOUT,
             )
         except Exception as exc:  # pragma: no cover - defensive
-            logger.warning("Failed to construct DeepSeek ChatOpenAI: %s", exc)
-            return MockChatModel(model_name=effective_model)
+            raise AgentLLMConfigurationError("Failed to construct DeepSeek ChatOpenAI") from exc
         return _LangChainChatModel(
             model,
             provider="deepseek",
@@ -337,8 +352,7 @@ def get_chat_model(provider: Optional[str] = None, model_name: Optional[str] = N
     if effective_provider == "ollama":
         return _build_ollama_model(effective_model)
 
-    logger.info("Unknown AGENT_PROVIDER=%r; falling back to mock", effective_provider)
-    return MockChatModel(model_name=effective_model)
+    raise AgentLLMConfigurationError(f"Unknown agent provider {effective_provider!r}")
 
 
 def langchain_available() -> bool:

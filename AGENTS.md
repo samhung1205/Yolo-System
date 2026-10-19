@@ -75,7 +75,45 @@
 
 ## 當前 Phase
 
-> **目前已完成至「桌面版維護模式 + Bug 修復」，前一階段為「安全強化 P0」。下一步：Agent 重構 A → B → C（先讀 Deep Agents 官方文件並與使用者討論）；之後再排批次上限提高（輪詢瘦身 → 分片上傳 → 1000 張）、批次分析 Phase 2（空間關係推論），或 Phase 6（Docker、測試、部署文件完善），視優先順序決定。**
+> **目前已完成至「Agent 重構 B」，前一階段為「Agent 重構 A」。下一步：Agent 重構 C（評測 + 決定預設引擎與模型 + Deep Agents 試做）；之後再排批次上限提高（輪詢瘦身 → 分片上傳 → 1000 張）、批次分析 Phase 2（空間關係推論），或 Phase 6（Docker、測試、部署文件完善），視優先順序決定。**
+
+**Agent 重構 B — ✅ 完成（2026-10-19）**
+
+- [x] `app/agents/langchain_tools.py`：10 個唯讀 `@tool`（偵測詳情 / 比較 / 歷史統計 / 近期清單 / 模型表現 / 報告 / 批次統計 / 依類別查影像 / admin 使用者清單 / admin 全站統計），全部委派既有 `app/agents/tools/*`；使用者、選取 ID 由 `ToolRuntime[AgentToolContext]` 注入，模型看不到也改不了；admin 工具函式內硬檢查；物件清單上限 50 筆
+- [x] `app/agents/tool_agent.py`：`create_agent` 引擎，mode = 工具子集 + 指引；`ToolCallLimitMiddleware` / `ModelCallLimitMiddleware`；compiled agent 依 `(provider, model, mode, is_admin)` 快取；DB session 以 `db_lock` 序列化（ToolNode 會並行執行工具）
+- [x] `AGENT_ENGINE=pipeline|tool_calling`（預設 `pipeline`）、`AGENT_MAX_TOOL_CALLS=8`；mock / report / vision-explain 自動走 pipeline
+- [x] 錯誤訊息與 pipeline 一致（缺 detection_id / batch_id、非 admin 用 admin_help、provider 未設定、模型失敗）
+- [x] SSE 新增 `tool` 事件（`running` / `done`），Web AgentPage 串流中顯示工具進度；Desktop 忽略此事件、行為不變
+- [x] `explain_detection` / `batch_analysis` 有選取資料時先把資料放進 context：歷史只存問答、不存工具結果，否則追問時小模型會憑記憶亂答
+- [x] 測試：`tests/test_tool_agent.py`（17 項，含假 tool-calling 模型）、`tests/test_agent_stream_route.py` 新增 tool 事件契約；全套 118 項通過
+
+*本機實測（Ollama，6 題：選取中偵測、「第 12 筆」、追問、歷史、批次、非 admin 要求使用者清單）*
+- 工具選擇、ID 抽取（「第 12 筆」→ 12）、權限邊界：qwen2.5 / gemma4 皆正確
+- gemma4：6/6 內容正確，每題 3–14 秒
+- qwen2.5：調整 prompt + 預載資料後主要錯誤消失，每題 1–6 秒；仍偶爾夾雜簡體字
+- 建議：要開 `tool_calling` 時優先用 gemma4；qwen2.5 適合維持 `pipeline`。以 C 的評測量化後再決定預設
+
+*C 待辦*
+- [ ] 擴充 `tests/evals`：工具選擇、ID 抽取、grounding（不得補出資料沒有的數字/原因）、越權嘗試、繁簡體；比較 qwen2.5 / gemma4 / llama3.2 / DeepSeek
+- [ ] 依評測結果決定 `AGENT_ENGINE` 預設值與預設模型
+- [ ] Deep Agents 針對報告模式試做（需先把 LangChain 升到 >=1.4.6）
+
+**Agent 重構 A — ✅ 完成（2026-10-19）**
+
+*決策*（已與使用者確認）：A → B → C 依序進行；B 用 LangChain v1 `create_agent`（工具以 `ToolRuntime[context]` 取得使用者，scope 由程式控制），Deep Agents 延到 C 再針對報告模式試做（`deepagents` 0.7.28 需要 `langchain>=1.4.6`，目前環境為 1.3.0，且預設帶虛擬檔案系統工具與 general-purpose subagent，不適合唯讀短任務）；主力本地模型先用 Ollama `qwen2.5`；Agent UI 保留模式下拉選單。
+
+- [x] graph 只 compile 一次；`db` / `current_user` 改走 LangGraph runtime context（`AgentRuntimeContext`），節點不再靠 closure
+- [x] `run_graph()` 與 `stream_graph()` 跑同一個 compiled graph（`invoke` vs `stream(stream_mode=["updates","custom"])`），移除原本繞過 LangGraph 的手寫串流流程；也移除「LangGraph 例外時改跑 plain pipeline」造成的重複 LLM 呼叫
+- [x] `compose_answer` 一律串流並透過 `get_stream_writer()` 輸出片段；SSE 事件格式（`start` / `chunk` / `done` / `error`）不變，Web 與 Desktop 不需修改
+- [x] 所有模式都帶入對話歷史（原本只有 `general_chat` 有），追問不再遺失上下文
+- [x] 移除「缺 API key / 缺套件 / 未知 provider 時偷偷改用 mock」：改丟 `AgentLLMConfigurationError` → `errors=["llm_not_configured"]`；只有明確 `provider=mock` 才用 mock
+- [x] LangChain 串流中途失敗時不再 fallback 到 `invoke()`（會把整段答案重送一次），改回報 `llm_invocation_failed`
+- [x] 測試：`tests/test_agent_graph_state.py`（11 項）、`tests/test_agent_stream_route.py`（SSE 契約 2 項）；全套 100 項通過；並以本機 Ollama `qwen2.5` 實測 invoke / stream / 追問 / 不存在模型
+
+*B 待辦（下一步）*
+- [ ] 現有唯讀工具以 `@tool` + `ToolRuntime[AgentContext]` 包裝；模式 = 工具子集 + prompt；admin 工具只在 admin 請求出現且保留函式內硬檢查
+- [ ] `AGENT_ENGINE=pipeline|tool_calling` 開關，舊流程保留為 fallback；串流改用 `updates` 事件把工具呼叫進度推給前端
+- [ ] 實測紀錄：qwen2.5 無法把「第 12 筆」轉成 `detection_id=12`（反問 ID）；回覆偶爾為簡體中文、會補出資料沒有的模型名稱 → 列入 C 的評測案例
 
 **桌面版維護模式 + Bug 修復 — ✅ 完成（2026-10-19）**
 

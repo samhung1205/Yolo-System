@@ -738,7 +738,24 @@ data: {"type":"error","message":"錯誤訊息"}
 - 一般使用者呼叫 `mode=admin_help` → `answer` 會回傳「此操作需要管理員權限」訊息，HTTP 200（agent friendly error）。
 - `mode=explain_detection` / `report` 缺 `detection_id` → `answer` 會說明需要提供 detection_id，HTTP 200。
 - 指定的 `detection_id` 不屬於使用者（非 admin）→ `answer` 會說明「無權存取指定的偵測任務」，HTTP 200。
-- LangChain / LangGraph 未安裝或 LLM provider 失敗 → 自動切換 mock LLM，回傳 mock 回覆，HTTP 200。
+- 所選 provider 未設定（缺 API key / 缺套件）→ `answer`「所選的模型供應商尚未設定完成，請改用其他模型。」、`errors=["llm_not_configured"]`、`success=false`，HTTP 200。**不再自動改用 mock 回覆**；只有明確指定 `provider=mock`（或 `AGENT_PROVIDER=mock`）才會用 mock
+- LLM 呼叫失敗（模型不存在、連線失敗、不支援圖片等）→ `errors=["llm_invocation_failed"]`、`success=false`，HTTP 200
+- 串流途中失敗：已送出的 `chunk` 不會重送，最後送出 `error` 事件
+- LangChain / LangGraph 都未安裝 → 回傳 `agent_runtime_unavailable`，HTTP 200
+
+**Agent 引擎（`AGENT_ENGINE`，Agent 重構 B）**
+
+| 值 | 行為 |
+|----|------|
+| `pipeline`（預設） | 依 mode / 關鍵字決定流程，後端先查好資料，再呼叫一次 LLM（`app/agents/graph.py`） |
+| `tool_calling` | LangChain v1 `create_agent`：模型自行決定呼叫哪些唯讀工具（`app/agents/tool_agent.py`、`langchain_tools.py`），每次請求最多 `AGENT_MAX_TOOL_CALLS` 次工具呼叫 |
+
+- `tool_calling` 遇到以下情況自動改走 `pipeline`：`provider=mock`、`mode=report`（報告 markdown 需保持確定性）、`AGENT_ENABLE_VISION=true` 時的 `explain_detection`（只有 pipeline 會附圖）
+- 各 mode 可用工具：`explain_detection` → 偵測詳情 / 比較；`history_analysis` → 歷史統計 / 近期清單 / 模型表現 / 偵測詳情；`batch_analysis` → 批次統計 / 依類別查影像；`admin_help` → 使用者清單 / 全站統計（僅 admin）；`general_chat` → 無工具；`auto` → 全部一般工具（admin 另含管理工具）
+- 使用者身分、選取中的 `detection_id` / `batch_id` 由後端以 runtime context 注入工具，模型無法指定其他使用者；admin 工具在函式內仍會硬檢查
+- `explain_detection` / `batch_analysis` 有選取資料時，會先把該筆資料放進 context（與 pipeline 相同的 grounding），追問時模型不必依賴記憶
+
+**對話歷史**：所有模式（含 `explain_detection` / `report` / `batch_analysis` / `history_analysis` / `admin_help`）都會帶入同一 `conversation_id` 最近 `AGENT_MAX_HISTORY_TURNS` 輪對話，追問（例如「那第二個物件呢？」）不會遺失上下文；工具資料只附在最新一輪使用者訊息中。
 
 **Agent 視覺能力（`AGENT_ENABLE_VISION`，Phase 6A-6 新增）**
 
@@ -774,10 +791,15 @@ data: {"type": "chunk", "delta": "..."}        (一或多次)
 
 data: {"type": "done",  "conversation_id": "...", "answer": "...", "mode": "...", "tool_calls": [...], "references": [...]}
 
+data: {"type": "tool", "tool": "get_detection_detail", "status": "running", "args": {...}}
+data: {"type": "tool", "tool": "get_detection_detail", "status": "done", "ok": true}
+                                                (僅 AGENT_ENGINE=tool_calling，每次工具呼叫各一組)
+
 data: {"type": "error", "message": "..."}      (僅在失敗時)
 ```
 
-工具呼叫（tool calls）在 `start` 事件完成後即回傳，LLM 答案以 `chunk` 漸進串流。
+- `pipeline` 引擎（預設）：工具結果在 `start` 事件就完整回傳，LLM 答案以 `chunk` 漸進串流。
+- `tool_calling` 引擎：`start` 先送出空的 `tool_calls`，模型每呼叫一次工具就送出一組 `tool` 事件（`running` → `done`），最後的 `done.tool_calls` 才是完整清單。未知事件類型 client 應忽略（Desktop 目前即忽略 `tool` 事件）。
 `done` 事件同時觸發 `chat_logs` 寫入（`provider="langgraph-agent"`）。
 
 Web 端使用 native `fetch` + `ReadableStream`（`agentService.js → streamAgentMessage()`）。

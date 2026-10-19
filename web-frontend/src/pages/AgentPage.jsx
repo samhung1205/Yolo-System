@@ -23,6 +23,31 @@ const BUILTIN_MODES = [
 ];
 const MARKDOWN_PLUGINS = [remarkGfm];
 
+// Tool names sent by the backend tool-calling engine (AGENT_ENGINE=tool_calling).
+const TOOL_LABELS = {
+  get_detection_detail: "讀取偵測結果",
+  compare_detections: "比較兩筆偵測",
+  summarize_detection_history: "統計偵測歷史",
+  list_recent_detections: "查詢近期偵測",
+  summarize_model_performance: "統計模型表現",
+  generate_detection_report: "產生偵測報告",
+  summarize_batch: "統計批次結果",
+  list_batch_images_by_class: "查詢含特定類別的影像",
+  admin_list_users: "查詢使用者清單",
+  admin_detection_overview: "統計全站偵測",
+};
+
+function applyToolEvent(liveTools = [], event) {
+  if (event.status === "running") {
+    return [...liveTools, { tool: event.tool, status: "running" }];
+  }
+  const index = liveTools.findIndex((item) => item.tool === event.tool && item.status === "running");
+  if (index === -1) return [...liveTools, { tool: event.tool, status: "done", ok: event.ok }];
+  const updated = [...liveTools];
+  updated[index] = { ...updated[index], status: "done", ok: event.ok };
+  return updated;
+}
+
 function getDefaultMessage(mode, detectionId, batchId) {
   if (detectionId) {
     if (mode === "explain_detection") {
@@ -251,6 +276,15 @@ export default function AgentPage() {
                 tool_calls: event.tool_calls || [],
                 references: event.references || [],
               };
+            }
+            return updated;
+          });
+        } else if (event.type === "tool") {
+          setMessages((prev) => {
+            const updated = [...prev];
+            const last = updated[updated.length - 1];
+            if (last?.isStreaming) {
+              updated[updated.length - 1] = { ...last, live_tools: applyToolEvent(last.live_tools, event) };
             }
             return updated;
           });
@@ -550,6 +584,16 @@ export default function AgentPage() {
                         <span className="agent-streaming-indicator"> ▍</span>
                       ) : null}
                     </span>
+                    {msg.isStreaming && msg.live_tools?.length ? (
+                      <ul className="agent-tool-progress" aria-live="polite">
+                        {msg.live_tools.map((item, toolIndex) => (
+                          <li key={toolIndex} className={`agent-tool-progress-item is-${item.status}${item.ok === false ? " is-failed" : ""}`}>
+                            {TOOL_LABELS[item.tool] || item.tool}
+                            {item.status === "running" ? "…" : item.ok === false ? "（失敗）" : "（完成）"}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
                     <div className="markdown-report">
                       <ReactMarkdown remarkPlugins={MARKDOWN_PLUGINS}>
                         {msg.content || (msg.isStreaming ? "" : "(no answer)")}
