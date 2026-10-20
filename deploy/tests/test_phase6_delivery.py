@@ -1,11 +1,16 @@
 import hashlib
+from contextlib import redirect_stdout
+import io
 import json
+import os
 from pathlib import Path
+import shlex
+import subprocess
 import sys
 import tempfile
 from types import SimpleNamespace
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 import apply_phase6 as delivery
@@ -92,6 +97,97 @@ class GatewayTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):finalize.update_gateway(self.batch,{'image':'previous'},self.work)
         self.assertEqual((self.root/'compose.env').read_text(),self.before)
         self.assertEqual(count,2)
+
+
+class ContainerRegressionTests(unittest.TestCase):
+    def setUp(self):
+        self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup)
+        self.root=Path(self.temp.name)
+        self.batch=SimpleNamespace(repo=self.root)
+        self.state={'image':'sha256:'+'a'*64,'user':'1007:1007'}
+
+    def test_no_host_tmp_or_private_media_is_mounted_and_gpu_limits_remain(self):
+        with patch.object(finalize,'checked',return_value='182 passed\nContainer custom YOLO GPU smoke test: PASS') as run:
+            finalize.container_tests(self.batch,self.state)
+        command=run.call_args.args[0]
+        mounts=[command[i+1] for i,value in enumerate(command) if value=='--mount']
+        self.assertEqual(len(mounts),4)
+        self.assertTrue(all(value.endswith(',readonly') for value in mounts))
+        self.assertFalse(any('/backend/static' in value or '/.env' in value for value in mounts))
+        self.assertIn('/opt/yolo/backend/static:rw,nosuid,nodev,noexec,size=16m,mode=1777',command)
+        self.assertEqual(command[command.index('--network')+1],'none')
+        self.assertEqual(command[command.index('--user')+1],'1007:1007')
+        self.assertEqual(command[command.index('--memory')+1],'8g')
+        self.assertEqual(command[command.index('--gpus')+1],'all')
+        self.assertNotIn('--privileged',command)
+
+    def test_actual_seed_command_creates_only_three_synthetic_images(self):
+        from PIL import Image
+        with patch.object(finalize,'checked',return_value='Container custom YOLO GPU smoke test: PASS') as run:
+            finalize.container_tests(self.batch,self.state)
+        tokens=shlex.split(run.call_args.args[0][-1])
+        seed=tokens[tokens.index('-c')+1]
+        self.assertIn('&&',tokens)
+        subprocess.run([sys.executable,'-c',seed],cwd=self.root,check=True,capture_output=True)
+        images=sorted(self.root.rglob('*.png'))
+        self.assertEqual(len(images),3)
+        for path in images:
+            with Image.open(path) as image:self.assertEqual(image.size,(640,640))
+
+    def test_missing_gpu_pass_marker_is_not_success(self):
+        with patch.object(finalize,'checked',return_value='182 passed'):
+            with self.assertRaises(finalize.Failed):finalize.container_tests(self.batch,self.state)
+
+    def test_real_subprocess_error_is_private_and_preserves_exit_and_stderr(self):
+        log=self.root/'failure.json'
+        stdout=io.StringIO()
+        with redirect_stdout(stdout),self.assertRaises(finalize.CommandFailure) as raised:
+            finalize.checked([sys.executable,'-c',
+                'import sys; print("private fixture"); print("diagnostic fixture",file=sys.stderr); sys.exit(125)'],
+                show=True,log_path=log)
+        self.assertEqual(raised.exception.returncode,125)
+        self.assertNotIn('private fixture',stdout.getvalue()+str(raised.exception))
+        self.assertNotIn('diagnostic fixture',stdout.getvalue()+str(raised.exception))
+        report=json.loads(log.read_text())
+        self.assertEqual(report['exit_code'],125)
+        self.assertIn('diagnostic fixture',report['stderr'])
+        self.assertEqual(log.stat().st_mode & 0o777,0o600)
+
+    def test_docker_mount_error_is_not_mislabelled_as_sudo(self):
+        result=subprocess.CompletedProcess([],125,'','Error response from daemon: bind source path does not exist: /tmp/private-fixture')
+        with patch.object(finalize.subprocess,'run',return_value=result),self.assertRaises(finalize.CommandFailure) as raised:
+            finalize.checked(['sudo','-n','docker','run'],log_path=self.root/'mount.json')
+        message=str(raised.exception)
+        self.assertIn('Docker',message)
+        self.assertIn('bind mount',message)
+        self.assertNotIn('/tmp/private-fixture',message)
+
+    def test_sudo_authentication_error_remains_distinguishable(self):
+        result=subprocess.CompletedProcess([],1,'','sudo: a password is required')
+        with patch.object(finalize.subprocess,'run',return_value=result),self.assertRaises(finalize.CommandFailure) as raised:
+            finalize.checked(['sudo','-n','docker','run'],log_path=self.root/'sudo.json')
+        self.assertIn('sudo 驗證',str(raised.exception))
+
+    def test_container_failure_stops_before_gateway_or_account_changes(self):
+        previous=os.umask(0o077);self.addCleanup(os.umask,previous)
+        config=self.root/'config';config.mkdir()
+        (config/'releases').mkdir()
+        batch=Mock(config=config,stamp='test',repo=self.root)
+        batch.inspect.return_value={'running':True,'mounts':[{'Name':'sam-yolo-mysql-data'}]}
+        resources=Mock();resources.thread.ident=None
+        failure=finalize.CommandFailure('Docker',125,self.root/'command.json','fixture failure')
+        with patch.object(finalize.sys,'platform','linux'),patch.object(finalize.os,'getuid',return_value=1007), \
+             patch.object(finalize,'Batch',return_value=batch),patch.object(finalize,'checked'), \
+             patch.object(finalize,'ResourceSample',return_value=resources), \
+             patch.object(finalize,'keep_sudo_alive'),patch.object(finalize,'container_tests',side_effect=failure), \
+             patch.object(finalize,'update_gateway') as gateway,patch.object(finalize,'Regression') as regression, \
+             redirect_stdout(io.StringIO()):
+            self.assertEqual(finalize.main(),1)
+        gateway.assert_not_called();regression.assert_not_called()
+        report=json.loads(next((config/'reports').glob('finalize-*.json')).read_text())
+        self.assertFalse(report['success'])
+        self.assertEqual(report['stage'],'container-regression')
+        self.assertEqual(report['command_failure']['exit_code'],125)
 
 
 if __name__=='__main__':unittest.main()

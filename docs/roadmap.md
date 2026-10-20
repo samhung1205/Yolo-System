@@ -23,8 +23,8 @@
 - [x] 維運、備份與中斷工作復原工具完成；部署工具 130 項、後端 182 項本機測試通過。
 - [x] Vite 8.3.4／React plugin 6.1.2，本機 build、audit 0 與瀏覽器流程通過；正式 gateway 待收尾批次套用。
 - [x] 獨立 SQLite／測試 HTTPS 的真實 CPU 回歸通過：兩帳號隔離、頭像、100 張批次、ZIP、影片、Desktop client、改密碼與 JWT。
-- [x] 手動 CI workflow 已建立；無 checkpoint 的隔離測試 173 通過、9 排除。尚未 push／執行 GitHub Actions。
-- [ ] 在 Ubuntu 執行 [單次收尾批次](lab-phase6-finalization.md)，取得正式 image 全套與公開 HTTPS 回歸報告。
+- [x] 手動 CI workflow 已建立；無 checkpoint 的隔離測試 173 通過、9 排除。已隨 `84dcbca` push，尚無 GitHub Actions run 結果。
+- [ ] Ubuntu 已同步 `84dcbca`，health／DB 正常；首次 [收尾批次](lab-phase6-finalization.md) 停在容器回歸，未切換 gateway／安裝排程。修正版移除主機 `/tmp` 掛載並補 exit code／私人錯誤紀錄，本機部署工具 137 項通過，待 Ubuntu 重驗。
 - [ ] 首份包含目前來源、SQL、媒體、模型、image、Ollama 與憑證的備份／隔離還原成功，再啟用每日 **23:30 Asia/Taipei**、保留 7 份成功備份。
 - [ ] 將新完整備份與引用的 image／Ollama 快取下載到 Mac，執行完整性核對；最初還原基準固定保留。
 - [ ] 記錄收尾後來源版本與 image、MySQL 啟停交接；有實際 GitHub run 後另補 CI 結果。

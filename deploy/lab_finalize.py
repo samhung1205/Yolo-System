@@ -1,7 +1,7 @@
 """Run Phase 6 lab verification, install daily backups, then verify one snapshot.
 
-Run as the project user after sudo -v. Does not rebuild production images,
-restart shared services, change firewall rules or touch other projects.
+Run as the project user after sudo -v. Builds and switches only the gateway;
+does not restart shared services, change firewall rules or touch other projects.
 """
 from datetime import datetime, timezone
 import fcntl
@@ -10,13 +10,12 @@ import os
 from pathlib import Path
 import pwd
 import re
+import shlex
 import subprocess
 import sys
-import tempfile
 import threading
 import requests
 
-from PIL import Image
 from lab_backup_verify import keep_sudo_alive, private_write
 from lab_compose_apply import Batch, Failed, need
 from lab_public_verify import Verify
@@ -66,35 +65,69 @@ class ResourceSample:
                 'note':'Shared GPU observation; not a 50-user capacity guarantee'}
 
 
-def checked(args, *, timeout=180, show=False):
+class CommandFailure(Failed):
+    def __init__(self, command, returncode, log_path, hint):
+        self.returncode = returncode
+        self.log_path = str(log_path)
+        self.hint = hint
+        super().__init__(f'{command} 執行失敗（exit {returncode}）：{hint}；私人紀錄：{log_path}')
+
+
+def checked(args, *, timeout=180, show=False, log_path=None):
     result = subprocess.run(args, capture_output=True, text=True, timeout=timeout)
-    if show:
+    if result.returncode:
+        if log_path is None:
+            folder = Path.home() / '.config/yolo-system/reports'
+            folder.mkdir(parents=True, mode=0o700, exist_ok=True)
+            stamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')
+            log_path = folder / f'command-{stamp}-{os.getpid()}.json'
+        private_write(log_path, json.dumps({'exit_code': result.returncode,
+                                           'stdout': result.stdout, 'stderr': result.stderr},
+                                          ensure_ascii=False, indent=2))
+        error = result.stderr.lower()
+        if 'bind source path does not exist' in error:
+            hint = 'Docker 無法存取 bind mount 的來源路徑'
+        elif 'sudo:' in error and ('password' in error or 'terminal' in error):
+            hint = 'sudo 驗證無法供非互動指令使用，請先 sudo -v'
+        elif 'operation not permitted' in error or 'permission denied' in error:
+            hint = '容器或檔案權限被拒絕，需檢查私人紀錄'
+        else:
+            hint = '子程序錯誤已保存，請檢查私人紀錄'
+        command = 'Docker' if args[:3] == ['sudo', '-n', 'docker'] else Path(args[0]).name
+        raise CommandFailure(command, result.returncode, log_path, hint)
+    if show and result.stdout:
         print(result.stdout[-7000:], flush=True)
-    need(result.returncode == 0, '執行失敗：' + Path(args[0]).name + '；請檢查本專案服務狀態／私人報告')
     return result.stdout
 
 
-def container_tests(batch, state):
-    with tempfile.TemporaryDirectory(prefix='yolo-final-tests-') as folder:
-        root = Path(folder)
-        samples = root / 'detections/originals'
-        samples.mkdir(parents=True)
-        for index, color in enumerate(('white','blue','red')):
-            Image.new('RGB', (640,640), color).save(samples / f'{index}.png')
-        command = ['sudo','-n','docker','run','--rm','--network','none','--runtime=nvidia','--gpus','all',
-            '--user',state['user'],'--cpus','4','--memory','8g','--shm-size','256m',
-            '-e','APP_ENV=development','-e','PYTHONDONTWRITEBYTECODE=1']
-        for source, target in ((batch.repo/'backend/tests','/opt/yolo/backend/tests'),
-                               (batch.repo/'backend/scripts','/opt/yolo/backend/scripts'),
-                               (batch.repo/'backend/pytest.ini','/opt/yolo/backend/pytest.ini'),
-                               (batch.repo/'backend/pt','/opt/yolo/backend/pt'),
-                               (root,'/opt/yolo/backend/static')):
-            command += ['--mount', f'type=bind,source={source},target={target},readonly']
-        command += [state['image'], 'sh','-c',
-                    'python -m pip check && python -m pytest -q -p no:cacheprovider && python /opt/yolo/deploy/backend_smoke.py --gpu']
-        output = checked(command, timeout=600, show=True)
-        need('Container custom YOLO GPU smoke test: PASS' in output and 'failed' not in output.lower(), '容器回歸未完整通過')
-        return output.splitlines()[-15:]
+SEED_IMAGES = '''from pathlib import Path
+from PIL import Image
+samples = Path('static/detections/originals')
+samples.mkdir(parents=True, exist_ok=True)
+for index, color in enumerate(('white', 'blue', 'red')):
+    Image.new('RGB', (640, 640), color).save(samples / f'{index}.png')
+'''
+
+
+def container_tests(batch, state, log_path=None):
+    # Docker Snap sees its own /tmp, so never bind a host temporary directory.
+    # Seed only synthetic media in this disposable container's bounded tmpfs.
+    command = ['sudo','-n','docker','run','--rm','--network','none','--runtime=nvidia','--gpus','all',
+        '--user',state['user'],'--cpus','4','--memory','8g','--shm-size','256m',
+        '--workdir','/opt/yolo/backend',
+        '--tmpfs','/opt/yolo/backend/static:rw,nosuid,nodev,noexec,size=16m,mode=1777',
+        '-e','APP_ENV=development','-e','PYTHONDONTWRITEBYTECODE=1']
+    for source, target in ((batch.repo/'backend/tests','/opt/yolo/backend/tests'),
+                           (batch.repo/'backend/scripts','/opt/yolo/backend/scripts'),
+                           (batch.repo/'backend/pytest.ini','/opt/yolo/backend/pytest.ini'),
+                           (batch.repo/'backend/pt','/opt/yolo/backend/pt')):
+        command += ['--mount', f'type=bind,source={source},target={target},readonly']
+    command += [state['image'], 'sh','-c',
+                'python -m pip check && python -c ' + shlex.quote(SEED_IMAGES) +
+                ' && python -m pytest -q -p no:cacheprovider && python /opt/yolo/deploy/backend_smoke.py --gpu']
+    output = checked(command, timeout=600, show=True, log_path=log_path)
+    need('Container custom YOLO GPU smoke test: PASS' in output, '容器回歸未完整通過')
+    return output.splitlines()[-15:]
 
 
 def update_gateway(batch, previous, work):
@@ -172,7 +205,7 @@ def main():
         database=original['sam-yolo-mysql']
         need(any(m.get('Name')=='sam-yolo-mysql-data' for m in database['mounts']),'MySQL 歸屬不符')
         report['stage']='container-regression'
-        report['container_tests']=container_tests(batch,original['sam-yolo-backend'])
+        report['container_tests']=container_tests(batch,original['sam-yolo-backend'],work/'container-regression.json')
         print('PASS: 正式 image 全套測試／合成影像／自訂模型 GPU；正式資料未掛入測試容器',flush=True)
         report['stage']='frontend-gateway'
         report['gateway_update']=update_gateway(batch,original['sam-yolo-gateway'],work)
@@ -231,6 +264,8 @@ def main():
         print('PASS: 每日 23:30 備份／7 份成功版本輪替／當前完整 SQL 與檔案隔離還原／服務恢復／舊資料一致',flush=True)
     except (Exception,KeyboardInterrupt) as exc:
         report['error']=str(exc) if isinstance(exc,(Failed,RuntimeError)) else type(exc).__name__
+        if isinstance(exc, CommandFailure):
+            report['command_failure']={'exit_code':exc.returncode,'log':exc.log_path,'hint':exc.hint}
         print('FAIL ['+report['stage']+']: '+report['error'],flush=True)
         if report['stage']=='initial-managed-backup':
             print('診斷：sudo journalctl -u sam-yolo-backup.service -n 20 --no-pager',flush=True)
