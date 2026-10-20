@@ -21,6 +21,12 @@ def register_user(db: Session, user_in: UserCreate) -> User:
     - Hashes the password with bcrypt.
     - Persists and returns the new User.
     """
+    if not settings.ALLOW_REGISTRATION:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="目前不開放自行註冊，請聯絡管理員建立帳號。",
+        )
+
     existing = db.query(User).filter(User.username == user_in.username).first()
     if existing:
         raise HTTPException(

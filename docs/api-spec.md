@@ -1,8 +1,8 @@
 # API 規格文件
 
-> **版本**: v0.9 (Chat conversation delete)
-> **Base URL**: `http://localhost:8000`  
-> **最後更新**: 2026-09-04
+> **範圍**：目前 API 契約；實際 route／schema 與測試為最終依據
+> **Base URL**：開發 `http://127.0.0.1:8000`；實驗室 `https://140.113.135.113`
+> **最後核對**：2026-10-21
 
 ---
 
@@ -73,7 +73,20 @@ GET /static/detections/results/task_12_a1b2c3d4.jpg?sig=<hmac>&exp=<unix_ts>
 
 ## Auth 端點
 
+### GET /api/auth/config
+
+不需登入，只回傳帳號建立政策，並帶 `Cache-Control: no-store`：
+
+```json
+{"registration_enabled": false}
+```
+
+由 `ALLOW_REGISTRATION` 決定（原始碼預設 true；實驗室 Compose 明確設為 false）。關閉時，Web 登入頁提示向管理員申請，直接進入 `/register` 不顯示註冊表單；設定讀取失敗也不顯示表單。權限以後端為準，Desktop 或直接呼叫 API 同樣受限制。管理員仍可使用既有 `POST /api/users` 建立帳號。
+
 ### POST /api/auth/register
+
+`ALLOW_REGISTRATION=false` 時，合法的註冊請求回 **403**，不查重、不 hash 密碼或建立帳號：`目前不開放自行註冊，請聯絡管理員建立帳號。`。登入與管理員建立帳號不受此開關影響。
+
 > 驗證規則：
 > - `username`：英數字，長度 `3-32`
 > - `email`：合法 Email 格式
@@ -274,7 +287,7 @@ GET /static/detections/results/task_12_a1b2c3d4.jpg?sig=<hmac>&exp=<unix_ts>
 | `question` | ✅ | 使用者訊息，1-8000 字 |
 | `conversation_id` | ❌ | 同對話 id 才能延續 context；省略則自動產生 |
 | `provider` | ❌ | 覆蓋 `CHAT_PROVIDER`：`openai` / `deepseek` / `ollama` |
-| `model` | ❌ | 覆蓋預設模型名稱，例如 `gpt-4o`、`deepseek-coder` |
+| `model` | ❌ | 覆蓋預設模型名稱，例如 `llama3.2`、`deepseek-chat`；須在當前白名單內 |
 
 **Response 201**
 ```json
@@ -299,7 +312,7 @@ GET /static/detections/results/task_12_a1b2c3d4.jpg?sig=<hmac>&exp=<unix_ts>
   - provider 上游 API 呼叫失敗
 
 **本地驗證補充**
-- `CHAT_PROVIDER=mock` 時，`POST /api/chat` 與 `POST /api/chat/stream` 會回傳本地生成的假資料，用於 UI 串接驗證；正式環境應使用 `openai` 或 `deepseek`
+- `CHAT_PROVIDER=mock` 時，`POST /api/chat` 與 `POST /api/chat/stream` 會回傳本地生成的假資料，用於 UI 串接驗證；正式環境應使用已設定的真實 provider；本實驗室採免費同機 `ollama`，不必啟用付費 key
 
 ### GET /api/chat
 > 取得目前使用者的對話列表摘要
@@ -842,12 +855,12 @@ Desktop 端使用 `DesktopApiClient.stream_agent_chat()`（`AICSMain.py → Agen
 
 ---
 
-## Web Frontend 使用說明（Phase 6A-2）
+## Web Frontend 串接說明
 
 | 頁面 | 呼叫端點 | 說明 |
 |------|---------|------|
-| `/chat` | `POST /api/chat` | 一般 provider-based chat（ChatPage.jsx → chatService.js） |
-| `/agent` | `POST /api/agent/chat`、`GET /api/agent/modes` | LangGraph agent（AgentPage.jsx → agentService.js） |
+| `/chat` | `POST /api/chat/stream`（預設）或 `POST /api/chat` | 一般對話，ChatPage.jsx → chatService.js |
+| `/agent` | `POST /api/agent/chat/stream`（預設）或 `POST /api/agent/chat`、`GET /api/agent/modes` | 唯讀 Agent，AgentPage.jsx → agentService.js |
 | `/detections` 結果區 | 跳轉 `/agent?mode=explain_detection&detection_id={id}` | DetectionPage 快捷按鈕 |
 | `/detections/history` 詳情區 | 跳轉 `/agent?mode=report&detection_id={id}` | DetectionHistoryPage 快捷按鈕 |
 | `/detections/batch`（Phase 1 新增） | `POST /api/detections/batch`、`GET/DELETE /api/detections/batches*` | 批次上傳多張影像（或整個資料夾）、輪詢進度、逐張結果縮圖（BatchDetectionPage.jsx → detectionService.js） |
@@ -906,7 +919,7 @@ Desktop 端使用 `DesktopApiClient.stream_agent_chat()`（`AICSMain.py → Agen
   {
     "provider": "ollama",
     "label": "Ollama (本地)",
-    "models": ["llama3.2", "gemma2:9b"],
+    "models": ["llama3.2", "gemma4"],
     "available": true
   }
 ]
@@ -930,7 +943,7 @@ Desktop 端使用 `DesktopApiClient.stream_agent_chat()`（`AICSMain.py → Agen
 自訂模組的來源檔不存在時，`available` 為 `false` 並在 `unavailable_reason`
 說明原因。
 
-**Response 200**
+**Response 200**（欄位示意；實際模型指紋以目前 registry／API 回應為準）
 ```json
 [
   {
@@ -941,8 +954,8 @@ Desktop 端使用 `DesktopApiClient.stream_agent_chat()`（`AICSMain.py → Agen
     "dataset_variant": "7-class multimodal",
     "task": "detect",
     "input_size": 960,
-    "checkpoint_class_names": { "0": "naval", "1": "Merchant" },
-    "canonical_class_names": { "0": "naval", "1": "merchant" },
+    "checkpoint_class_names": { "0": "naval", "1": "Merchant", "2": "dock", "3": "other_vessel", "4": "airplane", "5": "large-vehicle", "6": "small-vehicle" },
+    "canonical_class_names": { "0": "naval", "1": "merchant", "2": "dock", "3": "other_vessel", "4": "airplane", "5": "large-vehicle", "6": "small-vehicle" },
     "class_count": 7,
     "sha256": "40479020fc96399858e4cb009cf80f181e290a4f1c56002a0754b42c1660210b",
     "available": true,
@@ -986,6 +999,6 @@ Desktop 端使用 `DesktopApiClient.stream_agent_chat()`（`AICSMain.py → Agen
 - `POST /api/detections/video` 為 background task，需輪詢 `GET /api/detections/{id}`
 - video detection 目前只保存 preview frame 的 detection objects，不保存每一幀結果
 - webcam / RTSP / 串流尚未 backend 化
-- Chat `/api/chat` streaming（`/api/chat/stream`）Web 前端尚未接入 SSE
+- Web Chat 與 Agent 均已接 SSE；停止接收不保證後端已取消生成
 - `class_thresholds` 目前僅支援 image 與 batch；`POST /api/detections/video` 仍只吃純量 conf/iou
 - Desktop PySide6 尚未提供各類別閾值 UI（僅 Web 支援）

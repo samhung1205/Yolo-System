@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router";
 
+import useAuthConfig from "../hooks/useAuthConfig";
 import authService from "../services/authService";
 import { normalizeApiError } from "../services/api";
 
@@ -61,6 +62,7 @@ function EyeSlashIcon() {
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const { registrationEnabled, configError } = useAuthConfig();
   const notice = useLocation().state?.notice || "";
   const [form, setForm] = useState({ username: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
@@ -164,8 +166,11 @@ export default function LoginPage() {
 
         {/* Footer */}
         <div className="auth-footer">
-          還沒有帳號？{" "}
-          <Link to="/register">立即註冊</Link>
+          {configError || (registrationEnabled === null
+            ? "正在確認帳號申請方式…"
+            : registrationEnabled
+              ? <>還沒有帳號？ <Link to="/register">立即註冊</Link></>
+              : "需要帳號？請聯絡管理員建立。") }
         </div>
       </div>
     </div>

@@ -1,3 +1,5 @@
+> 歷史報告／原始設計：保留追溯用途，內含當時限制或任務指令，不代表現行規範。現況以 [文件索引](../../README.md) 與 [開發狀態](../../roadmap.md) 為準。
+
 # Phase 6A-1 — Backend Agentic Layer with LangChain / LangGraph / DeepAgents
 
 你現在要協助重構一個 YOLO System 專案。這個專案目前包含：

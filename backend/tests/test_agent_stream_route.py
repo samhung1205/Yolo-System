@@ -73,6 +73,9 @@ def test_tool_engine_streams_tool_events(client, monkeypatch):
     from fake_models import ScriptedToolModel
 
     monkeypatch.setattr(settings, "AGENT_ENGINE", "tool_calling")
+    # This route test uses a scripted model, not a live Ollama installation.
+    # Keep real allowlist validation while isolating installed-model discovery.
+    monkeypatch.setattr(llm_policy, "fetch_ollama_models", lambda: ["qwen2.5"])
     tool_agent._agent_cache.clear()
     model = ScriptedToolModel(
         script=[
@@ -91,6 +94,7 @@ def test_tool_engine_streams_tool_events(client, monkeypatch):
         "/api/agent/chat/stream",
         json={"message": "我有幾筆偵測？", "mode": "history_analysis", "provider": "ollama", "model": "qwen2.5"},
     )
+    assert response.status_code == 200
     events = _events(response)
     tool_agent._agent_cache.clear()
 

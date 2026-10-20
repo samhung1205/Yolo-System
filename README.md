@@ -1,770 +1,150 @@
-# YOLO System — 桌面版 + Web 版雙軌架構
+# YOLO System 使用手冊
 
-> 把一支 UI、業務邏輯與 SQL 全部耦合在同一層的 PySide6 桌面程式，
-> 在不中斷既有功能的前提下，逐步重構成桌面版與 React Web 共用同一組
-> FastAPI 後端的偵測平台。
+YOLO System 提供圖片物件偵測、批次影像分析、偵測紀錄與 AI 助理，讓實驗室成員在瀏覽器完成「上傳 → 偵測 → 檢視 → 分析 → 下載」流程。管理員可管理帳號與服務。
 
-**目前狀態**：後端、Web 前端與桌面版主流程皆可執行；容器化與部署（Phase 6）尚未開始，目前僅支援本機執行。
+**網站已部署在實驗室 Ubuntu 伺服器**：[開啟 YOLO System](https://140.113.135.113)。使用者已確認可透過校外行動網路操作，無須再部署到 Vercel。一般使用者不需要安裝 Python、Node.js、Docker 或下載模型；自己的電腦關機也不影響伺服器上的網站。
 
-**技術棧**：FastAPI · SQLAlchemy · Alembic · MySQL · React 18 + Vite · PySide6 · Ultralytics YOLO · LangGraph
+本手冊核對日期：**2026-10-21**。功能說明以目前原始碼為準，正式網站若尚未套用最新版本，介面可能略有差異。每日備份等維運收尾的安裝狀態另見 [開發與部署狀態](docs/roadmap.md)。
 
-### 從哪裡開始讀
+## 快速開始
 
-| 想知道 | 看這裡 |
+1. 向管理員申請帳號。目前關閉自行註冊，Ubuntu 帳號與本網站帳號是兩回事。
+2. 開啟網站，以使用者名稱或電子郵件及密碼登入。
+3. 選擇「物件偵測」，上傳圖片、選擇模型，再開始偵測。
+4. 對照原圖、標註圖與物件清單；需要時下載結果。
+5. 從結果進入「解釋偵測結果」，讓 AI 助理分析已保存的紀錄。
+
+手機可由選單切換功能；電腦可直接使用側邊導覽。使用公用電腦後請登出。
+
+## 功能與入口
+
+| 功能 | 位置 | 用途 |
+|---|---|---|
+| 工作台 | `/` | 開始單張／批次偵測，查看最近工作 |
+| 物件偵測 | `/detections` | 上傳單張圖片，選模型與閾值，檢視標註 |
+| 批次分析 | `/detections/batch` | 上傳多圖或資料夾，查看進度與整批結果 |
+| 偵測紀錄 | `/detections/history` | 篩選、檢視、下載或刪除已有結果 |
+| AI 助理：一般對話 | `/chat` | 一般問答、接續與刪除歷史對話 |
+| AI 助理：偵測分析 | `/agent` | 解釋結果、統計歷史、分析批次與產出報告 |
+| 個人資料 | `/profile` | 查看帳號、修改暱稱與密碼 |
+| 使用者管理 | `/admin/users` | 管理員建立、編輯、停用或刪除帳號 |
+
+一般使用者只能存取自己有權限的資料；管理員具較高的資料查閱與帳號管理權限。
+
+## 圖片偵測
+
+1. 開啟「物件偵測」，選擇圖片。建議使用 JPG、PNG 或 WEBP，單檔上限 **10 MiB**；以實際畫面與伺服器設定為準。
+2. 選擇符合資料類型的模型。清單分為 4 類別、7 類別、7 類別 · Pre、旋轉框（OBB）與 COCO · 80 類別。灰色或不可用的模型無法執行。
+3. 初次操作可保留預設信心門檻（Confidence，0.25）與重疊抑制門檻（IoU，0.45）。提高信心門檻會減少低分預測，也可能漏掉物件；IoU 影響重疊框的保留方式。
+4. 如需針對特定類別調整，展開「各類別自訂閾值」；未設定的類別沿用全域值。OBB 模型目前不支援各類別閾值。
+5. 開始偵測，等待完成後查看原圖、標註圖、類別、信心分數與耗時。點擊影像可放大、縮小或拖曳，按 `Esc` 關閉。
+6. 使用下載按鈕保存標註圖，或進入 AI 分析。
+
+「Pre」只是另一組模型的命名，不代表一定較準。模型的信心分數也不等於實際正確率，重要結果請人工覆核。
+
+## 批次影像分析
+
+1. 選擇「批次分析」，使用多圖選取或整個資料夾入口。
+2. 選模型與閾值，再送出。預設一次最多 **100 張**，每張仍受單圖大小限制。
+3. 查看處理進度與成功／失敗數量；被略過的非圖片檔案會另行提示。
+4. 完成後查看各圖標註、下載單張結果或整批 ZIP，再用「分析這批」進入 AI 助理。
+
+若顯示連線中斷，先使用重新連線或重新整理讀取既有批次，避免立即重送造成重複工作。刪除批次會一併刪除其中的偵測紀錄與相關媒體，請先下載需要保留的結果。處理中的批次不提供刪除。
+
+批次統計是模型預測的彙整。「沒有偵測到物件」不代表圖片確定沒有物件，也不是已確認漏檢；目前不支援「哪些船上有飛機」等空間關係判斷。
+
+## 偵測紀錄與下載
+
+在「偵測紀錄」使用類型、狀態與分頁找到工作，再點選紀錄查看詳情。單張圖片、批次內圖片與透過桌面版／API 提交的影片，都可在有權限時讀取。
+
+- 圖片：檢視原圖與標註結果，下載結果圖，或交由 AI 解釋。
+- 影片：查看預覽與工作狀態，完成後下載結果影片。**目前 Web 沒有影片上傳入口**，影片提交使用桌面版或 API。
+- 刪除：確認後移除紀錄及相關檔案，沒有資源回收筒；需要恢復時須由管理員評估備份。
+
+媒體連結有權限與有效期限。舊分頁的圖片失效時，重新讀取紀錄取得新連結。請使用下載按鈕保存檔案，不要把含簽章的網址當成永久分享連結。
+
+## AI 助理
+
+### 一般對話（Chat）
+
+適合一般問答，不會自行讀取你的偵測資料。選擇模型、輸入問題並送出，回覆通常逐段顯示；可從歷史清單接續對話，或建立新對話。刪除歷史對話前會要求確認。
+
+實驗室目前預設使用同機 Ollama 的 **llama3.2**。若要分析圖片紀錄，請切換「偵測分析」並選擇資料。
+
+### 偵測分析（Agent）
+
+先選模式，必要時選擇已完成的偵測或批次，再輸入問題；也可從偵測結果的捷徑直接帶入資料。
+
+| 模式 | 使用方式 |
 |---|---|
-| 架構怎麼演進、資料流長怎樣 | [docs/architecture.md](docs/architecture.md) |
-| 有哪些 API 端點 | [docs/api-spec.md](docs/api-spec.md) |
-| 資料表設計與 legacy 對照 | [docs/database-design.md](docs/database-design.md) |
-| 怎麼跑起來 | 本文件的[啟動方式](#啟動方式) |
-| 各階段做了什麼 | 本文件的[開發歷程](#開發歷程) |
+| 自動偵測 | 由助理依問題選擇工具；明確選取資料可減少誤解 |
+| 解釋偵測結果 | 選一筆結果，詢問物件數量、類別與低信心預測 |
+| 偵測歷史分析 | 詢問自己的任務總數、狀態與常見類別 |
+| 產出報告 | 選一筆結果，取得報告與解讀；可下載 Markdown 或 PDF |
+| 批次影像分析 | 選一個批次，詢問各類別總數、逐圖摘要與零偵測情況 |
+| 一般對話 | 在 Agent 頁進行不主動查資料的一般問答 |
+| 管理員輔助 | 管理員查閱使用者與全站使用摘要 |
 
----
+實驗室 Agent 預設使用 **gemma4**。它讀取已有結果，不重新執行 YOLO，也不會替你刪除資料、修改帳號或訓練模型。畫面中的分析依據可回到原紀錄查核。
 
-## 專案簡介
+可先試：「請統計這批圖片各類別的總數」或「這筆偵測有哪些低信心結果需要人工確認？」AI 可能回答錯誤，數量與信心值請以物件清單、統計及確定性報告核對。
 
-本系統整合 YOLO 影像偵測、AI 對話與 agent 助理、使用者與管理員後台。原始版本為純 PySide6 桌面應用程式，UI、業務邏輯與資料庫操作高度耦合；重構的核心是把「誰可以直接存取資料庫、模型與外部 API」從 UI 移到後端，使桌面版與 Web 版能共用同一份業務邏輯。
+### 對話切換與等待
 
----
+在 AI 助理內切換「一般對話／偵測分析」會保留各自草稿與當前內容；離開工作區、重新整理或登出會清除記憶體中的草稿，已完成保存的問答仍在資料庫。一般對話有歷史清單，Agent 尚未提供完整跨工作階段的歷史切換介面。
 
-## Legacy 專案現況與重構目標
+「停止接收」或生成途中切換分頁會中止前端接收，**不保證後端已停止生成**。共享 GPU 忙碌或模型第一次載入時可能較慢，請避免連續重送。
 
-### Legacy 現況
+## 帳號與個人資料
 
-> 以下描述的是重構「之前」的狀態，作為對照保留。`mysql/dataDB.py` 與
-> `utils/deepseek.py` 已退出正式流程且不納入版本控制；開發機可能仍保留 legacy 參考檔。
+在「個人資料」點選編輯，可修改暱稱或密碼。修改密碼須輸入目前密碼；成功後會登出，所有裝置上的舊登入憑證也會失效，請重新登入。
 
-- **框架**: PySide6 桌面應用
-- **資料庫**: MySQL（直接在 UI handler 中執行 SQL）
-- **密碼**: 明文儲存於資料庫
-- **API Key**: 硬編碼於 `utils/deepseek.py`
-- **DB 連線**: 硬編碼於 `mysql/dataDB.py`
-- **SQL 注入風險**: 使用字串格式化拼接 SQL
-- **狀態管理**: `mysql/dataDB.py` 中的全域 `SI` class 管理視窗引用
+- 使用者名稱：3–32 位英文字母或數字。
+- 密碼：8–64 位，須同時包含英文字母與數字；可使用符號，不可含空白或中文。
+- 忘記密碼：聯絡網站管理員。目前沒有電子郵件自助重設流程。
+- 頭像：Web 目前顯示既有頭像，沒有上傳控制項；桌面版與 API 支援頭像操作。
 
-### 重構目標
-1. UI / 業務邏輯 / 資料庫操作分層
-2. 引入 FastAPI 後端作為共用核心服務
-3. 引入 React Web 前端作為展示版本
-4. 桌面版與 Web 版共用後端 API
-5. 密碼改用 bcrypt hash，身分驗證使用 JWT
-6. 敏感設定移至 `.env`
-7. Web auth 帳號格式已調整為英數 `username`，並可搭配 `email`；登入支援 username 或 email
+## 管理員操作
 
----
+### 建立、停用與重設帳號
 
-## 架構摘要
+1. 以網站管理員登入，進入「使用者管理」。這與 Ubuntu 的 `sudo` 權限無關。
+2. 展開建立表單，填寫使用者名稱、電子郵件、初始密碼與暱稱，送出後再通知成員登入並修改密碼。
+3. 需要調整帳號時，點選 `Edit`：可修改暱稱、電子郵件、密碼、管理員身分與啟用狀態。密碼留空代表不變更。
+4. 成員忘記密碼時，可在編輯中設定新密碼；不要查詢或索取其原密碼。
+5. 暫停使用權限時優先停用。刪除帳號會連帶移除其偵測、對話與相關媒體，確認前先處理保留需求。
 
-### 舊架構
-```
-PySide6 UI ──直接調用──> mysql/dataDB.py ──> MySQL
-PySide6 UI ──直接調用──> utils/deepseek.py ──> DeepSeek API
-PySide6 UI ──直接調用──> detect_mainui.py ──> YOLO
-```
+系統禁止管理員刪除、停用或降級自己，也不能移除最後一位啟用中的管理員。改密碼、停用或變更管理員身分會撤銷該使用者的舊登入憑證。
 
-### 現行架構
-```
-PySide6 Desktop App ──HTTP──> FastAPI Backend ──> MySQL (SQLAlchemy)
-React Web Frontend  ──HTTP──> FastAPI Backend ──> MySQL (SQLAlchemy)
-                                    │
-                              ┌─────┴─────┐
-                         YOLO Service  Chat Service (provider-based)
-```
+### 服務與備份
 
----
+網站依賴實驗室伺服器、網路、GPU、資料庫與 Ollama 運作；不需要讓 Mac 或 VS Code 一直開著。主機關機或網路中斷仍會影響網站。
 
-## 專案目錄結構
+目前已通過公開 HTTPS、登入、圖片偵測、Chat／Agent 串流及舊資料保存驗證，第一份備份也已隔離還原並下載至 Mac。
 
-```
-Yolo_system/
-│
-├── README.md                   # 本文件
-├── DEPLOY.md                   # 部署診斷、實驗室主機方案與 Phase 6 驗收計畫
-├── AGENTS.md                   # AI 協作規範文件
-│
-├── docs/                       # 專案文件
-│   ├── architecture.md         # 架構設計
-│   ├── api-spec.md             # API 規格
-│   ├── database-design.md      # 資料庫設計
-│   ├── roadmap.md              # 開發路線圖
-│   ├── 01_phase6a_backend_agentic_layer.md
-│   ├── 02_phase6a_web_desktop_agent_ui.md
-│   ├── evals/                  # explain_detection eval 框架說明
-│   └── prompts/                # agent / 稽核用 prompt
-│
-├── backend/                    # FastAPI 後端
-│   ├── app/
-│   │   ├── api/routes/         # API 路由
-│   │   ├── core/               # 設定、安全、JWT、簽章靜態 URL
-│   │   ├── db/                 # SQLAlchemy 設定
-│   │   ├── models/             # ORM 模型
-│   │   ├── schemas/            # Pydantic schemas
-│   │   ├── repositories/       # 資料存取層
-│   │   ├── services/           # 業務邏輯服務
-│   │   ├── integrations/       # YOLO engine、模型註冊表、chat providers
-│   │   └── agents/             # LangGraph supervisor、subagents、tools
-│   ├── migrations/versions/    # Alembic migrations
-│   ├── tests/                  # 後端單元測試
-│   ├── .env.example            # 環境變數範例
-│   ├── requirements.txt
-│   └── main.py
-│
-├── desktop-app/                # PySide6 桌面版（Phase 2 起重構）
-│   ├── api_client.py           # Desktop 端共用 API client
-│   ├── avatar_cache.py         # backend avatar 本地快取工具
-│   └── ui_state.py             # Desktop 視窗共享狀態
-│
-├── AgentWindow.py              # Phase 6A-3b：Desktop 獨立 Agent QDialog
-│
-├── web-frontend/               # React + Vite 前端（Phase 5 MVP）
-│   ├── package.json
-│   ├── vite.config.js
-│   ├── src/
-│   │   ├── pages/              # Login / Register / Dashboard / Detection / History / Profile / Chat / Agent / Admin
-│   │   ├── components/         # Layout / ProtectedRoute
-│   │   ├── services/           # authService / chatService / agentService / detectionService / modelService / userService
-│   │   ├── router/             # React Router 設定
-│   │   ├── App.jsx
-│   │   └── styles.css
-│   └── README.md
-│
-├── tests/evals/                # explain_detection component eval 與結果
-│
-│── [桌面版進入點與 legacy UI - 根目錄]
-│   ├── Login.py
-│   ├── Register.py
-│   ├── MainUI.py
-│   ├── AdminMainUI.py
-│   ├── AdminAddUser.py
-│   ├── AdminEditUser.py
-│   ├── AICSMain.py
-│   ├── detect_mainui.py        # webcam / RTSP，尚未後端化
-│   ├── PersonFormMain.py
-│   ├── utils/
-│   └── ui/
-```
+**每日台灣時間 23:30、保留最近 7 份成功備份是已確認的維運設定，尚待 Ubuntu 收尾批次成功後啟用。** 不可把工具已準備好當成排程已執行。管理員日常檢查、服務啟停、備份下載、故障復原與更新流程，請依 [維運操作手冊](docs/lab-operations.md)；一次性收尾見 [Phase 6 收尾](docs/lab-phase6-finalization.md)。
 
----
+## 常見問題
 
-## 啟動方式
+| 問題 | 建議處理 |
+|---|---|
+| 無法登入 | 確認輸入網站帳密；忘記密碼請找管理員。連續失敗過多時依提示稍後再試 |
+| 登入突然失效 | 密碼、帳號狀態或權限可能被修改，請重新登入 |
+| 沒有註冊表單 | 目前採管理員建立帳號，屬正常設定 |
+| 圖片或下載失敗 | 重新讀取紀錄取得有效連結；仍失敗時提供紀錄 ID 給管理員 |
+| 模型不可用 | 改用可用模型並通知管理員檢查模型檔與指紋，不必自行下載陌生模型 |
+| 批次長時間處理中 | 先重連查看狀態；若主機曾重啟，由管理員依復原流程處理，避免重送整批 |
+| AI 回覆很慢 | 共用 GPU 或冷載入可能造成等待；停止接收不等於停止後端 |
+| 網站無法開啟 | 由管理員檢查主機與 HTTPS 服務；不要略過瀏覽器的憑證警告 |
 
-### Legacy 桌面版（維護模式，詳見 [desktop-app/README.md](desktop-app/README.md)）
-```bash
-# 建議直接用 yolo-backend conda 環境（已含 PySide6 / ultralytics）；不再限制 Python 3.9-3.11
-# 於 repo 根目錄執行
-# 可選：若 backend 不在 http://127.0.0.1:8000，先設定 API base URL
-# export YOLO_API_BASE_URL=http://127.0.0.1:8000
-python Login.py
-```
+回報問題時，請提供操作步驟、時間、紀錄／批次 ID 與錯誤摘要，不要附上密碼、登入憑證或含簽章的私人圖片網址。
 
-### Backend
-```bash
-cd backend
-cp .env.example .env   # 填入實際 MySQL 密碼與其他設定
+## 桌面版與其他文件
 
-# 推薦用 conda（macOS Sonoma 避免 Gatekeeper 慢啟動問題）
-conda create -n yolo-backend python=3.11 -y
-conda run -n yolo-backend pip install -r requirements.txt
+PySide6 桌面版保留給研究展示與既有操作，處於維護模式；支援單張／影片、對話與本機 Webcam／RTSP。Webcam／RTSP 在使用者電腦推論，不會自動寫入網站紀錄。Web 的模型選擇、批次、各類別閾值與報告下載尚未完整移植到桌面版。
 
-# 若使用 repo 內模型，可設定：
-# YOLO_DEFAULT_MODEL=../yolo11n.pt
-# 若要啟用 chat provider，可設定：
-# CHAT_PROVIDER=openai
-# OPENAI_API_KEY=sk-...
-# 若只想做本地 UI 驗證，可暫時改用：
-# CHAT_PROVIDER=mock
-# CORS_ORIGINS 可用逗號分隔，或 JSON array 字串
-
-# 執行 migration 建立 users / detection_* 資料表（需先確認 MySQL 連線；請在 backend/ 目錄執行）
-conda run -n yolo-backend alembic upgrade head
-
-# 啟動伺服器（約 20 秒冷啟動）
-conda run -n yolo-backend uvicorn main:app --reload --port 8000
-# 開啟 http://localhost:8000/docs 驗證
-```
-
-> **macOS Sonoma 注意事項**：pip venv 安裝的 native extension (.so) 會觸發 Gatekeeper 掃描（每次約 60-100 秒）。建議使用 conda 環境（約 20 秒）。
-
-### Web Frontend
-```bash
-cd web-frontend
-npm install
-npm run dev
-```
-
-本地驗證若沿用目前專案的 mock chat / detection 測試組合，建議直接用：
-```bash
-# backend
-cd backend
-conda run -n yolo-backend uvicorn main:app --reload --host 127.0.0.1 --port 8000
-
-# frontend
-cd web-frontend
-npm run dev -- --host 127.0.0.1 --port 5173
-```
-
-### 自訂 YOLO checkpoint 相容層
-
-Web 平台只載入 registry 核准的已訓練 checkpoint，不使用根目錄的舊版
-`tasks.py` 建構模型。ASFF、DySample 與 EfficientViM checkpoint 所保存的歷史
-Python module path，由
-`backend/app/integrations/legacy_checkpoint_compat.py` 映射到版本庫內的原始碼：
-
-- `models/custom_modules/ASFFHead.py`
-- `SCAM_DySample.py`
-- `AddModules/EfficientViMBlock.py`
-
-因此不需要、也不應再把這些檔案複製到 conda 環境的 Ultralytics
-`site-packages`。根目錄 `tasks.py` 與 `AddModules/Dysample.py` 僅保留為舊訓練
-架構參考，不是 FastAPI 推論 runtime dependency。
-
----
-
-## 目前 Phase 狀態
-
-| Phase | 名稱 | 狀態 |
-|-------|------|------|
-| Phase 0 | 盤點現有專案、建立文件 | ✅ 已完成 |
-| Phase 1 | 建立 Backend 骨架與 Auth | ✅ **已完成** |
-| Phase 2 | 桌面版改接 Backend API | ✅ **已完成**（2026-10-19 起維護模式：註冊頭像上傳、個資/改密碼改走 `/api/auth/profile`） |
-| Phase 3 | 重構 YOLO Detection Service | ✅ **已完成**（image/video MVP；webcam/RTSP 為 Phase 3+ 待辦） |
-| Phase 4 | 重構 AI Chat Service | ✅ **已完成**（provider-based chat + history/context + streaming） |
-| Phase 5 | 建立 React Web 前端 MVP | ✅ **已完成**（所有主流程頁面可用，API/runtime 驗證通過） |
-| Phase 6A-1 | Backend Agentic Layer (LangGraph) | ✅ **已完成**（`/api/agent/chat` + `/api/agent/modes`，DeepAgents 為 optional flag） |
-| Phase 6A-2 | Web / Desktop Agent UI 整合 | ✅ **已完成**（`/agent` 頁面、Dashboard/Detection shortcuts、Desktop api_client 就緒） |
-| Phase 6A-3 | Agent Streaming + Desktop AgentApiThread | ✅ **已完成**（SSE `/api/agent/chat/stream`，AgentPage 預設 streaming，AICSMain AgentApiThread） |
-| Phase 6A-3b | Desktop AgentWindow 獨立視窗 | ✅ **已完成**（`AgentWindow.py` QDialog，MainUI 新增「AI Agent」按鈕） |
-| Phase 6A-4 | LLM 模型選單 | ✅ **已完成**（`GET /api/models`；Chat/Agent 頁面 per-request provider/model 切換） |
-| Phase 6A-5 | 品質修復與 Agent / 下載強化 | ✅ **已完成**（Agent prompt 捷徑修正、Web 下載結果圖/影片、chat_logs FK cascade、desktop session/執行緒修復） |
-| Phase 6A-6 | IME 輸入修復 + 對話滾動 + Agent Vision | ✅ **已完成**（中文輸入法送出誤判修復、對話 thread 滾動修復、`AGENT_ENABLE_VISION` 唯讀圖片附加） |
-| 批次影像分析 Phase 1 | 多圖 / 資料夾批次上傳 + 類別總數聚合 + Agent `batch_analysis` | ✅ **已完成**（`POST /api/detections/batch`、`detection_batches` 表、Web `/detections/batch` 頁面、Agent 新模式） |
-| 各類別閾值 Phase 1 | 各類別獨立 conf / IOU 閾值（image + batch） | ✅ **已完成**（migration `0011`、`class_thresholds` Form 欄位、Web `ClassThresholdEditor`；影片與 Desktop 未支援） |
-| 部署前清理 | react-router 7、頭像歸屬與清理、對話輪次唯一鍵 | ✅ **已完成**（migration `0013`；`scripts/cleanup_avatars.py`） |
-| 安全強化 P1 | 認證強化（部署前） | ✅ **已完成**（PyJWT + token 撤銷 migration `0012`、登入節流、密碼可含符號、管理員自我保護、啟動檢查、production 關閉 `/docs`） |
-| Agent 重構 C | Agent 評測 + 預設引擎/模型 + Deep Agents 評估 | ✅ **已完成**（`tests/evals/evaluate_agent_engines.py`；預設 `tool_calling` + gemma4；Deep Agents 評估後不採用） |
-| Agent 重構 B | tool-calling 引擎（LangChain `create_agent`） | ✅ **已完成**（`AGENT_ENGINE=tool_calling` 開啟，預設仍為 `pipeline`；Web 顯示工具進度） |
-| Agent 重構 A | 單一 graph 執行路徑 + 全模式對話歷史 + 明確錯誤 | ✅ **已完成**（graph compile 一次、runtime context、`invoke`/`stream` 同一 graph；B 用 `create_agent`、Deep Agents 延到 C） |
-| 安全強化 P0 | 上傳白名單 + static nosniff、LLM 白名單與限流、隱藏內部錯誤 | ✅ **已完成**（`app/core/uploads.py`、`app/services/llm_policy.py`；其餘審查發現見 AGENTS.md） |
-| 批次上限 1000 張 | 分片上傳 + 輪詢瘦身 + 中斷復原 | ⏳ 待辦（已完成瓶頸分析，見 AGENTS.md） |
-| Phase 6 | 實驗室主機同網址部署、Docker、備份與驗收 | ⏳ 待辦（2026-10-20 確認免費優先，見 [DEPLOY.md](DEPLOY.md)） |
-
----
-
-## 文件索引
-
-| 文件 | 說明 |
-|------|------|
-| [architecture.md](docs/architecture.md) | 架構設計、資料流與 agent 層邊界 |
-| [api-spec.md](docs/api-spec.md) | API 端點規格 |
-| [database-design.md](docs/database-design.md) | 資料表設計與 legacy 對照 |
-| [roadmap.md](docs/roadmap.md) | 開發路線圖與里程碑 |
-| [DEPLOY.md](DEPLOY.md) | 部署診斷、平台比較、實驗室免費部署與 Phase 6 驗收計畫 |
-| [01_phase6a_backend_agentic_layer.md](docs/01_phase6a_backend_agentic_layer.md) | Agentic layer 設計說明 |
-| [02_phase6a_web_desktop_agent_ui.md](docs/02_phase6a_web_desktop_agent_ui.md) | Web / Desktop Agent UI 整合 |
-| [evals/explain_detection_eval_framework.md](docs/evals/explain_detection_eval_framework.md) | explain_detection component eval 框架 |
-| [AGENTS.md](AGENTS.md) | AI 協作規範 |
-
-> Legacy 系統的現況分析請見上方「Legacy 專案現況與重構目標」；原本獨立的
-> `docs/current-system-analysis.md` 已不再維護。
-
----
-
-## 後續工作
-
-Phase 0–5 與 6A 系列已完成（見上方 Phase 狀態表）。目前仍待辦：
-
-1. **Phase 6** — 實驗室主機同網址部署、Docker、備份與驗收（已完成診斷，尚未完成部署；見 [DEPLOY.md](DEPLOY.md)）
-2. webcam / RTSP 改為後端任務或獨立 streaming service
-3. image detection 由同步呼叫改為非同步任務；影片改用真正的 job queue（含進度與取消）
-4. Web 一般對話頁接上 `POST /api/chat/stream`（Agent 頁已使用 SSE）
-
----
-
-## 開發歷程
-
-> 以下為各階段的完成範圍與當時的已知限制，保留作為決策紀錄。
-> 只想了解目前狀態的話，看上方的「Phase 狀態表」與「後續工作」即可。
-
-#### Phase 2 完成範圍
-
-- `Login.py` / `Register.py` 已改呼叫 backend auth API，不再直接查 MySQL。
-- `AdminMainUI.py` / `AdminAddUser.py` / `AdminEditUser.py` 已改呼叫 `/api/users/*`。
-- `MainUI.py` 與 `AdminMainUI.py` 的個資修改、改密碼已改走 backend。
-- Desktop 端透過 `QSettings` 保存 JWT，啟動時會用 `/api/auth/me` 驗證 token 再自動登入。
-- 已登入後的頭像更新改走 `/api/upload/avatar`，並同步快取到本地 `user_avatars/`。
-
-### Phase 2 完成當時已知限制
-
-- 註冊前頭像仍沿用本地暫存，尚未改成匿名上傳或註冊後補傳。
-- YOLO、DeepSeek 主流程仍是 legacy local call，尚未進入 backend service phase。
-
-### Phase 3 已完成範圍
-
-- backend 已新增 detection domain：
-  - `DetectionTask`
-  - `DetectionObject`
-  - `YoloEngine`
-  - `DetectionService`
-  - `/api/detections/*`
-- 已完成 `POST /api/detections/image`
-- 已完成 `POST /api/detections/video`
-  - video 目前為 background task + desktop 輪詢 `GET /api/detections/{id}`
-- 已完成 `GET /api/detections`
-- 已完成 `GET /api/detections/{id}`
-- 已完成 `DELETE /api/detections/{id}`
-- backend 會統一保存：
-  - 原始圖片：`static/detections/originals`
-  - 結果圖片：`static/detections/results`
-  - 原始影片：`static/detections/videos/originals`
-  - 結果影片：`static/detections/videos/results`
-  - preview 圖：`static/detections/previews`
-- 桌面端 [MainUI.py](MainUI.py) 已改為：
-  - 單張圖片走 backend image detection
-  - 本地影片檔走 backend video detection
-  - detection history 可讀 backend
-  - 結果圖/結果影片可由 UI 開啟
-
-### Phase 3 已知限制
-
-- webcam 偵測仍走 legacy [detect_mainui.py](detect_mainui.py)
-- RTSP / 串流仍走 legacy [detect_mainui.py](detect_mainui.py)
-- video detection 目前只保存 preview frame 的 detection objects，不是每一幀都入庫
-- 桌面端影片 detection 目前仍以輪詢等待完成，尚未做真正非阻塞 UI 任務管理
-- history UI 目前是動態 dialog，尚未做完整篩選/分頁/刪除
-
-### Phase 4 已完成範圍
-
-- backend 已新增 chat domain：
-  - `ChatLog`
-  - `ChatService`
-  - `POST /api/chat`
-  - `POST /api/chat/stream`
-  - `GET /api/chat`
-  - `GET /api/chat/{conversation_id}`
-- 已新增 provider-based integration：
-  - `OpenAIChatProvider`
-  - `DeepSeekChatProvider`
-  - `BaseChatProvider`
-- `chat_logs` 已新增：
-  - `conversation_id`
-  - `turn_index`
-- backend 已支援多輪上下文：
-  - 同一 `conversation_id` 下的歷史問答會作為 provider context 傳入
-- backend 已支援 streaming chat：
-  - `text/event-stream`
-  - 串流完成後仍會寫入 `chat_logs`
-- provider 選擇改由 `.env` 控制：
-  - `CHAT_PROVIDER=openai`
-  - `CHAT_PROVIDER=deepseek`
-- Desktop [AICSMain.py](AICSMain.py) 已改為：
-  - 使用 backend `/api/chat`
-  - 使用 backend `/api/chat/stream` 逐段更新 assistant bubble
-  - 同一視窗內自動沿用 `conversation_id`
-  - 不再直接 import `utils.deepseek.ApiThread`
-  - 保留原本 chat bubble UI 與非阻塞互動流程
-- backend 會將單輪聊天結果寫入 `chat_logs`
-
-### Phase 4 已知限制
-
-- Desktop 目前僅支援同一視窗內的多輪上下文，尚未加入 history 切換 UI
-- `utils/deepseek.py` 仍保留在 repo 中作為 legacy 參考，但已退出 desktop 主流程
-- 真正的 provider 執行層驗證仍需要本機有效 API key
-
-### Phase 5 已完成範圍
-
-- 已建立 React + Vite 前端骨架：
-  - React Router
-  - Axios service layer
-  - `ProtectedRoute`
-  - `Layout`
-- 已建立頁面：
-  - `LoginPage`
-  - `RegisterPage`
-  - `DashboardPage`
-  - `DetectionPage`
-  - `DetectionHistoryPage`
-  - `ProfilePage`
-  - `ChatPage`
-  - `admin/UserManagementPage`
-- `DetectionHistoryPage` 已針對大量紀錄優化：Web 寬螢幕使用固定高度雙欄與獨立捲動，分頁固定於列表底部；900px 以下改為 Task List / Detail 單面板切換
-- `ChatPage` 已統一 Conversations / Chat 面板高度；歷史對話清單獨立捲動、最多載入最近 100 組，並可透過 `DELETE /api/chat/{conversation_id}` 二次確認後刪除
-- Detection 影像預覽已共用 `ZoomableImage`：Object Detection、Detection Records 與 Batch Analysis 的結果圖可點擊開啟 modal，支援按鈕/滾輪縮放、放大後拖曳、重設與 `Esc` 關閉
-- Batch Analysis 的 Recent Batches / Batch Detail、Object Detection 的 Original / Result，以及 Detection Analyst 的 Settings / Chat panel 已統一高度與內容起點；結果圖下載按鈕統一顯示 `Download`
-- 已串接 backend API：
-  - `/api/auth/login`
-  - `/api/auth/register`
-  - `/api/auth/me`
-  - `/api/detections/image`
-  - `/api/detections`
-  - `/api/detections/{id}`
-  - `/api/chat`
-  - `/api/chat`
-  - `/api/chat/{conversation_id}`
-  - `/api/users`
-  - `/api/users/{id}`（create/delete 已接；edit service 已備好但 UI 未做）
-- 已完成 localStorage token 管理與 admin route guard
-- `npm run build` 已通過
-- 已完成 API / runtime 驗證：
-  - register / login（`username` 與 `email` 都可登入）
-  - admin users list / create / delete
-  - image detection / detection history
-  - profile
-  - chat（`CHAT_PROVIDER=mock`）
-- desktop 的 [Register.py](Register.py)、[AdminAddUser.py](AdminAddUser.py)、[AdminEditUser.py](AdminEditUser.py) 已同步改為相同帳號規則：
-  - `username`：英數字 `3-32` 位
-  - `email`：合法 Email
-  - `password`：至少 `8` 位，且需同時包含英文與數字
-
-### Phase 5 已知限制
-
-- ChatPage 走非串流 `/api/chat`，尚未接 SSE `/api/chat/stream`（Web streaming 待辦）
-- Web 端尚未做 detection video streaming / avatar upload
-- webcam / RTSP detection 尚未 backend 化（Phase 3+ 待辦）
-
-### Phase 3 已驗證結果
-
-- backend 實測通過：
-  - `alembic upgrade head`
-  - `POST /api/auth/login`
-  - `POST /api/detections/image`
-  - `POST /api/detections/video`
-  - `GET /api/detections`
-  - `GET /api/detections/{id}`
-  - `DELETE /api/detections/{id}`
-  - `/static/...` 結果圖、preview 圖、結果影片可直接存取
-- 桌面端 offscreen smoke test 實測通過：
-  - `Login.py` 一般使用者登入
-  - `MainUI.py` 進入 detection 頁
-  - `img_predict()`
-  - `video_predict()`
-  - detection history 讀取
-- 本輪執行層驗證額外修正：
-  - [backend/requirements.txt](backend/requirements.txt) 補上 `opencv-python-headless`
-  - [PersonFormMain.py](PersonFormMain.py) 改用 [ui_state.py](desktop-app/ui_state.py)，移除對 legacy `mysql.dataDB.SI` 的依賴
-  - [MainUI.py](MainUI.py) 修正動態按鈕建立順序，避免 `pushButton_history` / `pushButton_open_result` 尚未建立就先綁定事件
-
-### Phase 4 手動驗證方式
-
-1. 在 `backend/.env` 設定（可由 `backend/.env.example` 複製）：
-```bash
-CHAT_PROVIDER=openai
-OPENAI_API_KEY=sk-...
-OPENAI_CHAT_MODEL=gpt-4.1-mini
-CHAT_CONTEXT_MAX_TURNS=10
-```
-2. 啟 backend：
-```bash
-cd backend
-conda run -n yolo-backend alembic upgrade head
-conda run -n yolo-backend uvicorn main:app --reload --port 8000
-```
-3. 啟 desktop：
-```bash
-# 於 repo 根目錄執行
-python Login.py
-```
-4. 登入後開啟 [AICSMain.py](AICSMain.py) 對話視窗
-5. 送出一則問題，確認：
-   - user bubble 正常顯示
-   - assistant bubble 會逐段顯示 backend 串流回覆
-   - 同一視窗送第二則問題時會延續上一輪上下文
-   - provider 錯誤時 UI 顯示合理錯誤訊息
-6. 確認資料庫 `chat_logs` 有新增紀錄
-7. 驗證 history API：
-```bash
-curl -H "Authorization: Bearer <TOKEN>" http://127.0.0.1:8000/api/chat
-curl -H "Authorization: Bearer <TOKEN>" http://127.0.0.1:8000/api/chat/<conversation_id>
-```
-8. 驗證 streaming API：
-```bash
-curl -N -X POST "http://127.0.0.1:8000/api/chat/stream" \
-  -H "Authorization: Bearer <TOKEN>" \
-  -H "Content-Type: application/json" \
-  -d '{"question":"請用三句話介紹本系統"}'
-```
-
-### Phase 6A-1 — Backend Agentic Layer（LangGraph）
-
-新增了 `/api/agent/*` 智慧助理入口，與既有 `/api/chat` 完全獨立。設計重點：
-
-- YOLO 推論仍由 `detection_service` 觸發；agent **只讀**現有 `DetectionTask` / `DetectionObject`。
-- `chat_logs` 表共用，agent 寫入時 `provider="langgraph-agent"`，與 chat provider 不衝突，無需 migration。
-- LangChain / LangGraph / DeepAgents 一律 lazy import；缺套件時 backend 仍能啟動。缺 API key 時回傳明確的「模型供應商尚未設定」錯誤（2026-10-19 起不再偷偷回 mock 回覆）。
-- DeepAgents 為 **optional enhancement**，預設關閉。`requirements.txt` 中保留註解，需手動啟用。
-
-#### 新增端點
-
-```text
-POST /api/agent/chat   # JWT 必填；mode = auto | general_chat | explain_detection | history_analysis | report | admin_help
-GET  /api/agent/modes  # JWT 必填；回傳可用 mode 與 admin_only flag
-```
-
-#### 啟動方式
-
-依現有指引啟動 backend：
-
-```bash
-conda activate yolo-backend
-cd backend
-# 第一次或要切換到真實 LLM 才需要安裝 langchain
-conda run -n yolo-backend pip install -r requirements.txt
-conda run -n yolo-backend uvicorn main:app --reload --port 8000
-```
-
-`.env` 範例新增：
-
-```env
-# 留空會繼承 CHAT_PROVIDER / OPENAI_CHAT_MODEL
-AGENT_PROVIDER=
-AGENT_MODEL=
-AGENT_ENABLE_DEEPAGENTS=false
-AGENT_MAX_HISTORY_TURNS=10
-AGENT_RECURSION_LIMIT=25
-```
-
-本地驗證可設 `AGENT_PROVIDER=mock` 不需要 API key。
-
-#### 測試方式
-
-```bash
-TOKEN=...  # 從 /api/auth/login 取得
-
-curl -X GET "http://127.0.0.1:8000/api/agent/modes" \
-  -H "Authorization: Bearer $TOKEN"
-
-curl -X POST "http://127.0.0.1:8000/api/agent/chat" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"message":"請摘要我最近的偵測歷史","mode":"history_analysis"}'
-
-curl -X POST "http://127.0.0.1:8000/api/agent/chat" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"message":"請解釋這筆偵測","mode":"explain_detection","detection_id":1}'
-
-curl -X POST "http://127.0.0.1:8000/api/agent/chat" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"message":"請產出 detection 報告","mode":"report","detection_id":1}'
-```
-
-#### DeepAgents（optional enhancement）
-
-預設關閉。若要啟用：
-
-1. 解除 `backend/requirements.txt` 中 `deepagents>=0.0.5` 的註解並重新安裝。
-2. `.env` 設定 `AGENT_ENABLE_DEEPAGENTS=true`。
-3. 後端啟動後會在 `agents.llm.deepagents_available()` 中顯示 `True`，本階段尚未把 DeepAgents 直接接入 supervisor，僅保留 flag 與 readiness check。
-
-#### Phase 6A-1 已知限制
-
-- 此階段當時尚未提供 agent streaming；`/api/agent/chat/stream` 已於 Phase 6A-3 完成。
-- DeepAgents flag 目前僅做 import readiness，沒有實際使用 deepagents.subagents。
-
----
-
-### Phase 6A-2 — Web Agent Console（Web Frontend & Desktop Agent UI）
-
-#### Web Agent Console（`/agent`）
-
-新增了獨立的 AI Agent 智慧助理頁面，與 `/chat` 完全分開：
-
-| 路由 | 說明 |
-|------|------|
-| `/chat` | 一般 provider-based chat（`POST /api/chat`） |
-| `/agent` | LangGraph Agent Console（`POST /api/agent/chat`） |
-
-**AgentPage 功能：**
-
-- mode 下拉選單（auto / general_chat / explain_detection / history_analysis / report / admin_help）
-- 可選填 `detection_id`，搭配 explain_detection / report mode 自動填入預設訊息
-- 對話 thread 顯示 tool_calls / references（若後端有回傳）
-- `admin_help` 模式：非管理員前端顯示提示，後端仍進行權限驗證
-
-**Agent Shortcuts：**
-
-完成一次圖片偵測或在 Detection History 選取一筆紀錄後，可一鍵跳轉：
-
-```text
-/agent?mode=explain_detection&detection_id=123   ← Ask Agent to Explain
-/agent?mode=report&detection_id=123              ← Generate Report
-```
-
-#### Web Frontend 啟動方式
-
-```bash
-cd web-frontend
-npm install
-npm run dev      # http://localhost:5173
-npm run build    # 生產版本 build 檢查
-```
-
-#### Desktop 整合狀態
-
-`desktop-app/api_client.py` 已包含 `agent_chat()` / `list_agent_modes()`（Phase 6A-1 完成）。
-Desktop PySide6 的獨立 `AgentWindow.py` 已於 Phase 6A-3b 完成。
-
-#### Phase 6A-3 — Agent Streaming（SSE）
-
-新增 `POST /api/agent/chat/stream`，SSE 事件格式與 `/api/chat/stream` 一致：
-
-```
-start → chunk (×N) → done   或   error
-```
-
-Web `AgentPage` 預設使用 streaming，右上角 **Streaming** checkbox 可切換為 batch 模式。
-串流中顯示 ▍ 閃爍游標，`done` 後才渲染 tool_calls / references。
-
-Desktop `AICSMain.py` 新增 `AgentApiThread` + `enable_agent_mode()` / `disable_agent_mode()` helper，
-可由 MainUI 或其他呼叫者切換至 LangGraph agent backend，不影響原本 `/api/chat/stream` 流程。
-
-#### Phase 6A-3b — Desktop AgentWindow 獨立視窗
-
-`AgentWindow.py` — 獨立 PySide6 QDialog，從 `MainUI.py` 的「AI Agent」按鈕開啟：
-
-- **Mode 下拉選單**：auto / general_chat / explain_detection / history_analysis / report / admin_help
-- **Detection ID 欄位**：有 `current_detection` 時自動帶入，mode 自動切換為 `explain_detection`
-- **泡泡對話顯示**：使用 `AIChatMessageWindow`，與 AICSMain.py 風格一致
-- **Streaming**：自帶 `AgentStreamThread`，呼叫 `/api/agent/chat/stream`，逐字顯示
-- **Stand-alone 啟動**（開發測試用）：`python AgentWindow.py`
-
----
-
-### Phase 6A-4 — LLM 模型選單
-
-新增 `GET /api/models` 端點與前端 provider/model 選單，讓使用者可在 Chat 與 Agent 頁面即時切換 LLM。
-
-#### 後端（`GET /api/models`）
-
-| Provider | 出現條件 | 模型來源 |
-|----------|---------|---------|
-| OpenAI GPT | `.env` 中 `OPENAI_API_KEY` 有設定 | 固定列表（`gpt-4.1-mini`、`gpt-4o` 等）+ 設定值優先 |
-| DeepSeek | `.env` 中 `DEEPSEEK_API_KEY` 有設定 | 固定列表（`deepseek-chat`、`deepseek-coder` 等）|
-| Ollama（本地） | 一律出現 | 即時呼叫 `OLLAMA_BASE_URL/api/tags`；Ollama 未啟動時 fallback 至 `OLLAMA_MODEL` |
-| mock | 不出現（僅內部測試用）| — |
-
-#### 前端
-
-- `web-frontend/src/services/modelService.js` — `listModels()` 呼叫 `GET /api/models`
-- `ChatPage.jsx` — textarea 上方顯示 provider / model 雙 select
-- `AgentPage.jsx` — controls 側邊欄 Detection ID 下方顯示 provider / model select
-
-#### Per-request model override
-
-`POST /api/chat`、`POST /api/chat/stream`、`POST /api/agent/chat`、`POST /api/agent/chat/stream` 均已接受 optional `provider` 與 `model` 欄位，優先於 `.env` 設定。
-
----
-
-### Phase 6A-5 — 品質修復與 Agent / 下載強化（2026-07-12）
-
-一次性收斂前期審查發現的問題，並新增兩項功能（完整清單見 `AGENTS.md` Phase 6A-5 區塊）：
-
-**新功能**
-- Web `DetectionPage` / `DetectionHistoryPage` 新增「下載結果圖 / 下載結果影片」按鈕（blob 下載，沿用共用 axios instance）。
-- Agent 頁 mode / Detection ID 切換時會智慧更新預設 prompt（自打文字不會被覆蓋）；`history_analysis` / `admin_help` 補上預設 prompt；`/agent?mode=...&detection_id=...` 捷徑在頁內導航也會生效。
-
-**重要修復**
-- migration `0008`：`chat_logs.user_id` FK 改 `ON DELETE CASCADE` — 修復刪除有聊天紀錄的使用者時整個 API 失敗的 bug；刪 user 時同步清理 detection / avatar 靜態檔案。
-- Agent 統計工具移除 100 筆掃描上限（`HISTORY_SCAN_LIMIT=1000` + 真實 `total_tasks`）；history / report / admin 三個 subagent 的 `role:"tool"` 訊息改為 user-turn 嵌入，修復 OpenAI 嚴格模式 400。
-- Desktop：登入時清除另一角色 token（修復 admin/user session 錯亂）、admin 登出清 session、串流視窗關閉時安全斷開 QThread、`api_client` 分操作 timeout、detection history 分頁改用後端 total、影片輪詢關窗即停、登入自動快取頭像。
-- Web：DetectionHistory 篩選競態（abort 未接 axios）、刪除後分頁 clamp、ChatPage 兩個競態、SSE 401 導回登入、object URL 洩漏、預設 model 改選可用 provider。
-
-**驗證**：`alembic upgrade head` 通過（FK 已確認 `ondelete: CASCADE`）、backend import + `/api/health` 200、subagent 訊息 roles 確認無 `tool`、`npm run build` 通過、desktop 全部修改檔案 `py_compile` 通過。
-
----
-
-### 批次影像分析 Phase 1（2026-07-23）
-
-一次上傳多張影像（或整個資料夾），逐張沿用現有單張圖片偵測流程，並用確定性 SQL 聚合回答「這批影像總共偵測到幾艘船/幾架飛機/幾輛車」「有幾張疑似漏檢（估計）」之類的問題。空間關係推論（例如「哪些船上有飛機」）與影片逐幀問答為後續 Phase。
-
-**Backend**
-- migration `0010`：新增 `detection_batches` 表 + `detection_tasks.batch_id`（nullable FK，`ON DELETE CASCADE`）
-- `POST /api/detections/batch`：上傳多張圖片（欄位 `files`），單次上限 `DETECTION_BATCH_MAX_FILES`（預設 100，`.env` 可調，規劃未來提高到 500）；非圖片檔案自動略過（記錄於 `skipped_files`），不中斷整批請求；儲存完成後立即回傳 202，推論在背景任務中依序執行
-- `GET /api/detections/batches`、`GET /api/detections/batches/{id}`、`DELETE /api/detections/batches/{id}`：清單（分頁/篩選同既有慣例）、詳情（含每張圖 task 摘要，供前端輪詢進度）、刪除（含靜態檔案清理）
-- Agent 新模式 `batch_analysis`：`summarize_batch_tool` 對整批 `detection_objects` 做 `GROUP BY class_name` 聚合；`batch_analyst` subagent + `BATCH_ANALYST_PROMPT` 明確要求「零偵測影像數僅為估計提示，非確定漏檢結論」，且對空間關係問題誠實回覆目前不支援
-- `AgentState` / `run_graph` / `stream_graph` / `/api/agent/chat(/stream)` 新增 optional `batch_id`（與既有 `detection_id` 相同模式）
-
-**Web**
-- 新頁面 `/detections/batch`（`BatchDetectionPage.jsx`）：多檔/整個資料夾選擇、上傳進度條（輪詢 `GET /api/detections/batches/{id}`）、逐張縮圖結果、「用 Agent 分析這批」捷徑（`/agent?mode=batch_analysis&batch_id={id}`）
-- `detectionService.js` 新增 `detectImageBatch` / `listBatches` / `getBatch` / `deleteBatch`
-- `AgentPage.jsx` 新增 Batch ID 欄位與 `batch_analysis` 模式（沿用既有 Detection ID 欄位的智慧預填 / query params 同步邏輯）
-- Dashboard / 側邊選單新增「Batch Analysis」入口
-
-**已知限制**
-- 背景處理為單一 worker 依序執行（非併發），100 張視硬體效能可能需數十秒到數分鐘；未來擴到 500 張或多批次併發需 Phase 6 job queue
-- 僅支援影像批次；影片批次與逐幀問答為後續 Phase
-- 僅做每類別總數聚合，不做 bbox 空間關係判斷
-
-**驗證**：`alembic upgrade head` 通過（`detection_batches` 表 + `detection_tasks.batch_id` 已建立）、backend 全部新模組 import 成功、`npm run build` 通過。
-
----
-
-### 各類別閾值（per-class conf / IOU，2026-09-04）
-
-同一個模型的不同類別可以各自設定信心閾值與 NMS IOU，例如「ship 放寬到 conf 0.20 / IOU 0.40，
-airplane 收緊到 conf 0.50 / IOU 0.35」。適用於單張影像偵測與批次偵測。
-
-**為什麼可行**
-Ultralytics 的 `predict()` 只接受純量 `conf`/`iou`，所以後端改為「單次推論 + 分類別後處理」：
-以所有門檻的最小 `conf` 搭配 `iou=1.0`（等於關閉抑制）取得原始候選框，再依各類別自己的門檻
-過濾並重跑 class-aware NMS。這在數學上與「各類別分別用自己門檻推論」**等價而非近似**，兩個
-理由都有回歸測試（`backend/tests/test_per_class_thresholds.py`，21 項）：
-- 貪婪 NMS 依信心遞減處理，低於門檻的候選框不可能改變門檻以上框的存留結果
-- Ultralytics 預設的 NMS 本來就是分類別進行的，不同類別的框不會互相抑制
-
-**Backend**
-- migration `0011`：`detection_tasks` / `detection_batches` 新增 `class_thresholds_json`；原本的純量
-  `confidence_threshold` / `iou_threshold` 保留為未列出類別的預設值，既有紀錄與單一閾值請求不受影響
-- `class_thresholds` 以 multipart Form 欄位（JSON 字串）傳入，key 為 class id：
-  `{"0": {"conf": 0.20, "iou": 0.40}, "4": {"conf": 0.50, "iou": 0.35}}`
-- class id 會對照所選模型的 `canonical_class_names` 驗證，不符即回 400
-- 批次的背景任務從批次紀錄讀取設定，因此重啟續跑仍沿用同一組閾值
-- `DETECTION_PERCLASS_MAX_DET`（預設 3000）：關閉抑制後候選框變多，而 `max_det` 是在 NMS 之後
-  才套用，維持預設 300 會讓密集影像在自行抑制前就被截斷
-
-**Web**
-- 新元件 `ClassThresholdEditor`：類別清單直接取自 `/api/yolo-models` 既有的 `canonical_class_names`，
-  切換模型時自動重建並清掉失效的覆寫
-- `DetectionPage` / `BatchDetectionPage`：保留原本兩支全域滑桿當預設，新增「各類別自訂閾值」開關
-  與表格；結果區會顯示實際採用的 per-class 閾值
-
-**實測結果**（7 類模型、同一張密集影像）
-| 設定 | airplane | small-vehicle |
-|------|----------|---------------|
-| 全域 conf 0.20 | 20 | 113 |
-| 全域 conf 0.50 | 18 | 9 |
-| per-class（airplane 0.20 / small-vehicle 0.50） | **20** | **9** |
-
-per-class 同時保住了全域 0.50 會漏掉的 2 架 airplane，又把 small-vehicle 收到與全域 0.50 相同的
-9 個，這正是這個功能的用途。
-
-**已知限制**
-- 僅支援 image 與 batch；影片偵測仍只吃純量 conf/iou
-- Desktop PySide6 尚未提供對應 UI
-- 只改變後處理、不改變模型，因此無法找回信心低於所有門檻最小值的物件
-
-**驗證**：`alembic upgrade head`（含 downgrade 往返）通過、backend 47 項測試全數通過、
-`npm run build` 通過、並以真實模型與影像完成端到端實測（含權限與 400 錯誤路徑）。
-
----
-
-### Phase 3 手動驗證方式
-
-1. 啟 backend：
-```bash
-conda run -n yolo-backend bash -lc 'cd backend && YOLO_DEFAULT_MODEL=../yolo11n.pt uvicorn main:app --host 127.0.0.1 --port 8001'
-```
-2. 另開 terminal 啟桌面端：
-```bash
-# 於 repo 根目錄執行
-export YOLO_API_BASE_URL=http://127.0.0.1:8001
-conda run -n yolo-backend python Login.py
-```
-3. 使用一般使用者登入後驗證：
-   - 圖片 detection
-   - 本地影片 detection
-   - 歷史紀錄
-   - 打開结果
-
----
-
-*最後更新: Web detection / analyst UI 對齊與可縮放影像檢視器 — 2026-09-04*
+- [全部文件索引](docs/README.md)：依使用、維運、開發與歷史報告分類。
+- [桌面版說明](desktop-app/README.md)：安裝與啟動。
+- [開發環境與驗證](docs/development.md)：給需要修改程式的人。
+- [目前狀態與後續工作](docs/roadmap.md)：已上線、待驗證與另行規劃事項。
+- [AI 協作規範](AGENTS.md)：後續優化與開發的規則。

@@ -1,8 +1,8 @@
 # 資料庫設計文件
 
-> **版本**: v0.9 (批次影像分析 Phase 1)  
-> **Database**: MySQL 8.0, database name: `yolo`  
-> **最後更新**: 2026-09-04
+> **版本**：v1.1（migration 0013）
+> **Database**：實驗室 MySQL 8.4，database name: `yolo`
+> **最後核對**：2026-10-21
 
 ---
 
@@ -10,7 +10,7 @@
 
 | 項目 | Legacy | 新版 |
 |------|--------|------|
-| 資料表數量 | 1 (`user`) | 4+ |
+| 資料表數量 | 1 (`user`) | 5 張業務表（另有 Alembic 版本表） |
 | 密碼儲存 | 明文 | bcrypt hash |
 | Detection 任務 | 無 | `detection_tasks` |
 | Detection 物件 | 無 | `detection_objects` |
@@ -194,7 +194,7 @@ CREATE TABLE chat_logs (
   - 對話內第幾輪問答
   - 同一使用者、同一對話內唯一（migration `0013`）。兩個請求同時寫同一段對話時，後寫入的會撞到唯一鍵，`chat_repository.append_log()` 會改用下一個編號重試
 - `provider`
-  - 目前支援 `openai`、`deepseek`
+  - 一般對話支援 `openai`、`deepseek`、`ollama`、明確選取的 `mock`；Agent 紀錄使用 `langgraph-agent`
 - `model_name`
   - 儲存實際回應使用的模型名稱
 - `question` / `answer`
@@ -264,7 +264,7 @@ alembic upgrade head
 - video detection 目前只保存 preview frame 的 detection objects
 - webcam / RTSP 目前仍未落地到 detection tables
 - chat 目前以 `chat_logs` 聚合多輪上下文，但尚未拆成獨立 `chat_conversations` table
-- 批次影像分析（`detection_batches`）目前以 `BackgroundTasks` 依序（非併發）處理，單次上限 `DETECTION_BATCH_MAX_FILES`（預設 100）；尚未支援影片批次或跨批次併發，屬 Phase 6 job queue 待辦範圍
+- 批次影像分析（`detection_batches`）目前以 `BackgroundTasks` 依序（非併發）處理，單次上限 `DETECTION_BATCH_MAX_FILES`（預設 100）；尚未支援影片批次或跨批次併發，擴充排隊與併發需另行評估，不能視為 Phase 6 已承諾加入 job queue
 - `summarize_batch_tool` 目前只做「每個類別的總數」聚合，不做 bbox 空間關係判斷（例如「船上有沒有飛機」），屬後續 Phase 待辦
 - `class_thresholds_json` 只記錄請求時採用的各類別閾值，屬 provenance 性質；未建立索引，也不支援按閾值查詢。影片偵測（`source_type='video'`）目前不會寫入此欄位
 

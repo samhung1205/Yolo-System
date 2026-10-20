@@ -12,6 +12,11 @@ function saveSession({ access_token, token_type, user }) {
 }
 
 const authService = {
+  async fetchConfig() {
+    const response = await api.get("/api/auth/config");
+    return response.data;
+  },
+
   async login(payload) {
     const response = await api.post("/api/auth/login", payload);
     saveSession(response.data);

@@ -9,8 +9,10 @@ from app.integrations.model_registry import (
     list_yolo_models,
 )
 from app.integrations.yolo_engine import YoloEngine
+from app.integrations import yolo_engine
 
 
+@pytest.mark.checkpoints
 def test_registry_exposes_all_approved_checkpoints_with_sources() -> None:
     metadata = [spec.public_metadata() for spec in list_yolo_models()]
     available = [item for item in metadata if item["available"]]
@@ -32,6 +34,7 @@ def test_registry_exposes_all_approved_checkpoints_with_sources() -> None:
     assert sum(item["is_default"] for item in metadata) == 1
 
 
+@pytest.mark.checkpoints
 def test_default_model_has_verified_provenance() -> None:
     spec = get_yolo_model()
 
@@ -46,6 +49,7 @@ def test_unknown_model_key_is_rejected() -> None:
         get_yolo_model("../../untrusted.pt")
 
 
+@pytest.mark.checkpoints
 def test_obb_and_coco_models_are_selectable() -> None:
     obb_spec = get_yolo_model("four_class_obb")
     assert obb_spec.task == "obb"
@@ -57,6 +61,7 @@ def test_obb_and_coco_models_are_selectable() -> None:
     assert coco_spec.canonical_class_names[4] == "airplane"
 
 
+@pytest.mark.checkpoints
 def test_custom_model_provenance_includes_runtime_module_hash() -> None:
     spec = get_yolo_model("four_class_dysample")
     runtime_modules = spec.provenance_snapshot()["runtime_modules"]
@@ -65,6 +70,7 @@ def test_custom_model_provenance_includes_runtime_module_hash() -> None:
     assert len(runtime_modules["ultralytics.nn.modules.SCAM_DySample"]) == 64
 
 
+@pytest.mark.checkpoints
 def test_seven_class_pre_models_are_selectable_and_distinct_from_main_set() -> None:
     """The '-pre' checkpoints live in a separate pt/7classes-pre/ folder and
     must be registered as distinct keys/fingerprints from pt/7classes/."""
@@ -81,6 +87,13 @@ def test_seven_class_pre_models_are_selectable_and_distinct_from_main_set() -> N
         assert pre_spec.relative_path != main_spec.relative_path
         assert pre_spec.expected_sha256 != main_spec.expected_sha256
         assert pre_spec.current_sha256() == pre_spec.expected_sha256
+
+
+def extraction_engine(monkeypatch, key):
+    # Parsing synthetic result tensors needs registry metadata, not model bytes.
+    spec = next(item for item in list_yolo_models() if item.key == key)
+    monkeypatch.setattr(yolo_engine, "get_yolo_model", lambda _: spec)
+    return YoloEngine(model_key=key)
 
 
 class _TensorLike:
@@ -104,8 +117,8 @@ class _Result:
     names = {1: "Merchant"}
 
 
-def test_detection_output_uses_canonical_class_name() -> None:
-    engine = YoloEngine(model_key="four_class_base")
+def test_detection_output_uses_canonical_class_name(monkeypatch) -> None:
+    engine = extraction_engine(monkeypatch, "four_class_base")
 
     objects = engine._extract_objects(_Result())
 
@@ -136,8 +149,8 @@ class _ObbResult:
     names = {0: "naval"}
 
 
-def test_detection_output_supports_obb_models_via_axis_aligned_rectangle() -> None:
-    engine = YoloEngine(model_key="four_class_obb")
+def test_detection_output_supports_obb_models_via_axis_aligned_rectangle(monkeypatch) -> None:
+    engine = extraction_engine(monkeypatch, "four_class_obb")
 
     objects = engine._extract_objects(_ObbResult())
 
@@ -152,8 +165,8 @@ def test_detection_output_supports_obb_models_via_axis_aligned_rectangle() -> No
     ]
 
 
-def test_detection_source_returns_none_when_neither_boxes_nor_obb_present() -> None:
-    engine = YoloEngine(model_key="four_class_base")
+def test_detection_source_returns_none_when_neither_boxes_nor_obb_present(monkeypatch) -> None:
+    engine = extraction_engine(monkeypatch, "four_class_base")
 
     class _EmptyResult:
         boxes = None

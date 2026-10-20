@@ -1,0 +1,17 @@
+**
+!web-frontend/
+!web-frontend/package.json
+!web-frontend/package-lock.json
+!web-frontend/index.html
+!web-frontend/vite.config.js
+!web-frontend/src/
+!web-frontend/src/**
+!deploy/
+!deploy/public.Dockerfile
+!deploy/Caddyfile.public
+**/node_modules
+**/.env
+**/.env.*
+**/*.pem
+**/*.key
+**/*.log

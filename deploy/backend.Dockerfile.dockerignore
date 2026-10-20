@@ -1,0 +1,35 @@
+# Allow only required source and the validated Linux dependency snapshot.
+# The build context is the repository root; use -f deploy/backend.Dockerfile.
+**
+!backend/
+!backend/main.py
+!backend/alembic.ini
+!backend/app/
+!backend/app/**
+!backend/migrations/
+!backend/migrations/**
+!backend/scripts/
+!backend/scripts/**
+!backend/tests/
+!backend/tests/test_yolo_model_registry.py
+!backend/tests/test_legacy_checkpoint_compat.py
+!deploy/
+!deploy/backend.Dockerfile
+!deploy/backend-linux.lock
+!deploy/backend_smoke.py
+!models/
+!models/custom_modules/
+!models/custom_modules/ASFFHead.py
+!SCAM_DySample.py
+!AddModules/
+!AddModules/EfficientViMBlock.py
+
+# Also exclude accidental local artifacts inside otherwise permitted directories.
+**/__pycache__
+**/*.pyc
+**/.env
+**/.env.*
+**/*.pt
+**/*.pem
+**/*.key
+**/*.log

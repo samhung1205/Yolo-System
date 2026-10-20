@@ -7,9 +7,10 @@ Auth API routes:
 """
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.deps import get_current_user, get_db
 from app.core.security import verify_password
 from app.models.user import User
@@ -20,6 +21,13 @@ from app.services import avatar_service, user_service
 from app.services.user_response_service import to_user_read
 
 router = APIRouter()
+
+
+@router.get("/config")
+def auth_config(response: Response):
+    """Public account-creation policy only; never expose private settings."""
+    response.headers["Cache-Control"] = "no-store"
+    return {"registration_enabled": settings.ALLOW_REGISTRATION}
 
 
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)

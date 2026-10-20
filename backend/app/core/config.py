@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     # parameters include password hashes and personal data.
     DB_ECHO: bool = False
 
+    # Public signup stays configurable for local development; lab deployment disables it.
+    ALLOW_REGISTRATION: bool = True
+
     # JWT
     SECRET_KEY: str = "change-me-in-production"
     ALGORITHM: str = "HS256"

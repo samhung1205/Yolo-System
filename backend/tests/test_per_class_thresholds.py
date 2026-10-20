@@ -30,10 +30,8 @@ MODEL_KEY = "seven_class_base"
 @pytest.fixture
 def model_spec():
     registry = pytest.importorskip("app.integrations.model_registry")
-    try:
-        return registry.get_yolo_model(MODEL_KEY)
-    except registry.YoloModelRegistryError as exc:  # pragma: no cover
-        pytest.skip(f"model {MODEL_KEY} unavailable: {exc}")
+    # Request validation uses static registry metadata; it needs no checkpoint.
+    return next(spec for spec in registry.list_yolo_models() if spec.key == MODEL_KEY)
 
 
 @pytest.mark.parametrize("raw", [None, "", "   ", "{}"])
@@ -139,6 +137,7 @@ def _rows(result, ndigits=2):
     )
 
 
+@pytest.mark.checkpoints
 def test_per_class_conf_matches_running_that_class_directly(loaded_model, images):
     """A high per-class conf must give the same boxes as predicting at that conf.
 
@@ -166,6 +165,7 @@ def test_per_class_conf_matches_running_that_class_directly(loaded_model, images
         assert _rows(widened) == _rows(direct), f"mismatch on {image.name}"
 
 
+@pytest.mark.checkpoints
 def test_per_class_iou_reproduces_ultralytics_nms(loaded_model, images):
     """Re-running NMS per class at the same IoU must match Ultralytics itself.
 
@@ -196,6 +196,7 @@ def test_per_class_iou_reproduces_ultralytics_nms(loaded_model, images):
         assert _rows(widened) == _rows(reference), f"mismatch on {image.name}"
 
 
+@pytest.mark.checkpoints
 def test_raising_one_class_conf_only_affects_that_class(loaded_model, images):
     """Per-class thresholds must not leak across classes."""
     model, spec = loaded_model
@@ -232,6 +233,7 @@ def test_raising_one_class_conf_only_affects_that_class(loaded_model, images):
         assert actual_others == expected_others, f"other classes changed on {image.name}"
 
 
+@pytest.mark.checkpoints
 def test_output_stays_sorted_by_confidence(loaded_model, images):
     """Grouping by class must not disturb Ultralytics' output ordering."""
     model, spec = loaded_model

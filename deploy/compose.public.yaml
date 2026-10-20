@@ -1,0 +1,42 @@
+# Use after compose.lab.yaml, with the updated private compose.env, same project.
+services:
+  backend:
+    image: "${YOLO_PUBLIC_BACKEND_IMAGE:?Run lab_public_apply.py}"
+    environment:
+      ALLOW_REGISTRATION: "false"
+  gateway:
+    image: "${YOLO_PUBLIC_GATEWAY_IMAGE:?Run lab_public_apply.py}"
+    pull_policy: never
+    platform: linux/amd64
+    container_name: sam-yolo-gateway
+    network_mode: host
+    restart: unless-stopped
+    stop_grace_period: 30s
+    cpus: 1
+    mem_limit: 384m
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    # Docker Snap needs false after lab_gateway_repair.py's runtime A/B check.
+    security_opt: ["no-new-privileges:${YOLO_GATEWAY_NNP:-true}"]
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+      - /config:size=16m,mode=0700
+    environment:
+      YOLO_PUBLIC_IP: "${YOLO_PUBLIC_IP:?Run lab_public_apply.py}"
+    volumes:
+      - type: volume
+        source: caddy_data
+        target: /data
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on:
+      backend:
+        condition: service_healthy
+volumes:
+  caddy_data:
+    external: true
+    name: sam-yolo-caddy-data

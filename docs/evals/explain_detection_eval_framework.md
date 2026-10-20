@@ -1,4 +1,6 @@
-The user pasted a dense, complete answer — skipping the interview per the prompt's rules. Here's the eval framework, diagnosis only, no code or docs touched.
+# 偵測解釋品質評估框架
+
+本文件為評估設計參考，不是實測通過報告。既有執行案例與結果見 [評測索引](../README.md#評測與品質)。原始英文 rubric 保留供重現；評估時只能檢查實際保存的預測，不能要求 Agent 找回門檻以下未保存的物件。
 
 ## Eval Framework: `explain_detection` (AI Detection Analyst)
 

@@ -1,3 +1,5 @@
+> 歷史報告／原始設計：保留追溯用途，內含當時限制或任務指令，不代表現行規範。現況以 [文件索引](../../README.md) 與 [開發狀態](../../roadmap.md) 為準。
+
 # Web UI 改善紀錄（2026-10-15）
 
 依全站 critique，按 A → B → C 分階段完成。保留 Desktop、既有 API、共用 Axios，以及獨立的 Chat / Agent 路由與 service。

@@ -1,0 +1,83 @@
+# Stage 1: backend + web only. MySQL and native Ollama remain external services.
+# Validate before replacing the existing manually created containers.
+name: sam-yolo
+
+x-lab-logging: &lab-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  backend:
+    image: "${YOLO_PUBLIC_BACKEND_IMAGE:-sha256:2fdf4814f7bef3919489586754819b7879059f8108dec8eb5a8ff09c8030a945}"
+    pull_policy: never
+    platform: linux/amd64
+    container_name: sam-yolo-backend
+    restart: unless-stopped
+    stop_grace_period: 120s
+    network_mode: host
+    runtime: nvidia
+    user: "${YOLO_UID:?Run configure_lab_compose.py}:${YOLO_GID:?Run configure_lab_compose.py}"
+    cpus: 4
+    mem_limit: 8g
+    shm_size: 256m
+    logging: *lab-logging
+    environment:
+      APP_PORT: "8000"
+      ALLOW_REGISTRATION: "false"
+    # Compatible with Compose 2.29.2; the service-level gpus key needs 2.30+.
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    volumes:
+      - type: bind
+        source: "${YOLO_REPO_ROOT:?Run configure_lab_compose.py}/backend/.env"
+        target: /opt/yolo/backend/.env
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: "${YOLO_REPO_ROOT:?Run configure_lab_compose.py}/backend/pt"
+        target: /opt/yolo/backend/pt
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: "${YOLO_REPO_ROOT:?Run configure_lab_compose.py}/backend/static"
+        target: /opt/yolo/backend/static
+        bind:
+          create_host_path: false
+    # CMD and the DB-aware healthcheck come from the tested image.
+
+  web:
+    image: nginx@sha256:970364228b1e4f932abc22d321932816782cca8a20b85a77552a7cfe9acfb3b5
+    pull_policy: never
+    platform: linux/amd64
+    container_name: sam-yolo-web
+    restart: unless-stopped
+    stop_grace_period: 30s
+    network_mode: host
+    cpus: 1
+    mem_limit: 256m
+    logging: *lab-logging
+    depends_on:
+      backend:
+        condition: service_healthy
+    volumes:
+      - type: bind
+        source: "${YOLO_CONFIG_ROOT:?Run configure_lab_compose.py}/nginx.lab.conf"
+        target: /etc/nginx/nginx.conf
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: "${YOLO_REPO_ROOT:?Run configure_lab_compose.py}/web-frontend/dist"
+        target: /usr/share/nginx/html
+        read_only: true
+        bind:
+          create_host_path: false

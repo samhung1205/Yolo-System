@@ -1,342 +1,73 @@
-# 架構設計文件
+# 系統架構與維護邊界
 
-> **版本**: v1.1（AI 助理共用入口、工具引擎與串流狀態校正）
-> **最後更新**: 2026-10-20
+最後核對：2026-10-21。本文描述目前原始碼與已確認的部署拓撲；驗證完成度集中於 [roadmap](roadmap.md)，早期設計保留於 [歷史索引](archive/README.md)。
 
----
-
-## 1. 整體架構圖
+## 主要元件
 
 ```text
-PySide6 Desktop  ──HTTP──>  FastAPI Backend  ──> MySQL
-      │                         │
-      │                         ├── Auth / Users Service
-      │                         ├── Detection Service
-      │                         ├── Chat Service
-      │                         ├── YOLO Engine (Ultralytics)
-      │                         ├── Chat Providers (OpenAI / DeepSeek)
-      │                         └── Static Storage
-      │
-      ├── image/video detection 走 backend API
-      ├── text chat 走 backend API
-      └── webcam/RTSP 暫時仍走 legacy local YOLO
+React Web ─────────┐
+                  ├─ HTTP / JWT / SSE → FastAPI
+PySide6 Desktop ──┘                     ├─ routes → services → repositories → MySQL
+                                       ├─ detection_service → YoloEngine → GPU
+                                       ├─ chat_service → LLM provider
+                                       ├─ agent service → 唯讀工具 / LLM
+                                       └─ static_files → 權限 / 簽章 → 媒體
+Desktop Webcam / RTSP → 本機 YOLO（既有例外，不入網站偵測紀錄）
 ```
 
----
+UI 不直接連 MySQL，也不持有外部 provider key。桌面版保留 legacy UI 以維護既有功能；主力介面是 Web。
 
-## 2. 目前實際分工
-
-### Desktop
-- `Login.py`
-  - 呼叫 `/api/auth/*`
-- `Register.py`
-  - 呼叫 `/api/auth/register`
-- `AdminMainUI.py` / `AdminAddUser.py` / `AdminEditUser.py`
-  - 呼叫 `/api/users/*`
-- `MainUI.py`
-  - 單張圖片 detection 呼叫 `POST /api/detections/image`
-  - 本地影片 detection 呼叫 `POST /api/detections/video`
-  - detection history 呼叫 `GET /api/detections`
-  - 單筆詳情呼叫 `GET /api/detections/{id}`
-  - 開啟結果圖 / 結果影片使用 backend static URL
-- `AICSMain.py`
-  - 文字聊天呼叫 `POST /api/chat`
-  - streaming 聊天呼叫 `POST /api/chat/stream`
-  - 同一視窗內自動沿用 `conversation_id` 做多輪上下文
-  - Desktop 只保留 chat bubble UI 與背景 thread 包裝，不再直接呼叫外部模型 API
-
-### Web Frontend
-- `AssistantWorkspace.jsx`
-  - `/chat`、`/agent` 共用的路由父層與「AI 助理」分頁導覽；兩個子頁面與 service 維持獨立。
-  - 以分開的 chat / agent 記憶體狀態保存草稿、目前對話、模型與選定分析結果；不把對話寫入 localStorage / sessionStorage。
-  - 工作區內切換保留狀態；離開工作區、重新整理與登出時清除。生成中切換中止前端接收，保留已收內容並顯示不完整提示，後端可能仍在執行。
-- `LoginPage.jsx`
-  - 呼叫 `/api/auth/login`
-  - 支援 username 或 email 登入
-- `RegisterPage.jsx`
-  - 呼叫 `/api/auth/register`
-  - 註冊規則：英數 username + email + 英數密碼
-- `DashboardPage.jsx`
-  - 顯示登入者基本資訊與入口
-- `DetectionPage.jsx`
-  - 呼叫 `POST /api/detections/image`
-- `DetectionHistoryPage.jsx`
-  - 呼叫 `GET /api/detections` / `GET /api/detections/{id}`
-- `ProfilePage.jsx`
-  - 呼叫 `/api/auth/me`
-- `ChatPage.jsx`
-  - 呼叫 `POST /api/chat` / `GET /api/chat` / `GET/DELETE /api/chat/{conversation_id}`
-  - 一般 provider-based chat（OpenAI / DeepSeek），不走 agent layer
-  - Conversations 與聊天區共用固定高度；清單獨立捲動並支援 conversation 級刪除
-  - UI 清單排除 provider 為 `langgraph-agent` 的紀錄；既有 API 仍共用 chat_logs，未新增歷史端點。
-- `AgentPage.jsx` ← Phase 6A-2 新增
-  - 路由：`/agent`
-  - 呼叫 `POST /api/agent/chat`、`GET /api/agent/modes`
-  - 獨立 LangGraph Agent 智慧助理介面，不影響 `/chat`
-  - 支援 URL query params：`?mode=explain_detection&detection_id=123`
-  - DetectionPage 與 DetectionHistoryPage 均有「Ask Agent to Explain」/「Generate Report」快捷按鈕跳轉此頁
-- `admin/UserManagementPage.jsx`
-  - 呼叫 `/api/users`
-  - MVP 先做 list / create / delete
-
-### Backend
-- `app/api/routes/detections.py`
-  - detection HTTP routes
-- `app/services/detection_service.py`
-  - detection 任務建立、序列化、刪除、background video processing
-- `app/integrations/yolo_engine.py`
-  - 封裝 Ultralytics YOLO 模型載入與 image/video inference
-- `app/repositories/detection_repository.py`
-  - detection task/object DB 存取
-- `app/models/detection_task.py`
-- `app/models/detection_object.py`
-  - detection ORM
-- `app/api/routes/chat.py`
-  - `POST /api/chat`
-  - `POST /api/chat/stream`
-  - `GET /api/chat`
-  - `GET /api/chat/{conversation_id}`
-  - `DELETE /api/chat/{conversation_id}`
-- `app/services/chat_service.py`
-  - provider 選擇、錯誤映射、chat log 寫入、conversation context 聚合
-- `app/integrations/chat_providers/*.py`
-  - 雲端 chat provider adapter
-- `app/repositories/chat_repository.py`
-  - chat log DB 存取
-- `app/models/chat_log.py`
-  - chat log ORM
-
----
-
-## 3. Detection 資料流
-
-### 3.1 Image Detection
+## 實驗室部署
 
 ```text
-Desktop MainUI
-  └── POST /api/detections/image
-        ├── 建立 detection_task
-        ├── 儲存原圖
-        ├── YOLO predict
-        ├── 儲存結果圖
-        ├── 寫入 detection_objects
-        └── 回傳 task + objects
+瀏覽器 → https://140.113.135.113 → Caddy gateway / React build
+                                 └─ /api、/static → FastAPI 127.0.0.1:8000
+                                                   ├─ MySQL 127.0.0.1:13306
+                                                   ├─ YOLO checkpoint / GPU
+                                                   └─ Ollama 127.0.0.1:11434
+維護入口 → nginx 127.0.0.1:8080 → 同一 FastAPI
 ```
 
-特性：
-- 同步執行
-- 適合單張圖片
-- Desktop 收到回應後直接渲染左右圖與 table
+Caddy／backend／nginx 由 Compose 管理，MySQL 是既有獨立容器，Ollama 為原生 systemd。backend 使用單 worker、主機 UID／GID、唯讀設定與模型、持久讀寫媒體；MySQL named volume 與 Caddy 憑證 volume 持久保存。公開入口已通過可信 IP HTTPS 與校外手機驗收。
 
-### 3.2 Video Detection
+Snap 的 gateway 需要私人 NNP=false 相容例外，保留其他隔離與資源限制；原因見 [HTTPS 專題](lab-public-https.md)。目前操作見 [維運交接](lab-operations.md)，每日排程啟用／新完整備份仍待 [收尾驗證](lab-phase6-finalization.md)。
 
-```text
-Desktop MainUI
-  └── POST /api/detections/video
-        ├── 建立 detection_task(status=processing)
-        ├── 儲存原始影片
-        └── 立即回傳 task id
+## 偵測與媒體
 
-FastAPI BackgroundTasks
-  └── process_video_detection_task()
-        ├── YOLO track 逐 frame 推論
-        ├── 儲存結果影片
-        ├── 產生 preview 圖
-        ├── 寫入 detection_objects (preview frame)
-        └── 更新 task(status=completed/failed)
+- 單張：route 驗證參數／上傳 → service 保存原圖 → `YoloEngine` 載入核准 checkpoint 並推論 → 保存標註圖／物件與模型來源 → 回傳紀錄。
+- 批次：建立 `detection_batches` 與各圖 `detection_tasks`，`BackgroundTasks` 逐圖執行、更新處理數；類別統計由 DB `GROUP BY` 完整聚合。
+- 影片：背景逐幀推論，保存結果影片與 preview，資料庫物件清單來自 preview frame，不是全影片每幀物件。
+- 模型：registry 限定 key、預期 SHA-256、類別對照與相容模組。OBB 的 DB bbox 是旋轉框外接矩形，不保存角度；各類別閾值只支援一般 image／batch。
+- 媒體：DB 存相對路徑，檔案位於 `backend/static/`；`/static` 不是公開目錄。Bearer 請求檢查擁有權，瀏覽器顯示採短期簽章 URL；安全標頭與格式白名單保留。
+- 頭像：檔名帶上傳者 id，指定時檢查歸屬、存在與是否被他人使用；換圖／刪人清理無人使用檔案，孤兒清理工具預設 dry-run。
 
-Desktop MainUI
-  └── 輪詢 GET /api/detections/{id}
-        └── 完成後渲染 preview 圖與 table
-```
+## Chat 與 Agent
 
-特性：
-- API 層非同步
-- 目前 Desktop 仍以輪詢等待完成
-- 尚未提供取消任務 / 百分比進度
+一般對話走 `/api/chat*`，依 conversation 載入上下文，再呼叫 provider；串流與非串流都保存問答。Agent 走獨立 `/api/agent/chat*`，只讀已有偵測／批次／歷史資料；兩者共用 `chat_logs`，Agent 以 `provider=langgraph-agent` 區別。
 
----
+| 引擎 | 用途與執行方式 |
+|---|---|
+| `tool_calling`（預設） | LangChain `create_agent`，模式決定工具子集；工具／模型次數有上限，compiled agent 快取 |
+| `pipeline` | LangGraph 的意圖 → 工具／輔助模組 → 回答；mock、確定性報告與 vision 路徑保留對應處理 |
 
-## 4. Static Storage
+使用者、DB、資料選取與鎖由 runtime context 注入，模型不能指定任意使用者身分。並行工具透過 DB lock 序列化 session 使用；非管理員查自己的資料，管理員工具函式內再次檢查。工具截斷清單不影響 DB 的完整聚合數字。
 
-```text
-backend/static/
-├── avatars/
-├── detections/
-│   ├── originals/
-│   ├── results/
-│   ├── previews/
-│   └── videos/
-│       ├── originals/
-│       └── results/
-└── results/
-```
+兩個引擎對 service 提供相同階段／文字事件，service 產生 SSE；Web 與 Desktop 不解析 provider 原始串流。tool-calling 可附 `tool` 事件，Web 顯示進度，Desktop 可忽略。LangChain／LangGraph lazy import；錯誤回傳固定訊息，provider 未設定不偷偷改 mock。
 
-FastAPI 透過 `/static/...` 掛載這些檔案，Desktop 用完整 URL 讀取或開啟。
+目前免費預設為 Chat Ollama `llama3.2`、Agent Ollama `gemma4`；模型清單依用途標註後端預設。DeepAgents 已決定不採用，flag 保持 false。Agent 不提供 CRUD 工具、不觸發 YOLO，也不直接寫檔；service 保存問答屬既有應用流程。
 
----
+## Web 工作區與 Desktop
 
-## 5. Chat 資料流
+Web 的單一「AI 助理」入口用路由連結切換 `/chat`／`/agent`，頁面與 service 獨立，共用一個 Axios instance。路由父層在記憶體分開保存草稿、模型、當前對話與資料選擇；重新整理、離開或登出即清除，已保存資料仍在 DB。Agent 保留 `mode`／`detection_id`／`batch_id` URL 帶入。
 
-### 5.1 Text Chat / Conversation MVP
+前端中止請求只代表停止接收，無法保證後端生成已取消。一般對話可切換歷史；Agent 尚無完整跨工作階段歷史清單。Web Profile 目前編輯暱稱／密碼、顯示頭像，沒有頭像上傳 UI；Web 單張偵測頁不提供影片上傳。
 
-```text
-Desktop AICSMain
-  └── POST /api/chat
-        ├── 驗證 JWT
-        ├── ChatService 依 CHAT_PROVIDER 選擇 provider
-        ├── 依 conversation_id 載入既有問答作為 context
-        ├── 呼叫 OpenAI / DeepSeek cloud API
-        ├── 將 question / answer / provider / model_name / conversation_id / turn_index 寫入 chat_logs
-        └── 回傳單輪聊天結果
-```
+Desktop 透過 `desktop-app/api_client.py` 使用共用 API。Webcam／RTSP 仍本機推論；模型選擇、批次、各類別閾值與報告下載尚未完整移植。細節見 [桌面版說明](../desktop-app/README.md)。
 
-特性：
-- 同步 API，Desktop 以本地 QThread 包裝避免 UI 卡住
-- provider 由 `.env` 決定，不綁死單一供應商
-- Desktop 不直接持有外部模型 API key
-- 對話上下文先以 `chat_logs` 聚合，不另建 conversation table
+## 認證、資料庫與限制
 
-### 5.2 Streaming Chat
+JWT 使用 PyJWT、bcrypt 密碼與 `users.token_version` 撤銷；Web token 仍存 localStorage，Desktop 存 QSettings，httpOnly cookie 未採用。登入節流與 LLM 額度目前是單程序記憶體，因此正式後端保留單 worker。管理員不可自我刪除／停用／降級，不可移除最後一位啟用管理員。
 
-```text
-Desktop AICSMain
-  └── POST /api/chat/stream
-        ├── 驗證 JWT
-        ├── 載入 conversation context
-        ├── provider stream_chat()
-        ├── 逐段輸出 SSE chunk
-        ├── 完整 answer 組裝完成後寫入 chat_logs
-        └── 回傳 done event
-```
+資料庫最新 migration `0013` 包含對話輪次唯一鍵，service 撞鍵重試；schema 見 [資料庫設計](database-design.md)，API 契約見 [規格](api-spec.md)。正式關閉自行註冊與 API 文件；開發環境設定不可推論為正式政策。
 
-特性：
-- backend 對 desktop 提供統一 SSE
-- Desktop 不直接解析第三方 provider SSE 協定
-- streaming 與非串流共用同一份 chat domain / history/context 設計
-
----
-
-## 6. 目前仍保留的 Legacy 路徑
-
-### `detect_mainui.py`
-- webcam detection
-- RTSP / 串流 detection
-- local QThread signal-driven 即時推論
-
-### `MainUI.py`
-- 對 webcam / RTSP 的按鈕與 Qt thread 控制仍保留 legacy 流程
-
-### `utils/deepseek.py`
-- 已退出 desktop 主流程
-- 暫時保留作為 legacy 參考，不再是正式 provider 實作
-
----
-
-## 7. 已知限制
-
-- `POST /api/detections/image` 仍為同步呼叫
-- `POST /api/detections/video` 使用 `BackgroundTasks`，不是完整 job queue
-- video detection 只保存 preview frame 的物件列表
-- Desktop chat history 切換 UI 尚未建立
-- Web Chat 頁目前尚未接 `POST /api/chat/stream`
-
----
-
-## 8. Agentic Layer（Phase 6A-1）
-
-### 8.1 定位
-
-```text
-PySide6 Desktop  ──HTTP──>  /api/agent/chat          ──>  AgentService
-React Web        ──HTTP──>  /api/agent/chat/stream        │
-                                                 ├── LangGraph Supervisor
-                                                 │     ├── classify_intent
-                                                 │     ├── call_tools_or_subagent
-                                                 │     ├── compose_answer
-                                                 │     └── handle_error
-                                                 ├── Subagents
-                                                 │     ├── yolo_result_explainer
-                                                 │     ├── detection_history_analyst
-                                                 │     ├── report_agent
-                                                 │     └── admin_assistant
-                                                 ├── Tools (read-only)
-                                                 │     ├── detection_tools
-                                                 │     ├── history_tools
-                                                 │     ├── user_tools
-                                                 │     └── report_tools
-                                                 └── chat_logs (provider="langgraph-agent")
-```
-
-關鍵原則：
-
-- YOLO 推論仍然由 `app/integrations/yolo_engine.py` 透過 `detection_service` 觸發，agent **只讀** 既有 `DetectionTask` / `DetectionObject`。
-- `/api/chat` 與 `/api/agent/chat` 完全分開；兩者寫入同一張 `chat_logs`，但 agent 路徑使用 `provider="langgraph-agent"` 作為區隔，不需要 migration。
-- LangChain / LangGraph / DeepAgents 一律以 lazy import 包裝，缺套件時 FastAPI 不會啟動失敗。所選 provider 無法使用（缺 API key / 缺套件）時回傳明確錯誤 `llm_not_configured`，**不會**偷偷改用 mock（mock 只在明確指定 `provider=mock` 時使用）。
-- DeepAgents 為 optional enhancement，預設 `AGENT_ENABLE_DEEPAGENTS=false`。
-
-### 8.2 LangGraph workflow
-
-```text
-classify_intent ──> call_tools_or_subagent ──┬──> compose_answer ──> END
-                                             └──> handle_error  ──> END
-```
-
-- `classify_intent`：若 request.mode != `auto` 直接套用該 mode；否則依使用者訊息與 `detection_id` 做關鍵字啟發式判斷。
-- `call_tools_or_subagent`：依 intent 呼叫對應 subagent helper 取得 deterministic payload，並組出要餵給 LLM 的 message list。
-- `compose_answer`：呼叫 `agents/llm.get_chat_model()` 並**一律以 stream 方式**取得回覆，每段文字透過 LangGraph `get_stream_writer()` 送出；若是 `generate_report`，保證 deterministic markdown 不會被 LLM 改寫，會放在 LLM 解讀文字之前。
-- `handle_error`：把 `permission_denied` / `detection not found` / `requires detection_id` 等錯誤映射為使用者可見訊息。
-
-**執行方式（Agent 重構 A，2026-10-19）**
-
-- graph 每個行程只 compile 一次（`_get_compiled_graph()`）；DB session 與 `current_user` 透過 LangGraph runtime context（`AgentRuntimeContext`）傳入節點，不再用 closure 綁在 graph 上。
-- `run_graph()` = `graph.invoke(...)`；`stream_graph()` = 同一個 graph 的 `graph.stream(stream_mode=["updates", "custom"])`：`updates` 事件在工具節點完成後轉成 SSE `start`，`custom` 事件就是 `compose_answer` 寫出的文字片段（SSE `chunk`）。兩條路徑執行完全相同的節點，不再有第二套手寫流程。
-- 所有模式都把 `history`（最近 `AGENT_MAX_HISTORY_TURNS` 輪）插在 system prompt 之後、最新使用者訊息之前。
-- 未安裝 LangGraph 時，同一組節點函式以 plain Python pipeline 依序執行。
-
-**Tool-calling 引擎（Agent 重構 B，`AGENT_ENGINE=tool_calling`）**
-
-```text
-agent service ──> use_tool_agent()? ──yes──> tool_agent.stream_tool_agent()
-                        │                      └─ create_agent(model, tools=mode 子集, context_schema=AgentToolContext)
-                        │                            ├─ ToolCallLimitMiddleware / ModelCallLimitMiddleware
-                        │                            └─ langchain_tools.* (@tool + ToolRuntime) ──> app/agents/tools/*（既有唯讀工具）
-                        └──no───> graph.stream_graph()（pipeline）
-```
-
-- 兩個引擎產生相同的 `(phase, data)`，service 轉成同一套 SSE；tool 引擎多一個 `tool` phase（工具進度）。
-- compiled agent 依 `(provider, model, mode, is_admin)` 快取；每次請求的 DB session、使用者、選取 ID 走 runtime context。
-- 同一輪模型可能並行呼叫多個工具（ToolNode 會用執行緒），`AgentToolContext.db_lock` 確保 SQLAlchemy session 不被同時使用。
-- 工具回傳的物件清單上限 50 筆（`MAX_OBJECTS_IN_TOOL_RESULT`），每類別統計永遠完整。
-
-### 8.3 Agent 工具邊界
-
-| 工具 | 權限 | 行為 |
-|------|------|------|
-| `get_detection_detail_tool` / `explain_detection_objects_tool` / `compare_detection_results_tool` | 擁有者或 admin | read-only |
-| `list_recent_detections_tool` / `summarize_detection_history_tool` / `filter_detections_by_status_or_type_tool` | 非 admin 強制 `user_id=current_user.id` | read-only |
-| `get_current_user_profile_tool` | 自己 | read-only |
-| `admin_list_users_tool` | admin only（函式開頭硬檢查） | read-only |
-| `generate_detection_report_markdown_tool` / `summarize_model_performance_tool` | 擁有者或 admin | read-only |
-
-本階段 **不曝露** delete / update / create 類工具。Agent 不可直接觸發 detection、不可呼叫 YOLO。
-
-### 8.4 已知限制
-
-- DeepAgents 整合僅保留 flag，沒有真實 subagent registry。
-- Agent 工具僅唯讀；不提供 create / update / delete，也不能觸發 YOLO 推論。
-
-> 更正（2026-08-28）：本節先前記載「agent streaming 尚未實作」與「Web
-> Frontend 尚未提供 `/agent` 入口」，兩者皆已於 Phase 6A-2／6A-3 完成：
-> `POST /api/agent/chat/stream` 由 `agents/service.stream_agent_reply()`
-> 實作為 SSE，Web 端入口為 `web-frontend/src/pages/AgentPage.jsx`
-> （路由 `/agent`）。
-
----
-
-## 9. 下一步建議
-
-1. 補 Web 一般對話頁的 streaming UI（`/chat` 尚未接 SSE；`/agent` 已接）
-2. 將 image detection 也統一為 async task
-3. 將 webcam / RTSP 改為 backend 任務或專門 streaming service
-4. Phase 6：Docker、部署文件與 CI/CD
+影片／批次使用 `BackgroundTasks`，不是持久工作佇列；意外重啟後可依受控工具標記中斷工作失敗，不自動重跑推論。1000 張批次、跨批次排隊、多 worker、空間關係、完整硬體災難復原與大規模併發均未宣稱完成。

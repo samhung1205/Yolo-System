@@ -69,3 +69,6 @@ htmlcov/
 
 # Local browser verification artifacts
 .playwright-cli/
+
+# Generated lab source update bundles
+deploy/out/

@@ -1,10 +1,12 @@
 import { Link } from "react-router";
 import { useState } from "react";
 
+import useAuthConfig from "../hooks/useAuthConfig";
 import authService from "../services/authService";
 import { normalizeApiError } from "../services/api";
 
 export default function RegisterPage() {
+  const { registrationEnabled, configError } = useAuthConfig();
   const [form, setForm] = useState({
     username: "",
     email: "",
@@ -17,6 +19,7 @@ export default function RegisterPage() {
 
   async function handleSubmit(event) {
     event.preventDefault();
+    if (registrationEnabled !== true) return;
     setError("");
     setSuccess("");
     setLoading(true);
@@ -30,6 +33,18 @@ export default function RegisterPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  if (registrationEnabled !== true) {
+    return (
+      <div className="auth-shell">
+        <div className="auth-panel">
+          <h1>{configError ? "暫時無法載入帳號申請方式" : registrationEnabled === null ? "正在確認帳號申請方式…" : "帳號由管理員建立"}</h1>
+          <p className="muted">{configError || (registrationEnabled === null ? "請稍候。" : "目前不開放自行註冊，請聯絡管理員申請帳號。")}</p>
+          <Link to="/login">返回登入</Link>
+        </div>
+      </div>
+    );
   }
 
   return (

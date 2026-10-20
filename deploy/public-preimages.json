@@ -1,0 +1,30 @@
+{
+  "backend/app/api/routes/auth.py": {
+    "lf_sha256": "88ede3eae775b18d80fbaa720d5e6ca2fb9b6f402a6f9323c67cedf89a819090",
+    "sha256": "9c8f3d1e15236435cbbe600ac34051522478e6c3ae36fef95d44f702d659fabf"
+  },
+  "backend/app/core/config.py": {
+    "lf_sha256": "fb67d2af3b7b95c42a9b6c809e40761e31ab36dd58f3f786a4c9b01f8496d911",
+    "sha256": "3855c825cca682cbbb3f6d651aa73f073f2917a863d15128fd88c0abd6c377fb"
+  },
+  "backend/app/services/auth_service.py": {
+    "lf_sha256": "07d78b29cf2d653dff77b77ce982d1b3f2eb7ba411b28ef76d91864af646395d",
+    "sha256": "2d78190afd32856ff756054fa5914137f5b62c825fd60de71e9bbc4b26a3d8af"
+  },
+  "deploy/compose.lab.yaml": {
+    "lf_sha256": "70fb42a9b841f09e93649d9ff187d45562c9722242d6686a3fac4b5801f2b90d",
+    "sha256": "70fb42a9b841f09e93649d9ff187d45562c9722242d6686a3fac4b5801f2b90d"
+  },
+  "web-frontend/src/pages/LoginPage.jsx": {
+    "lf_sha256": "c74c76dc7348d70e379e661c7f1c38439f762e69b55939297237d07d86ff68c7",
+    "sha256": "c74c76dc7348d70e379e661c7f1c38439f762e69b55939297237d07d86ff68c7"
+  },
+  "web-frontend/src/pages/RegisterPage.jsx": {
+    "lf_sha256": "828568d14da626af695bc9f9589c96056f64cfc95e486a4d4987fcd729169fcf",
+    "sha256": "828568d14da626af695bc9f9589c96056f64cfc95e486a4d4987fcd729169fcf"
+  },
+  "web-frontend/src/services/authService.js": {
+    "lf_sha256": "fb3f7d70eadca052ef71a1855568a92f3992374bacfc890c06f158183032261e",
+    "sha256": "fb3f7d70eadca052ef71a1855568a92f3992374bacfc890c06f158183032261e"
+  }
+}

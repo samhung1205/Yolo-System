@@ -6,11 +6,11 @@
 ## 啟動
 
 ```bash
-# 先啟動 backend（見根目錄 README），再從專案根目錄執行：
+# 連接既有網站，或先啟動開發 backend（見 docs/development.md）：
 conda activate yolo-backend          # 已含 PySide6 / ultralytics
 cd /path/to/Yolo_system
 # backend 不在 http://127.0.0.1:8000 時：
-# export YOLO_API_BASE_URL=http://127.0.0.1:8000
+# export YOLO_API_BASE_URL=https://140.113.135.113
 python Login.py
 ```
 
@@ -49,3 +49,5 @@ python Login.py
 - 只在 macOS 開發機上驗證；Windows 高 DPI 邏輯沿用 legacy 寫法
 
 詳細架構與階段狀態見 [architecture.md](../docs/architecture.md) 與 [roadmap.md](../docs/roadmap.md)。
+
+開發環境與驗證見 [development.md](../docs/development.md)；使用者操作見 [使用手冊](../README.md)。
