@@ -1,4 +1,4 @@
-"""Container health probe or explicit custom-checkpoint CUDA smoke test.
+"""Container health probe, custom-checkpoint CUDA or video smoke test.
 
 The CUDA test reads only the mounted approved checkpoints, uses temporary images,
 and does not connect to the database or Ollama. No .env mount is needed for it.
@@ -75,15 +75,77 @@ def gpu_smoke() -> None:
     print("Container custom YOLO GPU smoke test: PASS", flush=True)
 
 
+def decoded_frames(path: Path) -> int:
+    import cv2
+
+    capture = cv2.VideoCapture(str(path))
+    try:
+        if not capture.isOpened():
+            raise RuntimeError("Smoke-test video cannot be opened")
+        count = 0
+        while True:
+            ok, frame = capture.read()
+            if not ok:
+                break
+            if frame.shape[:2] != (64, 64):
+                raise RuntimeError("Smoke-test video dimensions changed")
+            count += 1
+        return count
+    finally:
+        capture.release()
+
+
+def video_smoke(*, use_cuda: bool = True) -> None:
+    """Exercise real tracking/encoding; CPU mode is for local verification only."""
+    import cv2
+    import numpy as np
+    import torch
+    from app.integrations.yolo_engine import YoloEngine
+
+    if use_cuda and not torch.cuda.is_available():
+        raise RuntimeError("CUDA unavailable for container video smoke test")
+    with TemporaryDirectory(prefix="yolo-video-") as folder:
+        root = Path(folder)
+        source, target = root / "input.mp4", root / "result.mp4"
+        writer = cv2.VideoWriter(str(source), cv2.VideoWriter_fourcc(*"mp4v"), 2, (64, 64))
+        try:
+            if not writer.isOpened():
+                raise RuntimeError("Smoke-test input encoder unavailable")
+            for _ in range(4):
+                writer.write(np.full((64, 64, 3), 255, dtype=np.uint8))
+        finally:
+            writer.release()
+        if decoded_frames(source) != 4:
+            raise RuntimeError("Smoke-test input must contain four frames")
+        engine = YoloEngine(model_key="seven_class_asff")
+        model = engine._load_model()
+        model.to("cuda:0" if use_cuda else "cpu")
+        result = engine.detect_video(source, output_video_path=target)
+        expected_device = "cuda" if use_cuda else "cpu"
+        if next(model.model.parameters()).device.type != expected_device:
+            raise RuntimeError("Video tracking used an unexpected device")
+        if (result.frame_count, result.image_width, result.image_height) != (4, 64, 64):
+            raise RuntimeError("Video tracking returned incomplete metadata")
+        if result.preview_image.size != (64, 64):
+            raise RuntimeError("Video tracking preview dimensions changed")
+        if not target.is_file() or not target.stat().st_size or decoded_frames(target) != 4:
+            raise RuntimeError("Video tracking output must decode to four frames")
+    print("Container YOLO video smoke test: PASS", flush=True)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--health", action="store_true")
     mode.add_argument("--gpu", action="store_true")
+    mode.add_argument("--video", action="store_true")
     args = parser.parse_args()
     if args.health:
         raise SystemExit(health())
-    gpu_smoke()
+    if args.video:
+        video_smoke()
+    else:
+        gpu_smoke()
 
 
 if __name__ == "__main__":

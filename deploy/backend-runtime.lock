@@ -1,0 +1,3 @@
+# Explicit runtime additions to the original verified backend-linux.lock.
+# Keep the original CUDA dependency layer reusable and do not upgrade its pins.
+lap==0.5.13

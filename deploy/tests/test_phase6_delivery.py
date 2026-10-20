@@ -107,7 +107,7 @@ class ContainerRegressionTests(unittest.TestCase):
         self.state={'image':'sha256:'+'a'*64,'user':'1007:1007'}
 
     def test_no_host_tmp_or_private_media_is_mounted_and_gpu_limits_remain(self):
-        with patch.object(finalize,'checked',return_value='182 passed\nContainer custom YOLO GPU smoke test: PASS') as run:
+        with patch.object(finalize,'checked',return_value='190 passed\nContainer custom YOLO GPU smoke test: PASS\nContainer YOLO video smoke test: PASS') as run:
             finalize.container_tests(self.batch,self.state)
         command=run.call_args.args[0]
         mounts=[command[i+1] for i,value in enumerate(command) if value=='--mount']
@@ -123,7 +123,7 @@ class ContainerRegressionTests(unittest.TestCase):
 
     def test_actual_seed_command_creates_only_three_synthetic_images(self):
         from PIL import Image
-        with patch.object(finalize,'checked',return_value='Container custom YOLO GPU smoke test: PASS') as run:
+        with patch.object(finalize,'checked',return_value='Container custom YOLO GPU smoke test: PASS\nContainer YOLO video smoke test: PASS') as run:
             finalize.container_tests(self.batch,self.state)
         tokens=shlex.split(run.call_args.args[0][-1])
         seed=tokens[tokens.index('-c')+1]
@@ -137,6 +137,11 @@ class ContainerRegressionTests(unittest.TestCase):
     def test_missing_gpu_pass_marker_is_not_success(self):
         with patch.object(finalize,'checked',return_value='182 passed'):
             with self.assertRaises(finalize.Failed):finalize.container_tests(self.batch,self.state)
+
+    def test_image_gpu_success_without_video_is_not_success(self):
+        with patch.object(finalize,'checked',return_value='190 passed\nContainer custom YOLO GPU smoke test: PASS'):
+            with self.assertRaisesRegex(finalize.Failed,'影片追蹤未通過'):
+                finalize.container_tests(self.batch,self.state)
 
     def test_real_subprocess_error_is_private_and_preserves_exit_and_stderr(self):
         log=self.root/'failure.json'

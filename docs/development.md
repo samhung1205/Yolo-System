@@ -76,6 +76,14 @@ VITE_API_BASE_URL='' npm run build
 
 沒有 `npm test` 或 lint script，請勿宣稱已執行。真實 GPU／MySQL／Ollama／HTTPS 與單元測試結果分開，完整歷史驗證見 [歷史索引](archive/README.md)。
 
+## 影片與容器依賴
+
+影片走 `YoloEngine.detect_video()` 的 `model.track()`，需 `lap==0.5.13`；一般圖片測試不會觸發追蹤依賴。本機 requirements 已列入。正式 Docker 使用原始 `deploy/backend-linux.lock` 加上 `deploy/backend-runtime.lock` 補充固定版本；補充層以 binary wheel／不更新既有依賴安裝，再驗證 pip check。原始 CUDA lock 保留，避免為新增追蹤套件重建大型依賴層。
+
+`deploy/ci_requirements.py` 合併兩份 lock，保留 lap，只將 Torch 改 CPU 版本並移除 CUDA 專用依賴。容器關閉 Ultralytics 執行時自動安裝；新增使用到的選用功能時，必須明列依賴並在候選 image 實測。
+
+`deploy/backend_smoke.py --video` 為容器的核准模型／CUDA 四影格影片追蹤及輸出解碼驗證，沒有私人資料或 DB 需求；`lab_finalize.py` 已將它放在正式服務切換之前。實機執行方式與最新結果見 [Phase 6 收尾批次](lab-phase6-finalization.md)。
+
 ## CI 與文件同步
 
 `.github/workflows/verify.yml` 目前是手動 `workflow_dispatch`，避免自行消耗私人 repository 的 Actions 額度。它固定 action commit、採唯讀權限、建 CPU 測試環境、排除私人 checkpoint、執行部署工具與文件檢查，再建置前端。檔案已準備好不代表 GitHub 已有成功 run；目前狀態見 [roadmap](roadmap.md)。

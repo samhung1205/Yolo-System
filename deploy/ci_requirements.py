@@ -17,4 +17,6 @@ def cpu_pins(text):
 
 
 if __name__ == '__main__':
-    print('\n'.join(cpu_pins(Path(__file__).with_name('backend-linux.lock').read_text())))
+    root = Path(__file__).parent
+    source = (root/'backend-linux.lock').read_text() + '\n' + (root/'backend-runtime.lock').read_text()
+    print('\n'.join(cpu_pins(source)))

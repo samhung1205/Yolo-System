@@ -24,6 +24,7 @@ requests>=2.31.0
 
 # AI / Detection
 ultralytics>=8.3.242
+lap==0.5.13  # Ultralytics video tracking; install at build time
 pillow>=10.0.0
 opencv-python-headless>=4.10.0
 reportlab>=4.0,<5

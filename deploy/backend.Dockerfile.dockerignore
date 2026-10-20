@@ -16,6 +16,7 @@
 !deploy/
 !deploy/backend.Dockerfile
 !deploy/backend-linux.lock
+!deploy/backend-runtime.lock
 !deploy/backend_smoke.py
 !models/
 !models/custom_modules/

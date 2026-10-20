@@ -124,9 +124,11 @@ def container_tests(batch, state, log_path=None):
         command += ['--mount', f'type=bind,source={source},target={target},readonly']
     command += [state['image'], 'sh','-c',
                 'python -m pip check && python -c ' + shlex.quote(SEED_IMAGES) +
-                ' && python -m pytest -q -p no:cacheprovider && python /opt/yolo/deploy/backend_smoke.py --gpu']
+                ' && python -m pytest -q -p no:cacheprovider && python /opt/yolo/deploy/backend_smoke.py --gpu'
+                ' && python /opt/yolo/deploy/backend_smoke.py --video']
     output = checked(command, timeout=600, show=True, log_path=log_path)
     need('Container custom YOLO GPU smoke test: PASS' in output, '容器回歸未完整通過')
+    need('Container YOLO video smoke test: PASS' in output, '候選 image 影片追蹤未通過，未切換正式服務')
     return output.splitlines()[-15:]
 
 

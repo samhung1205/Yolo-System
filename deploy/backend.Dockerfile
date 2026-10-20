@@ -26,6 +26,14 @@ RUN python -m pip install --prefer-binary \
         -r /opt/yolo/deploy/backend-linux.lock \
     && python -m pip check
 
+# Video tracking is lazy-loaded by Ultralytics and is absent from its core deps.
+# Install in a separate layer so adding it does not redownload the CUDA stack.
+COPY deploy/backend-runtime.lock /opt/yolo/deploy/backend-runtime.lock
+RUN python -m pip install --only-binary=:all: --no-deps \
+        -r /opt/yolo/deploy/backend-runtime.lock \
+    && python -m pip check \
+    && python -c "import lap; assert lap.__version__ == '0.5.13'"
+
 WORKDIR /opt/yolo/backend
 COPY backend/main.py backend/alembic.ini ./
 COPY backend/app/ ./app/

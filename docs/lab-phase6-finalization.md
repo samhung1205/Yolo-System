@@ -1,11 +1,11 @@
 # Phase 6 收尾批次
 
-2026-10-21：Ubuntu 已同步 `84dcbca`，公開 health／DB 正常；首次收尾停在 `container-regression`，尚未切換 gateway 或安裝每日排程。`5734992` 已移除主機 `/tmp` 掛載並補上子程序錯誤紀錄；Ubuntu 已能執行完整 pytest，但兩項非法圖片拒絕測試失敗（180 通過）。本輪已修正 Ultralytics 8.4.38 的 Pillow 包裝相容問題並加入候選 backend 建置／測試／受控切換，**仍待 Ubuntu 重驗，不能先標記 Phase 6 全部完成**。既有網站、校外手機驗收與第一份備份維持先前通過結果。
+2026-10-21：Ubuntu `d233630` 已通過候選 backend 回歸／GPU 並切換 backend／gateway；HTTPS 管理員權限、頭像、單圖、100 張批次與 ZIP 通過，接著影片失敗。日誌已確認容器缺少追蹤依賴 `lap`。本輪補上固定依賴與切換前的真實影片 gate，**仍待 Ubuntu 重驗，不能先標記 Phase 6 全部完成**。每日備份尚未安裝；既有網站、校外手機驗收與第一份備份維持先前通過結果。
 
 ## 已完成的本機驗證
 
-- 本輪後端全套 **190 passed（29.91 秒）**：獨立工作目錄／隨機測試 key／合成圖片，不讀正式 `.env` 或私人媒體；使用本機核准 checkpoint，非 Ubuntu GPU 重驗。新增 Ultralytics HEIF 包裝下的格式白名單、壞檔拒絕與暫存清理測試。
-- 部署工具涵蓋備份失敗恢復、輪替範圍、root／使用者權限界線、暫存還原歸屬、來源更新與 gateway 回退。本輪全套 **145 項通過**（含本機假 Docker Unix API、候選 backend 不動正式服務、忙碌拒絕切換、啟動失敗回復與私人設定競爭保護）。
+- 上一輪後端全套 **190 passed（29.91 秒）**：獨立工作目錄／隨機測試 key／合成圖片，不讀正式 `.env` 或私人媒體；使用本機核准 checkpoint，非 Ubuntu GPU 重驗。新增 Ultralytics HEIF 包裝下的格式白名單、壞檔拒絕與暫存清理測試。
+- 部署工具涵蓋備份失敗恢復、輪替範圍、root／使用者權限界線、暫存還原歸屬、來源更新與 gateway 回退。最新全套 **153 項通過**（含本機假 Docker Unix API、候選 backend 不動正式服務、忙碌拒絕切換、啟動失敗回復、私人設定競爭保護、影片依賴失敗／輸出截斷拒絕與 CI 補充依賴）。
 - Vite 8.3.4／React plugin 6.1.2，production build 通過，npm audit 為 0；Node 最低 20.19 或 22.12，部署使用 Node 22 image。依 [Vite 8 遷移文件](https://vite.dev/guide/migration) 更新，沒有執行 audit fix --force。
 - Playwright 實際瀏覽器：production build 登入／工作台、Agent query／重新整理、登出、未登入路由保護與關閉註冊頁通過。API 使用獨立 SQLite，沒有使用正式帳密／資料庫。favicon 404 與選取不存在的測試偵測 404 為預期診斷，沒有 JS 執行例外。
 - `lab_regression.py` 已在獨立 SQLite、測試 HTTPS 與真實 CPU 模型跑通：兩個臨時帳號、管理員權限、頭像歸屬／清理、單圖／100 張批次／ZIP、四影格影片、媒體權限、Desktop client、改密碼撤銷 JWT；臨時帳號清理成功。100 張合成圖片批次在本次 CPU 環境共 9.276 秒（含上傳／進度等待），只作測試紀錄，不當作真實資料的效能承諾。這不冒稱 Ubuntu GPU 驗收。
@@ -34,7 +34,7 @@ python deploy/lab_finalize.py
 
 整批完成：
 
-1. 依目前來源與 Linux lock 建置候選 backend image，正式網站在建置期間持續運行；候選 image 必須通過完整 pytest、合成圖片、自訂模型 CUDA／NMS。測試圖片直接建立在測試容器的 16 MiB tmpfs，容器移除即丟棄，不掛主機 `/tmp`、正式 `.env` 或私人媒體、不連正式 DB。測試／腳本／checkpoint 維持唯讀掛載，沿用原 UID／GPU／CPU／RAM 限制。
+1. 依目前來源與 Linux lock 建置候選 backend image，正式網站在建置期間持續運行；候選 image 必須通過完整 pytest、合成圖片、自訂模型 CUDA／NMS，以及四影格真實影片追蹤／預覽／輸出解碼。測試圖片直接建立在測試容器的 16 MiB tmpfs，容器移除即丟棄，不掛主機 `/tmp`、正式 `.env` 或私人媒體、不連正式 DB。測試／腳本／checkpoint 維持唯讀掛載，沿用原 UID／GPU／CPU／RAM 限制。
 2. 確認正式 backend 身分／掛載未改變，並只讀查核沒有 pending／processing 偵測或批次，才將私人 image 參數指向已測試候選；只重建本專案 backend，等待 DB health 與關閉註冊政策通過。失敗時回復原設定與舊 backend image，保留媒體／模型／DB 掛載；不執行 migration。接著建置新的 Vite 8／Caddy image、先驗證設定再切 gateway，保留 Snap NNP 旗標與原憑證 volume，gateway 啟動失敗亦回復。全程不重啟共享 Docker／MySQL／Ollama。
 3. 真實 HTTPS 的兩帳號、頭像、圖片／批次／影片、Desktop client 與 JWT 撤銷回歸；只刪本輪建立且已無進行中工作的臨時帳號。
 4. 原有圖片／對話基準、Chat／Agent SSE 與保存；各新增一組管理員測試對話。記錄共享 GPU 的觀測峰值，不推論成 50 人同時使用的能力。
@@ -63,7 +63,19 @@ Ubuntu `5734992` 的容器已執行完整 pytest，結果為 **180 passed／2 fa
 
 新 backend image 設 `YOLO_AUTOINSTALL=false`，維持固定依賴；不連網臨時補套件、不修改 Linux lock。因既有正式 image 不會隨 git pull 更新，本輪把建置候選、完整 pytest／GPU gate、閒置檢查與受控 backend 切換納入同一批次，而非只在測試容器覆蓋檔案。請在沒有其他成員提交工作時執行上述一段命令；建置通常可重用既有 dependency layer，切換 backend 時會短暫無法服務。
 
-本機新增測試已重現 upstream 包裝導致缺 pi-heif，再驗證修正版壞檔回 400／清理、所有白名單格式通過與 TIFF 拒絕，且沒有安裝嘗試。完整 190 後端／145 部署工具通過；**正式 Linux image 建置、GPU、HTTPS 與每日 timer 仍待本輪 Ubuntu 結果**，不因本機成功先標完成。
+本機新增測試已重現 upstream 包裝導致缺 pi-heif，再驗證修正版壞檔回 400／清理、所有白名單格式通過與 TIFF 拒絕，且沒有安裝嘗試。完整 190 後端／145 部署工具通過；當時正式 Linux image／GPU／HTTPS 尚待 Ubuntu；後續已跑至 HTTPS 影片失敗，見下節。
+
+## 2026-10-21 影片追蹤缺少 lap
+
+Ubuntu 報告 `finalize-20261020T184510Z.json` 已通過候選回歸及服務切換，HTTPS 回歸完成到 100 張批次／ZIP。影片失敗後，篩選出的正式日誌為 `Video detection failed for task 103` 與 `ModuleNotFoundError: No module named 'lap'`，直接原因已確認。
+
+`YoloEngine.detect_video()` 使用 Ultralytics `model.track()`；追蹤的 [matching 模組](https://docs.ultralytics.com/reference/trackers/utils/matching/) 會延遲載入 lap，單圖 smoke 不會驗出它。原始 Ubuntu 118 筆 freeze 未包含此選用依賴。本機環境已有 lap，因此先前 CPU 影片通過不能證明容器完整。
+
+修正使用 [lap 0.5.13](https://pypi.org/project/lap/0.5.13/)：`backend/requirements.txt` 明確列入；Docker 由 `deploy/backend-runtime.lock` 的獨立層安裝固定 binary wheel、`--no-deps` 並執行 pip check／import。原始 `backend-linux.lock` 與 CUDA 版本不動，可重用既有大型依賴層。CI 合併兩份 lock 後只轉 CPU Torch；維持 `YOLO_AUTOINSTALL=false`，不在運行容器或 Ubuntu conda 臨時補裝。
+
+候選 image 現在必須先通過 `backend_smoke.py --video`：合成四影格 64×64 MP4、核准的 ASFF 模型真實 CUDA 追蹤、預覽／metadata、輸出影片實際解碼四影格。測試使用容器內暫存資料且無網路；任何失敗會在 backend／gateway 切換之前停止。完整 HTTPS 影片／Desktop／資料權限驗收依然保留。
+
+本機以 lap 0.5.13 跑過相同影片流程的真實 CPU 推論／追蹤／輸出解碼，另有 153 項部署工具測試全部通過；本輪尚未在 Ubuntu 重跑 GPU／HTTPS，也尚未啟用每日備份。續跑使用上方同一段 Git 更新與收尾指令，不重跑舊套用包。
 
 ## 備份、狀態與停用
 
