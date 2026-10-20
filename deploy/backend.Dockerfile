@@ -4,6 +4,7 @@ FROM python:3.11.17-slim-bookworm
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
+    YOLO_AUTOINSTALL=false \
     HOME=/tmp/yolo-home \
     MPLCONFIGDIR=/tmp/matplotlib \
     YOLO_CONFIG_DIR=/tmp/ultralytics \

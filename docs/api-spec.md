@@ -46,6 +46,10 @@ Authorization: Bearer <jwt_token>
 > 500 / 502 / 503 與 SSE `error` 事件的 `detail` / `message` 一律是固定的對外訊息；
 > 上游回應內容、檔案路徑、例外字串只寫進後端 log，不會回傳給 client。
 
+### 上傳圖片驗證
+
+影像與頭像只接受實際解碼為 JPEG／PNG／WEBP／GIF／BMP 的內容；不依賴客戶端副檔名判斷，壞檔回 400 並清理暫存。Pillow 解碼明確限制於上述格式，避開 Ultralytics 的 HEIF 自動安裝包裝；HEIF／TIFF 不在支援範圍，不會為驗證未知檔案而補裝套件。
+
 ### 靜態資源（`/static/*`）
 
 偵測結果圖、影片、頭像等靜態檔**不再公開存取**。因為 `<img>` 無法帶 `Authorization` header，API 回傳的 `*_url` / `avatar_url` 會內嵌短期 signed query：

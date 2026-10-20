@@ -4,6 +4,7 @@ never renders an unexpected file type as a document.
 """
 import io
 from pathlib import Path
+import types
 
 import pytest
 from fastapi import HTTPException, UploadFile
@@ -55,6 +56,62 @@ def test_polyglot_png_with_html_tail_is_still_stored_as_png():
 def test_non_image_bytes_are_rejected():
     with pytest.raises(InvalidUploadError):
         image_extension_for_bytes(HTML_PAYLOAD)
+
+
+@pytest.fixture
+def heif_autoinstall_wrapper(monkeypatch):
+    """Reproduce the 8.4.38 wrapper without importing YOLO or using the network."""
+    native = Image.open
+    if getattr(native, "__module__", "") == "ultralytics.utils.patches":
+        native = native.__globals__["_image_open"]
+    module = types.ModuleType("ultralytics.utils.patches")
+    module._image_open = native
+    module.install_attempts = []
+    exec('''def image_open(source, *args, **kwargs):
+    try:
+        return _image_open(source, *args, **kwargs)
+    except Exception:
+        install_attempts.append("pi-heif")
+        raise ModuleNotFoundError("No module named pi_heif", name="pi_heif")
+''', module.__dict__)
+    monkeypatch.setattr(Image, "open", module.image_open)
+    return module
+
+
+def test_invalid_upload_is_rejected_without_heif_import_or_install(heif_autoinstall_wrapper):
+    # First prove this is the same failure mode observed in the offline image.
+    with pytest.raises(ModuleNotFoundError):
+        Image.open(io.BytesIO(HTML_PAYLOAD))
+    heif_autoinstall_wrapper.install_attempts.clear()
+    with pytest.raises(InvalidUploadError):
+        image_extension_for_bytes(HTML_PAYLOAD)
+    assert heif_autoinstall_wrapper.install_attempts == []
+    assert Image.open is heif_autoinstall_wrapper.image_open
+
+
+@pytest.mark.parametrize("format, extension", [("JPEG", ".jpg"), ("PNG", ".png"),
+    ("WEBP", ".webp"), ("GIF", ".gif"), ("BMP", ".bmp")])
+def test_supported_images_still_decode_after_yolo_patch(heif_autoinstall_wrapper, format, extension):
+    stream = io.BytesIO()
+    Image.new("RGB", (4, 4), "blue").save(stream, format=format)
+    assert image_extension_for_bytes(stream.getvalue()) == extension
+    assert heif_autoinstall_wrapper.install_attempts == []
+
+
+def test_disallowed_tiff_does_not_enable_an_extra_decoder(heif_autoinstall_wrapper):
+    stream = io.BytesIO()
+    Image.new("RGB", (4, 4), "blue").save(stream, format="TIFF")
+    with pytest.raises(InvalidUploadError):
+        image_extension_for_bytes(stream.getvalue())
+    assert heif_autoinstall_wrapper.install_attempts == []
+
+
+def test_invalid_upload_cleans_staging_file_after_yolo_patch(static_root, heif_autoinstall_wrapper):
+    with pytest.raises(HTTPException) as exc_info:
+        detection_service._store_original_image(8, _upload("evil.png", HTML_PAYLOAD, "image/png"))
+    assert exc_info.value.status_code == 400
+    assert list((static_root / "detections" / "originals").iterdir()) == []
+    assert heif_autoinstall_wrapper.install_attempts == []
 
 
 @pytest.mark.parametrize(

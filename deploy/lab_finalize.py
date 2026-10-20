@@ -1,6 +1,6 @@
 """Run Phase 6 lab verification, install daily backups, then verify one snapshot.
 
-Run as the project user after sudo -v. Builds and switches only the gateway;
+Run as the project user after sudo -v. Tests new backend and gateway images;
 does not restart shared services, change firewall rules or touch other projects.
 """
 from datetime import datetime, timezone
@@ -130,6 +130,67 @@ def container_tests(batch, state, log_path=None):
     return output.splitlines()[-15:]
 
 
+def build_backend(batch):
+    """Build from tracked sources; leave the running backend untouched."""
+    tag = 'sam-yolo-backend:phase6-' + batch.stamp.lower()
+    print('建置修正版 backend image；正式服務持續運行…', flush=True)
+    checked(['sudo','-n','docker','build','--pull=false','--platform','linux/amd64',
+             '-f',str(batch.repo/'deploy/backend.Dockerfile'),'-t',tag,str(batch.repo)],
+            timeout=1800,show=True)
+    image = batch.docker('image','inspect','--format','{{.Id}}',tag).strip()
+    need(re.fullmatch('sha256:[0-9a-f]{64}',image), 'New backend image ID invalid')
+    return image
+
+
+def update_backend(batch, previous, image, work):
+    """Switch the tested backend only, restoring the previous image on failure."""
+    env_path = batch.config/'compose.env'
+    before = env_path.read_text()
+    pattern = r'^YOLO_PUBLIC_BACKEND_IMAGE=.+$'
+    need(len(re.findall(pattern,before,re.M)) == 1, 'Backend image setting missing/duplicated')
+    need(re.search(pattern,before,re.M).group().split('=',1)[1] == previous['image'],
+         'Private backend image differs from running image; refusing replacement')
+    current = batch.inspect('sam-yolo-backend')
+    need(current['id'] == previous['id'] and current['image'] == previous['image']
+         and current['mounts'] == previous['mounts'] and current['running']
+         and current['project'] == 'sam-yolo' and current['service'] == 'backend',
+         'Backend identity changed; refusing replacement')
+    if image == previous['image']:
+        return {'previous_image': image, 'image': image, 'changed': False}
+    # Read-only query inside the existing backend; credentials never leave it.
+    idle = batch.docker('exec',previous['id'],'python','-c',
+        'from app.db.session import SessionLocal; from app.models import DetectionTask, DetectionBatch; '
+        'db=SessionLocal(); '
+        'print(db.query(DetectionTask).filter(DetectionTask.status.in_(("pending","processing"))).count()+'
+        'db.query(DetectionBatch).filter(DetectionBatch.status.in_(("pending","processing"))).count()); db.close()')
+    need(idle.strip() == '0', '仍有進行中／中斷偵測，未切換 backend，請先完成或受控復原')
+    private_write(work/'backend.compose.before.env', before)
+    after = re.sub(pattern, lambda _: 'YOLO_PUBLIC_BACKEND_IMAGE='+image, before, flags=re.M)
+    need(env_path.read_text() == before, 'Private Compose settings changed')
+    temporary = work/'backend.compose.next.env'
+    private_write(temporary, after)
+    os.replace(temporary, env_path)
+    compose = ['compose','--env-file',str(env_path),'-f',str(batch.repo/'deploy/compose.lab.yaml'),
+               '-f',str(batch.repo/'deploy/compose.public.yaml')]
+    try:
+        batch.docker(*compose,'config','--quiet')
+        batch.docker(*compose,'up','-d','--no-deps','--no-build','--pull','never','backend')
+        batch.wait_backend()
+        need(batch.inspect('sam-yolo-backend')['image'] == image, 'Backend did not adopt tested image')
+        need(batch.request('/api/auth/config',port=8000).json() == {'registration_enabled':False},
+             'New backend registration policy changed')
+    except Exception:
+        need(env_path.read_text() == after, 'Private configuration changed; refusing automatic rollback')
+        rollback = work/'backend.compose.rollback.env'
+        private_write(rollback, before)
+        os.replace(rollback, env_path)
+        batch.docker(*compose,'up','-d','--no-deps','--no-build','--pull','never','backend')
+        batch.wait_backend()
+        raise
+    print('PASS: 已測試 backend 更新／DB health／關閉註冊；資料掛載與其他服務保留',flush=True)
+    return {'previous_image':previous['image'],'image':image,'changed':True}
+
+
 def update_gateway(batch, previous, work):
     """Build stateless frontend, then switch only gateway with guarded rollback."""
     env_path=batch.config/'compose.env'
@@ -204,9 +265,15 @@ def main():
         need(all(state['running'] for state in original.values()),'服務尚未全部啟動')
         database=original['sam-yolo-mysql']
         need(any(m.get('Name')=='sam-yolo-mysql-data' for m in database['mounts']),'MySQL 歸屬不符')
+        report['stage']='backend-build'
+        image=build_backend(batch)
+        report['candidate_backend_image']=image
         report['stage']='container-regression'
-        report['container_tests']=container_tests(batch,original['sam-yolo-backend'],work/'container-regression.json')
-        print('PASS: 正式 image 全套測試／合成影像／自訂模型 GPU；正式資料未掛入測試容器',flush=True)
+        candidate={**original['sam-yolo-backend'],'image':image}
+        report['container_tests']=container_tests(batch,candidate,work/'container-regression.json')
+        print('PASS: 候選 backend 全套測試／合成影像／自訂模型 GPU；正式資料未掛入測試容器',flush=True)
+        report['stage']='backend-update'
+        report['backend_update']=update_backend(batch,original['sam-yolo-backend'],image,work)
         report['stage']='frontend-gateway'
         report['gateway_update']=update_gateway(batch,original['sam-yolo-gateway'],work)
         report['stage']='https-regression'

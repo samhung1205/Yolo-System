@@ -1,6 +1,6 @@
 # 實驗室部署：目前操作與交接
 
-2026-10-20 公開入口核心驗收通過：[https://140.113.135.113](https://140.113.135.113)。報告 `public-verify-20261020T094649Z-2578684/report.json`：原有圖片／對話 SHA-256 一致、Bearer／signed URL／未登入保護、Chat SSE／保存（首片段 1.05 秒）及 Agent 工具／SSE／保存（5.13 秒）皆通過。未重建／重啟服務。使用者另已確認手機行動網路瀏覽器全流程正常；Mac 備份副本亦已實際核對通過。2026-10-21 維運／完整回歸工具已完成本機實作與測試，Ubuntu 首次執行停在容器回歸、尚未進入服務變更；修正與續跑見 [Phase 6 收尾批次](lab-phase6-finalization.md)，Phase 6 持續進行。
+2026-10-20 公開入口核心驗收通過：[https://140.113.135.113](https://140.113.135.113)。報告 `public-verify-20261020T094649Z-2578684/report.json`：原有圖片／對話 SHA-256 一致、Bearer／signed URL／未登入保護、Chat SSE／保存（首片段 1.05 秒）及 Agent 工具／SSE／保存（5.13 秒）皆通過。未重建／重啟服務。使用者另已確認手機行動網路瀏覽器全流程正常；Mac 備份副本亦已實際核對通過。2026-10-21 維運／完整回歸工具已完成本機實作與測試，Ubuntu 後續已跑到 180 過／2 項非法圖片拒絕測試失敗，尚未進入服務變更；修正與續跑見 [Phase 6 收尾批次](lab-phase6-finalization.md)，Phase 6 持續進行。
 
 ## 服務位置與管理界線
 
@@ -75,7 +75,7 @@ python3 deploy/verify_downloaded_backup.py \
 
 原始已驗證備份早於 HTTPS 更新，是該時間點的資料與設定；它不包含後續新增對話、Caddy 憑證 volume、Docker image 本體或完整 Git 原始碼。下一批維運需要建立目前部署的可重建交接資訊與新備份，再設計每日排程／容量與保留輪替。原始成功還原基準先固定保留，不能先刪掉。
 
-升級前先備份；記錄目前 image ID／來源版本與 Linux lock，於暫用服務完成 schema／GPU／API 驗證，再切換 backend 或 gateway，並讀回舊資料。失敗時只回復本專案 image／Compose 參數；不可把正式 DB 直接還原覆蓋成舊版本。涉及 migration 的回退須另做相容驗證。不要重跑初期 Compose 納管或舊更新包，它們針對舊基準，並非日常重啟指令。
+升級前先備份；記錄目前 image ID／來源版本與 Linux lock，於隔離候選 image 完成必要測試／GPU 驗證，再受控切換 backend 或 gateway，確認啟動／DB／API 與舊資料。當前收尾包含上傳解碼修正，會建置新的 backend；僅在沒有進行中偵測／批次時切換，失敗回復原設定／image，不在運行容器內臨時 pip 安裝。失敗時只回復本專案 image／Compose 參數；不可把正式 DB 直接還原覆蓋成舊版本。涉及 migration 的回退須另做相容驗證。不要重跑初期 Compose 納管或舊更新包，它們針對舊基準，並非日常重啟指令。
 
 ## Phase 6 尚未完成的部分
 

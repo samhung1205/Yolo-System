@@ -178,16 +178,102 @@ class ContainerRegressionTests(unittest.TestCase):
         failure=finalize.CommandFailure('Docker',125,self.root/'command.json','fixture failure')
         with patch.object(finalize.sys,'platform','linux'),patch.object(finalize.os,'getuid',return_value=1007), \
              patch.object(finalize,'Batch',return_value=batch),patch.object(finalize,'checked'), \
+             patch.object(finalize,'build_backend',return_value='sha256:'+'a'*64), \
              patch.object(finalize,'ResourceSample',return_value=resources), \
              patch.object(finalize,'keep_sudo_alive'),patch.object(finalize,'container_tests',side_effect=failure), \
+             patch.object(finalize,'update_backend') as backend, \
              patch.object(finalize,'update_gateway') as gateway,patch.object(finalize,'Regression') as regression, \
              redirect_stdout(io.StringIO()):
             self.assertEqual(finalize.main(),1)
-        gateway.assert_not_called();regression.assert_not_called()
+        backend.assert_not_called();gateway.assert_not_called();regression.assert_not_called()
         report=json.loads(next((config/'reports').glob('finalize-*.json')).read_text())
         self.assertFalse(report['success'])
         self.assertEqual(report['stage'],'container-regression')
         self.assertEqual(report['command_failure']['exit_code'],125)
+
+
+class BackendUpdateTests(unittest.TestCase):
+    def setUp(self):
+        self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup)
+        self.root=Path(self.temp.name);self.work=self.root/'work';self.work.mkdir()
+        self.before='YOLO_PUBLIC_BACKEND_IMAGE=sha256:'+('a'*64)+'\nYOLO_GATEWAY_NNP=false\n'
+        (self.root/'compose.env').write_text(self.before)
+        self.old={'id':'old-id','image':'sha256:'+'a'*64,'mounts':[{'Name':'private-fixture'}],
+                  'running':True,'project':'sam-yolo','service':'backend'}
+        self.image='sha256:'+'b'*64
+        self.calls=[]
+        self.batch=SimpleNamespace(config=self.root,repo=self.root,stamp='fixture',
+            wait_backend=Mock(),inspect=Mock(side_effect=[self.old,{**self.old,'image':self.image}]),
+            request=Mock(return_value=SimpleNamespace(json=lambda:{'registration_enabled':False})))
+        def docker(*args):
+            self.calls.append(args)
+            return '0' if args[0]=='exec' else ''
+        self.batch.docker=docker
+
+    def test_only_tested_backend_changes_and_other_settings_survive(self):
+        result=finalize.update_backend(self.batch,self.old,self.image,self.work)
+        self.assertTrue(result['changed'])
+        ups=[call for call in self.calls if 'up' in call]
+        self.assertEqual(len(ups),1)
+        self.assertEqual(ups[0][-1],'backend')
+        self.assertIn('--no-deps',ups[0]);self.assertIn('--no-build',ups[0])
+        self.assertIn(self.image,(self.root/'compose.env').read_text())
+        self.assertIn('YOLO_GATEWAY_NNP=false',(self.root/'compose.env').read_text())
+        self.assertEqual((self.work/'backend.compose.before.env').read_text(),self.before)
+
+    def test_busy_database_preserves_original_config_and_container(self):
+        self.batch.docker=lambda *args:'1'
+        with self.assertRaises(finalize.Failed):
+            finalize.update_backend(self.batch,self.old,self.image,self.work)
+        self.assertEqual((self.root/'compose.env').read_text(),self.before)
+        self.batch.wait_backend.assert_not_called()
+
+    def test_foreign_or_changed_container_is_never_replaced(self):
+        self.batch.inspect=Mock(return_value={**self.old,'project':'foreign'})
+        with self.assertRaises(finalize.Failed):
+            finalize.update_backend(self.batch,self.old,self.image,self.work)
+        self.assertEqual(self.calls,[])
+
+    def test_stale_private_image_setting_cannot_be_used_for_rollback(self):
+        stale='YOLO_PUBLIC_BACKEND_IMAGE=sha256:'+('c'*64)+'\n'
+        (self.root/'compose.env').write_text(stale)
+        with self.assertRaisesRegex(finalize.Failed,'differs from running image'):
+            finalize.update_backend(self.batch,self.old,self.image,self.work)
+        self.assertEqual((self.root/'compose.env').read_text(),stale)
+        self.assertEqual(self.calls,[])
+
+    def test_startup_failure_restores_previous_image_and_waits_for_recovery(self):
+        self.batch.wait_backend.side_effect=[finalize.Failed('health failed'),None]
+        with self.assertRaises(finalize.Failed):
+            finalize.update_backend(self.batch,self.old,self.image,self.work)
+        self.assertEqual((self.root/'compose.env').read_text(),self.before)
+        self.assertEqual(len([call for call in self.calls if 'up' in call]),2)
+        self.assertEqual(self.batch.wait_backend.call_count,2)
+
+    def test_rollback_does_not_overwrite_concurrent_private_edit(self):
+        def fail():
+            (self.root/'compose.env').write_text('concurrent edit')
+            raise finalize.Failed('health failed')
+        self.batch.wait_backend.side_effect=fail
+        with self.assertRaisesRegex(finalize.Failed,'refusing automatic rollback'):
+            finalize.update_backend(self.batch,self.old,self.image,self.work)
+        self.assertEqual((self.root/'compose.env').read_text(),'concurrent edit')
+        self.assertEqual(len([call for call in self.calls if 'up' in call]),1)
+
+    def test_same_image_does_not_recreate_backend(self):
+        result=finalize.update_backend(self.batch,self.old,self.old['image'],self.work)
+        self.assertFalse(result['changed'])
+        self.assertEqual(self.calls,[])
+
+    def test_build_does_not_restart_or_reconfigure_production(self):
+        self.batch.docker=Mock(return_value=self.image)
+        with patch.object(finalize,'checked') as build:
+            self.assertEqual(finalize.build_backend(self.batch),self.image)
+        command=build.call_args.args[0]
+        self.assertEqual(command[:4],['sudo','-n','docker','build'])
+        self.assertIn('--pull=false',command)
+        self.assertEqual(self.batch.docker.call_args.args[:2],('image','inspect'))
+        self.batch.wait_backend.assert_not_called()
 
 
 if __name__=='__main__':unittest.main()

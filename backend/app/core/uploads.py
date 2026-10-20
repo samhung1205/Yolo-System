@@ -54,8 +54,17 @@ class InvalidUploadError(ValueError):
 
 
 def _image_extension(image_source) -> str:
+    # Ultralytics 8.4.38 replaces Image.open with a HEIF auto-install wrapper.
+    # Reuse its saved Pillow function, including when YOLO was imported first.
+    # Do not mutate the global decoder used by inference or install plugins.
+    opener = Image.open
+    if getattr(opener, "__module__", "") == "ultralytics.utils.patches":
+        original = opener.__globals__.get("_image_open")
+        if not callable(original) or getattr(original, "__module__", "") != "PIL.Image":
+            raise RuntimeError("Unsupported Ultralytics Pillow wrapper")
+        opener = original
     try:
-        with Image.open(image_source) as image:
+        with opener(image_source, formats=tuple(IMAGE_FORMAT_EXTENSIONS)) as image:
             image_format = (image.format or "").upper()
             image.verify()
     except (UnidentifiedImageError, OSError, SyntaxError, ValueError, Image.DecompressionBombError) as exc:

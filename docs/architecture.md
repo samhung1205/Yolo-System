@@ -38,6 +38,7 @@ Snap 的 gateway 需要私人 NNP=false 相容例外，保留其他隔離與資�
 - 批次：建立 `detection_batches` 與各圖 `detection_tasks`，`BackgroundTasks` 逐圖執行、更新處理數；類別統計由 DB `GROUP BY` 完整聚合。
 - 影片：背景逐幀推論，保存結果影片與 preview，資料庫物件清單來自 preview frame，不是全影片每幀物件。
 - 模型：registry 限定 key、預期 SHA-256、類別對照與相容模組。OBB 的 DB bbox 是旋轉框外接矩形，不保存角度；各類別閾值只支援一般 image／batch。
+- 上傳解碼：以 Pillow 原生開檔與 JPEG／PNG／WEBP／GIF／BMP 格式白名單驗證，避開 Ultralytics 8.4.38 的 HEIF 自動安裝包裝；保留 verify 與壞檔清理，新 backend image 關閉依賴自動安裝。
 - 媒體：DB 存相對路徑，檔案位於 `backend/static/`；`/static` 不是公開目錄。Bearer 請求檢查擁有權，瀏覽器顯示採短期簽章 URL；安全標頭與格式白名單保留。
 - 頭像：檔名帶上傳者 id，指定時檢查歸屬、存在與是否被他人使用；換圖／刪人清理無人使用檔案，孤兒清理工具預設 dry-run。
 

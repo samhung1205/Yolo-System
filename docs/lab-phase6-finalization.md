@@ -1,11 +1,11 @@
 # Phase 6 收尾批次
 
-2026-10-21：Ubuntu 已同步 `84dcbca`，公開 health／DB 正常；首次收尾停在 `container-regression`，尚未切換 gateway 或安裝每日排程。修正版已移除主機 `/tmp` 掛載並補上子程序錯誤紀錄，**仍待 Ubuntu 重驗，不能先標記 Phase 6 全部完成**。既有網站、校外手機驗收與第一份備份維持先前通過結果。
+2026-10-21：Ubuntu 已同步 `84dcbca`，公開 health／DB 正常；首次收尾停在 `container-regression`，尚未切換 gateway 或安裝每日排程。`5734992` 已移除主機 `/tmp` 掛載並補上子程序錯誤紀錄；Ubuntu 已能執行完整 pytest，但兩項非法圖片拒絕測試失敗（180 通過）。本輪已修正 Ultralytics 8.4.38 的 Pillow 包裝相容問題並加入候選 backend 建置／測試／受控切換，**仍待 Ubuntu 重驗，不能先標記 Phase 6 全部完成**。既有網站、校外手機驗收與第一份備份維持先前通過結果。
 
 ## 已完成的本機驗證
 
-- 後端全套 182 passed（29.14 秒），新增中斷工作盤點／套用／批次計數測試。
-- 部署工具涵蓋備份失敗恢復、輪替範圍、root／使用者權限界線、暫存還原歸屬、來源更新與 gateway 回退。最終全套 130 項通過（含真實本機假 Docker Unix API）。
+- 本輪後端全套 **190 passed（29.91 秒）**：獨立工作目錄／隨機測試 key／合成圖片，不讀正式 `.env` 或私人媒體；使用本機核准 checkpoint，非 Ubuntu GPU 重驗。新增 Ultralytics HEIF 包裝下的格式白名單、壞檔拒絕與暫存清理測試。
+- 部署工具涵蓋備份失敗恢復、輪替範圍、root／使用者權限界線、暫存還原歸屬、來源更新與 gateway 回退。本輪全套 **145 項通過**（含本機假 Docker Unix API、候選 backend 不動正式服務、忙碌拒絕切換、啟動失敗回復與私人設定競爭保護）。
 - Vite 8.3.4／React plugin 6.1.2，production build 通過，npm audit 為 0；Node 最低 20.19 或 22.12，部署使用 Node 22 image。依 [Vite 8 遷移文件](https://vite.dev/guide/migration) 更新，沒有執行 audit fix --force。
 - Playwright 實際瀏覽器：production build 登入／工作台、Agent query／重新整理、登出、未登入路由保護與關閉註冊頁通過。API 使用獨立 SQLite，沒有使用正式帳密／資料庫。favicon 404 與選取不存在的測試偵測 404 為預期診斷，沒有 JS 執行例外。
 - `lab_regression.py` 已在獨立 SQLite、測試 HTTPS 與真實 CPU 模型跑通：兩個臨時帳號、管理員權限、頭像歸屬／清理、單圖／100 張批次／ZIP、四影格影片、媒體權限、Desktop client、改密碼撤銷 JWT；臨時帳號清理成功。100 張合成圖片批次在本次 CPU 環境共 9.276 秒（含上傳／進度等待），只作測試紀錄，不當作真實資料的效能承諾。這不冒稱 Ubuntu GPU 驗收。
@@ -34,8 +34,8 @@ python deploy/lab_finalize.py
 
 整批完成：
 
-1. 正式 backend image 的完整 pytest、合成圖片、自訂模型 CUDA／NMS；測試圖片直接建立在測試容器的 16 MiB tmpfs，容器移除即丟棄，不掛主機 `/tmp`、正式 `.env` 或私人媒體、不連正式 DB。測試／腳本／checkpoint 維持唯讀掛載，沿用原 UID／GPU／CPU／RAM 限制。
-2. 建置新的 Vite 8／Caddy image，先驗證 Caddy 設定，只切換 gateway；保留 Snap NNP 相容旗標與原憑證 volume。啟動失敗自動回復原 gateway 設定；不重啟共享 Docker／MySQL／Ollama。
+1. 依目前來源與 Linux lock 建置候選 backend image，正式網站在建置期間持續運行；候選 image 必須通過完整 pytest、合成圖片、自訂模型 CUDA／NMS。測試圖片直接建立在測試容器的 16 MiB tmpfs，容器移除即丟棄，不掛主機 `/tmp`、正式 `.env` 或私人媒體、不連正式 DB。測試／腳本／checkpoint 維持唯讀掛載，沿用原 UID／GPU／CPU／RAM 限制。
+2. 確認正式 backend 身分／掛載未改變，並只讀查核沒有 pending／processing 偵測或批次，才將私人 image 參數指向已測試候選；只重建本專案 backend，等待 DB health 與關閉註冊政策通過。失敗時回復原設定與舊 backend image，保留媒體／模型／DB 掛載；不執行 migration。接著建置新的 Vite 8／Caddy image、先驗證設定再切 gateway，保留 Snap NNP 旗標與原憑證 volume，gateway 啟動失敗亦回復。全程不重啟共享 Docker／MySQL／Ollama。
 3. 真實 HTTPS 的兩帳號、頭像、圖片／批次／影片、Desktop client 與 JWT 撤銷回歸；只刪本輪建立且已無進行中工作的臨時帳號。
 4. 原有圖片／對話基準、Chat／Agent SSE 與保存；各新增一組管理員測試對話。記錄共享 GPU 的觀測峰值，不推論成 50 人同時使用的能力。
 5. 僅將本專案 MySQL 的 restart policy 補為 unless-stopped，確認 Ollama active／enabled。
@@ -54,6 +54,16 @@ python deploy/lab_finalize.py
 失敗時修正版保存 exit code、stdout、stderr 到該輪私人 releases 的 `container-regression.json`（0600），摘要報告另有 `command_failure` 的 exit code／固定提示／紀錄路徑。不把原始輸出或完整指令參數放到終端機；其他子程序失敗也會保存私人紀錄。請只回報終端機摘要，勿公開整份私人紀錄。容器測試未通過就停止，不切 gateway、不建立測試帳號、不安裝備份。
 
 本機部署工具全套 **137 項通過**，含實際執行合成圖片 seed、子程序 stderr／權限保存、Docker mount 與 sudo 驗證錯誤區分，以及回歸失敗必須阻止後續服務變更；未在 Mac 冒稱通過 Linux Docker Snap／GPU。重新執行上述 Git 更新與單次收尾指令即可，不需重新 stash 未改動的來源或重建 backend。
+
+## 2026-10-21 非圖片拒絕測試的 HEIF 相容修正
+
+Ubuntu `5734992` 的容器已執行完整 pytest，結果為 **180 passed／2 failed**，兩項均是 `test_upload_hardening.py` 的非圖片拒絕／暫存清理；紀錄另有 `pi-heif` 缺少且離線 AutoUpdate skipped。HMAC 短 key 警告來自未掛正式設定的隔離測試，不是這兩項失敗，也不代表正式 SECRET_KEY 被更改。
+
+[Ultralytics 8.4.38 原始碼](https://github.com/ultralytics/ultralytics/blob/v8.4.38/ultralytics/utils/patches.py) 會將 `PIL.Image.open` 包裝為「任何開檔例外就檢查／載入 pi-heif」。非法圖片原本該得到 `UnidentifiedImageError`，卻可能先變成缺少 optional module 的錯誤。上傳驗證現在辨識此已知包裝並使用其保存的 Pillow 原生函式，再明確限定 JPEG／PNG／WEBP／GIF／BMP；不改寫全域 Image.open、不新增 HEIF 支援、不全面吞掉 import 錯誤。未知包裝版本拒絕繼續，升級依賴時須重驗。[Pillow formats 參數](https://pillow.readthedocs.io/en/stable/reference/Image.html#PIL.Image.open)。
+
+新 backend image 設 `YOLO_AUTOINSTALL=false`，維持固定依賴；不連網臨時補套件、不修改 Linux lock。因既有正式 image 不會隨 git pull 更新，本輪把建置候選、完整 pytest／GPU gate、閒置檢查與受控 backend 切換納入同一批次，而非只在測試容器覆蓋檔案。請在沒有其他成員提交工作時執行上述一段命令；建置通常可重用既有 dependency layer，切換 backend 時會短暫無法服務。
+
+本機新增測試已重現 upstream 包裝導致缺 pi-heif，再驗證修正版壞檔回 400／清理、所有白名單格式通過與 TIFF 拒絕，且沒有安裝嘗試。完整 190 後端／145 部署工具通過；**正式 Linux image 建置、GPU、HTTPS 與每日 timer 仍待本輪 Ubuntu 結果**，不因本機成功先標完成。
 
 ## 備份、狀態與停用
 
@@ -114,4 +124,4 @@ python deploy/lab_recover.py --apply
 4. 以專用 ollama 帳號還原模型快取至該帳號的 `.ollama/models/`，檢查 `ollama list` 的名稱／digest。Caddy data 還原到新命名 volume；不同 IP 須調整設定並重新取得憑證，保持私鑰私有。
 5. 更新 Compose 私人設定並只啟動新環境，跑 GPU smoke、API 回歸與資料雜湊比對，再安排切換。失敗回到原環境；不能直接拿舊 SQL 覆寫正在服務的資料庫。
 
-本批實際演練的是同主機**隔離 DB／檔案還原、backend 暫停／恢復、gateway 切換／回退**；不會未經協調重開共享主機，也不宣稱已演練全新硬體／網路的完整災難復原。CI 原始檔已隨 `84dcbca` push，Ubuntu 已同步該版本；GitHub Run workflow 尚無成功結果。容量以本輪小型測試為基準；1000 張、大檔壓測、50 路併發、httpOnly cookie 與空間推論另排。
+本批在 Ubuntu 要驗證的是同主機**隔離 DB／檔案還原、backend 更新／回復與備份暫停／恢復、gateway 切換／回退**；不會未經協調重開共享主機，也不宣稱已演練全新硬體／網路的完整災難復原。CI 原始檔已隨 `84dcbca` push，Ubuntu 已同步該版本；GitHub Run workflow 尚無成功結果。容量以本輪小型測試為基準；1000 張、大檔壓測、50 路併發、httpOnly cookie 與空間推論另排。
