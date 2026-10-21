@@ -250,6 +250,148 @@ def capture_native_models(config, output, *, timeout=1200):
             raise RuntimeError('Native model capture failed: ' + diagnostic.read().decode())
 
 
+def model_inventory_key(name):
+    """Normalize public registry aliases as Ollama v0.40.6 does."""
+    need(isinstance(name, str) and name and not any(c.isspace() for c in name), 'Invalid Ollama model name')
+    parts = name.split('/')
+    tail = parts.pop()
+    model, separator, tag = tail.partition(':')
+    tag = tag if separator else 'latest'
+    if not parts:
+        host, namespace = 'registry.ollama.ai', 'library'
+    elif len(parts) == 1:
+        if '.' in parts[0] or ':' in parts[0] or parts[0] == 'localhost':
+            host, namespace = parts[0], 'library'
+        else:
+            host, namespace = 'registry.ollama.ai', parts[0]
+    else:
+        need(len(parts) == 2, 'Unsupported Ollama model name')
+        host, namespace = parts
+    host = host.replace('%3A', ':').replace('%3a', ':').lower()
+    if host == 'ollama.com':
+        host = 'registry.ollama.ai'
+    need(all(v and v not in ('.', '..') for v in (host, namespace, model, tag)), 'Invalid Ollama model name')
+    return tuple(v.casefold() for v in (host, namespace, model, tag))
+
+
+def manifest_digest(value):
+    match = re.fullmatch(r'(?:sha256[:-])?([0-9a-fA-F]{64})', value or '')
+    need(match, 'Invalid Ollama manifest digest')
+    return match[1].lower()
+
+
+def canonical_inline_manifest(document):
+    """Mirror Manifest.MarshalJSON / Layer field order for inline list children."""
+    def layer(value):
+        value = value or {}
+        result = {key: value.get(key, default) for key, default in
+                  (('mediaType', ''), ('digest', ''), ('size', 0))}
+        for key in ('from', 'name'):
+            if value.get(key):
+                result[key] = value[key]
+        return result
+    if document.get('mediaType') == 'application/vnd.ollama.manifest.list.v2+json':
+        body = {'schemaVersion': document.get('schemaVersion', 0), 'mediaType': document['mediaType'],
+                'manifests': [json.loads(canonical_inline_manifest(child)) for child in document.get('manifests', [])]}
+    elif document.get('digest') and not (document.get('config') or {}).get('digest') and not document.get('layers'):
+        body = {'mediaType': document.get('mediaType', ''), 'digest': 'sha256:' + manifest_digest(document['digest'])}
+    else:
+        body = {'schemaVersion': document.get('schemaVersion', 0), 'mediaType': document.get('mediaType', ''),
+                'config': layer(document.get('config')), 'layers': None if document.get('layers') is None
+                else [layer(value) for value in document['layers']]}
+    if document.get('mediaType') != 'application/vnd.ollama.manifest.list.v2+json':
+        for key in ('runner', 'format'):
+            if document.get(key):
+                body[key] = document[key]
+    text = json.dumps(body, ensure_ascii=False, separators=(',', ':'), allow_nan=False)
+    # encoding/json escapes HTML-sensitive characters and these separators.
+    for value, replacement in (('&', r'\u0026'), ('<', r'\u003c'), ('>', r'\u003e'),
+                               ('\u2028', r'\u2028'), ('\u2029', r'\u2029')):
+        text = text.replace(value, replacement)
+    return text.encode()
+
+
+def validate_native_models(path, inventory):
+    """Verify named legacy/v2 manifests, selected children and all blob bytes."""
+    blobs, documents, named, seen = {}, {}, {}, set()
+    with tarfile.open(path) as archive:
+        for member in archive:
+            relative = Path(member.name)
+            need(not member.issym() and not member.islnk() and not relative.is_absolute()
+                 and '..' not in relative.parts and (member.isfile() or member.isdir()), 'Unsafe native model archive')
+            key = relative.as_posix()
+            need(key not in seen, 'Duplicate native model archive entry')
+            seen.add(key)
+            if not member.isfile():
+                continue
+            small = member.size <= 4 * 1024 * 1024
+            with archive.extractfile(member) as source:
+                raw = source.read() if small else None
+                actual = hashlib.sha256(raw).hexdigest() if small else hash_stream(source)
+            document = None
+            if raw is not None:
+                try:
+                    candidate = json.loads(raw)
+                    if isinstance(candidate, dict):
+                        document = candidate
+                except (ValueError, UnicodeError):
+                    pass
+            if relative.parts[0] == 'blobs':
+                need(len(relative.parts) == 2 and relative.name == 'sha256-' + actual, 'Ollama blob fingerprint mismatch')
+                blobs[actual] = member.size
+                documents[actual] = document
+            if relative.parts[0] in ('manifests', 'manifests-v2') and len(relative.parts) == 5:
+                _, host, namespace, model, tag = relative.parts
+                name = model_inventory_key(host + '/' + namespace + '/' + model + ':' + tag)
+                priority = int(relative.parts[0] == 'manifests-v2')
+                if name not in named or priority > named[name][0]:
+                    named[name] = (priority, actual, document)
+
+    def runnable(document, digest, trail=frozenset()):
+        if not isinstance(document, dict):
+            return set()
+        need(digest not in trail and len(trail) < 32, 'Cyclic or excessively deep Ollama manifest list')
+        if document.get('mediaType') == 'application/vnd.ollama.manifest.list.v2+json':
+            children = document.get('manifests')
+            need(isinstance(children, list), 'Invalid Ollama manifest list')
+            verified = set()
+            for child in children:
+                need(isinstance(child, dict), 'Invalid Ollama child manifest')
+                if child.get('digest'):
+                    child_digest = manifest_digest(child['digest'])
+                    # Other-platform children may legitimately not be installed.
+                    child_document = documents.get(child_digest)
+                else:
+                    child_digest = hashlib.sha256(canonical_inline_manifest(child)).hexdigest()
+                    child_document = child
+                verified.update(runnable(child_document, child_digest, trail | {digest}))
+            return verified | {digest} if verified else set()
+        layers = document.get('layers')
+        if not isinstance(layers, list):
+            return set()
+        config = document.get('config') or {}
+        need(isinstance(config, dict), 'Invalid Ollama config descriptor')
+        references = layers + ([config] if config.get('digest') else [])
+        if not references:
+            return set()
+        for entry in references:
+            need(isinstance(entry, dict), 'Invalid Ollama layer descriptor')
+            reference = manifest_digest(entry.get('digest'))
+            if reference not in blobs:
+                return set()
+            if 'size' in entry:
+                need(entry['size'] == blobs[reference], 'Ollama layer size mismatch')
+        return {digest}
+
+    for name, expected in inventory:
+        key = model_inventory_key(name)
+        need(key in named, 'Ollama named model missing from legacy/v2 archive')
+        _, digest, document = named[key]
+        need(manifest_digest(expected) in runnable(document, digest),
+             'Ollama manifest inventory mismatch (legacy/v2/list checked)')
+    return {'named_models': len(named), 'verified_blobs': len(blobs)}
+
+
 class Maintenance:
     def __init__(self, config, root=ROOT):
         self.config, self.root = config, root
@@ -260,6 +402,10 @@ class Maintenance:
         self.temporary = None
         self.volume = None
         self.report = {'kind': 'sam-yolo-managed-v1', 'success': False, 'pinned': False, 'checks': []}
+
+    def ollama_inventory(self):
+        with build_opener(ProxyHandler({})).open('http://127.0.0.1:11434/api/tags', timeout=15) as response:
+            return json.load(response)
 
     def docker(self, *args, timeout=180, private_env=None):
         result = subprocess.run([self.config['docker'], *args], env={**self.env, **(private_env or {})}, capture_output=True, timeout=timeout)
@@ -308,8 +454,7 @@ class Maintenance:
         except Exception:
             self.report['operational_warning']='Check HTTPS certificate renewal'
         try:
-            with build_opener(ProxyHandler({})).open('http://127.0.0.1:11434/api/tags',timeout=15) as response:
-                self.report['ollama_models']=json.load(response)
+            self.report['ollama_models'] = self.ollama_inventory()
         except Exception:
             self.report['operational_warning']='Check Ollama availability'
         need(self.docker('exec', db['id'], 'sh', '-c', 'printf "%s|%s" "$MYSQL_DATABASE" "$MYSQL_USER"') == 'yolo|yolo_app', 'Unexpected DB identity')
@@ -408,6 +553,11 @@ class Maintenance:
         need(isinstance(inventory,dict) and inventory.get('models'),'Ollama inventory unavailable')
         # Ignore changing API metadata; identify the installed content digests.
         digests=sorted((model['name'],model['digest']) for model in inventory['models'])
+        def same_inventory():
+            current = self.ollama_inventory()
+            need(sorted((model['name'], model['digest']) for model in current.get('models', [])) == digests,
+                 'Ollama API inventory changed during backup')
+        same_inventory()
         identity=hashlib.sha256(json.dumps(digests).encode()).hexdigest()
         cache=self.root/'models'
         cache.mkdir(mode=0o750,exist_ok=True)
@@ -421,25 +571,13 @@ class Maintenance:
                 temporary.unlink()
             with temporary.open('xb') as output:
                 capture_native_models(self.config, output)
-            manifests=set()
-            with tarfile.open(temporary) as archive:
-                for member in archive:
-                    need(not member.issym() and not member.islnk() and not Path(member.name).is_absolute()
-                         and '..' not in Path(member.name).parts and (member.isfile() or member.isdir()),'Unsafe native model archive')
-                    if member.isfile():
-                        with archive.extractfile(member) as source:
-                            actual=hash_stream(source)
-                        relative=Path(member.name)
-                        if 'blobs' in relative.parts:
-                            need(relative.name=='sha256-'+actual,'Ollama blob fingerprint mismatch')
-                        if 'manifests' in relative.parts:
-                            manifests.add(actual)
-            need(all(digest.removeprefix('sha256:') in manifests for _,digest in digests),'Ollama manifest inventory changed')
+            self.report['native_model_validation'] = validate_native_models(temporary, digests)
             temporary.rename(target)
             os.chown(target,0,self.config['gid'])
             target.chmod(0o640)
         trusted(target)
         self.report['native_models']={'path':'models/'+target.name,'sha256':checksum(target),'inventory':digests}
+        same_inventory()
 
     def verify(self, states):
         credentials={'MYSQL_DATABASE':'yolo','MYSQL_USER':'yolo_app',
@@ -520,16 +658,22 @@ class Maintenance:
     def run(self):
         self.output.mkdir(mode=0o700)
         try:
+            self.report['stage'] = 'preflight'
             states = self.preflight()
             print('PASS: managed preflight / DB / disk / service ownership',flush=True)
+            self.report['stage'] = 'image-cache'
             self.cache_images(states)
             print('PASS: exact image cache',flush=True)
+            self.report['stage'] = 'model-cache'
             self.cache_models()
             print('PASS: native Ollama manifests / blob SHA-256 cache',flush=True)
+            self.report['stage'] = 'capture'
             self.capture(states)
             print('PASS: SQL / source / media / checkpoints / config / certificate capture; backend resumed',flush=True)
+            self.report['stage'] = 'isolated-restore'
             self.verify(states)
             print('PASS: isolated SQL restore / file restore SHA-256',flush=True)
+            self.report['stage'] = 'service-verification'
             self.cleanup()
             self.health()
             for name, state in states.items():
@@ -539,6 +683,7 @@ class Maintenance:
             self.report['database_sql_sha256'] = checksum(self.output / 'database.sql.gz', compressed=True)
             self.report['success'] = True
             self.report['worker_sha256'] = self.config['worker_sha256']
+            self.report['stage'] = 'complete'
         except Exception as exc:
             self.report['error'] = str(exc) if type(exc) is RuntimeError else type(exc).__name__
         finally:
@@ -559,6 +704,8 @@ class Maintenance:
                 trusted(path, directory=True)
                 shutil.rmtree(path)
         print(('PASS' if self.report['success'] else 'FAIL') + ': managed backup ' + self.stamp, flush=True)
+        if self.report.get('error'):
+            print('Backup failure [' + self.report['stage'] + ']: ' + self.report['error'], flush=True)
         if self.report.get('operational_warning'):
             print('WARN: '+self.report['operational_warning'],flush=True)
         return 0 if self.report['success'] and not self.report.get('operational_warning') else 1

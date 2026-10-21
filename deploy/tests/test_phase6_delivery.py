@@ -8,6 +8,7 @@ import shlex
 import subprocess
 import sys
 import tempfile
+import time
 from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
@@ -195,6 +196,49 @@ class ContainerRegressionTests(unittest.TestCase):
         self.assertFalse(report['success'])
         self.assertEqual(report['stage'],'container-regression')
         self.assertEqual(report['command_failure']['exit_code'],125)
+
+
+class BackupDiagnosticTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(); self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        self.snapshot = self.root / '20261021T031400Z-12345678'; self.snapshot.mkdir()
+        self.manifest = self.snapshot / 'manifest.json'
+        self.manifest.write_text(json.dumps({'stage': 'model-cache', 'success': False,
+            'error': 'Native model capture failed: Native model link leaves model store',
+            'files': {'private': 'must-not-be-output'}, 'settings': 'must-not-be-output'}))
+
+    def run_status(self, started):
+        script = finalize.BACKUP_STATUS.replace("Path('/var/lib/sam-yolo-backups')", 'Path(' + repr(str(self.root)) + ')')
+        result = subprocess.run([sys.executable, '-I', '-c', script, str(started)],
+                                capture_output=True, text=True, check=True)
+        self.assertNotIn('must-not-be-output', result.stdout)
+        return json.loads(result.stdout)
+
+    def test_reports_exact_stage_without_config_or_media_lists(self):
+        data = self.run_status(0)
+        self.assertEqual(data['stage'], 'model-cache')
+        self.assertIn('leaves model store', data['error'])
+        self.assertFalse(data['paused_marker'])
+        self.assertNotIn('files', data)
+
+    def test_never_attributes_previous_backup_to_new_failed_attempt(self):
+        data = self.run_status(time.time() + 60)
+        self.assertEqual(data['error'], 'No manifest from this backup attempt')
+        self.assertNotIn('snapshot', data)
+
+    def test_pause_marker_is_visible_without_exposing_container_id(self):
+        (self.root / 'paused-backend.json').write_text('{"id":"private-container-fixture"}')
+        data = self.run_status(0)
+        self.assertTrue(data['paused_marker'])
+        self.assertNotIn('private-container-fixture', json.dumps(data))
+
+    def test_systemctl_failure_names_the_backup_service(self):
+        result = subprocess.CompletedProcess([], 1, '', 'Job for sam-yolo-backup.service failed')
+        with patch.object(finalize.subprocess, 'run', return_value=result), self.assertRaises(finalize.CommandFailure) as raised:
+            finalize.checked(['sudo', '-n', 'systemctl', 'start', 'sam-yolo-backup.service'],
+                             log_path=self.root/'command.json')
+        self.assertIn('systemd 備份服務', str(raised.exception))
 
 
 class BackupResumeTests(unittest.TestCase):

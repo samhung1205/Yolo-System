@@ -92,10 +92,12 @@ class MaintenanceTests(unittest.TestCase):
         self.assertEqual(self.worker.paused,'backend')
 
     def test_failed_verification_never_rotates(self):
+        output = io.StringIO()
         with patch.object(self.worker,'preflight',side_effect=RuntimeError('busy')), \
              patch.object(self.worker,'cleanup'),patch.object(app.os,'chown'), \
-             patch.object(app,'retained_candidates') as rotate, redirect_stdout(io.StringIO()):
+             patch.object(app,'retained_candidates') as rotate, redirect_stdout(output):
             self.assertEqual(self.worker.run(),1)
+        self.assertIn('Backup failure [preflight]: busy', output.getvalue())
         rotate.assert_not_called()
         self.assertFalse(json.loads((self.worker.output/'manifest.json').read_text())['success'])
 
@@ -129,7 +131,7 @@ class MaintenanceTests(unittest.TestCase):
             source = models/'blobs'/('sha256-'+digest)
             source.rename(models/'payload')
             source.symlink_to('../payload')
-        manifests=models/'manifests/registry/library/test';manifests.mkdir(parents=True)
+        manifests=models/'manifests/registry.ollama.ai/library/test';manifests.mkdir(parents=True)
         metadata=json.dumps({'layers':[{'digest':'sha256:'+digest}]}).encode()
         (manifests/'latest').write_bytes(metadata)
         if aliases:
@@ -138,7 +140,8 @@ class MaintenanceTests(unittest.TestCase):
         self.worker.report['ollama_models']={'models':[{'name':'test:latest','digest':hashlib.sha256(metadata).hexdigest()}]}
         self.worker.config.update(ollama_models=str(models),ollama_uid=os.getuid(),ollama_gid=os.getgid())
         with patch.object(app.os,'setgroups'),patch.object(app.os,'setgid'),patch.object(app.os,'setuid'), \
-             patch.object(app,'trusted'),patch.object(app.os,'chown'):
+             patch.object(app,'trusted'),patch.object(app.os,'chown'), \
+             patch.object(self.worker, 'ollama_inventory', return_value=self.worker.report['ollama_models']):
             self.worker.cache_models()
 
     def test_native_model_cache_checks_manifest_and_blob_content(self):
@@ -155,9 +158,9 @@ class MaintenanceTests(unittest.TestCase):
         with tarfile.open(path) as archive:
             members = archive.getmembers()
             self.assertTrue(all(item.isfile() or item.isdir() for item in members))
-            latest = archive.extractfile('manifests/registry/library/test/latest').read()
+            latest = archive.extractfile('manifests/registry.ollama.ai/library/test/latest').read()
             for alias in ('relative', 'absolute'):
-                self.assertEqual(archive.extractfile('manifests/registry/library/test/' + alias).read(), latest)
+                self.assertEqual(archive.extractfile('manifests/registry.ollama.ai/library/test/' + alias).read(), latest)
 
     def test_internal_blob_link_is_exported_and_fingerprinted(self):
         self.model_cache(blob_alias=True)

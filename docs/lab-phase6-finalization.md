@@ -1,11 +1,11 @@
 # Phase 6 收尾批次
 
-2026-10-21：Ubuntu `de65239` 已通過候選 backend 完整回歸／GPU／影片、HTTPS 權限與完整功能、既有資料與 Chat／Agent SSE。備份服務已安裝；`finalize-20261020T214321Z.json` 進入首次維運備份，image 快取成功後因 `Unsafe native model archive` 停止，尚未擷取 SQL／檔案或啟用每日排程。網站與 DB health 正常，Phase 6 維運仍待完成；原始備份維持先前通過結果。
+2026-10-21：前段完整功能與 GPU 驗收已通過。Ubuntu `d4ab0fa` 的 `finalize-20261021T031358Z.json` 進入備份後，連結匯出成功，停在 `Ollama manifest inventory changed`；此文字是舊驗證器的失配訊息，不能據此認定模型真的變動。原驗證漏掉 Ollama 0.40.6 的 manifests-v2／manifest list，已補本機測試與修正，仍待實機續跑。此次尚未停止 backend 擷取資料；每日排程尚未啟用。2026-10-21 11:28 台灣時間，Mac 實際存取公開 HTTPS health 得到 status=ok／database=connected。
 
 ## 已完成的本機驗證
 
 - 上一輪後端全套 **190 passed（29.91 秒）**：獨立工作目錄／隨機測試 key／合成圖片，不讀正式 `.env` 或私人媒體；使用本機核准 checkpoint，非 Ubuntu GPU 重驗。新增 Ultralytics HEIF 包裝下的格式白名單、壞檔拒絕與暫存清理測試。
-- 部署工具涵蓋備份失敗恢復、輪替範圍、root／使用者權限界線、暫存還原歸屬、來源更新與 gateway 回退。最新全套 **170 項通過**（含本機假 Docker Unix API、候選 backend 不動正式服務、忙碌拒絕切換、啟動失敗回復、私人設定競爭保護、影片依賴失敗／輸出截斷拒絕與 CI 補充依賴）。
+- 部署工具涵蓋備份失敗恢復、輪替範圍、root／使用者權限界線、暫存還原歸屬、來源更新與 gateway 回退。最新全套 **185 項通過**（含本機假 Docker Unix API、候選 backend 不動正式服務、忙碌拒絕切換、啟動失敗回復、私人設定競爭保護、影片依賴失敗／輸出截斷拒絕與 CI 補充依賴）。
 - Vite 8.3.4／React plugin 6.1.2，production build 通過，npm audit 為 0；Node 最低 20.19 或 22.12，部署使用 Node 22 image。依 [Vite 8 遷移文件](https://vite.dev/guide/migration) 更新，沒有執行 audit fix --force。
 - Playwright 實際瀏覽器：production build 登入／工作台、Agent query／重新整理、登出、未登入路由保護與關閉註冊頁通過。API 使用獨立 SQLite，沒有使用正式帳密／資料庫。favicon 404 與選取不存在的測試偵測 404 為預期診斷，沒有 JS 執行例外。
 - `lab_regression.py` 已在獨立 SQLite、測試 HTTPS 與真實 CPU 模型跑通：兩個臨時帳號、管理員權限、頭像歸屬／清理、單圖／100 張批次／ZIP、四影格影片、媒體權限、Desktop client、改密碼撤銷 JWT；臨時帳號清理成功。100 張合成圖片批次在本次 CPU 環境共 9.276 秒（含上傳／進度等待），只作測試紀錄，不當作真實資料的效能承諾。這不冒稱 Ubuntu GPU 驗收。
@@ -106,6 +106,20 @@ python deploy/lab_finalize.py --resume-backup \
 匯出先掃描小型目錄資訊，解析每個來源，要求解析後仍在模型根目錄內；拒絕根目錄被替換為連結、越界／損壞／循環連結、特殊檔案與擷取途中檔案變更，再讀取／壓縮大型資料。以 [Python tarfile 的 dereference 行為](https://docs.python.org/3.11/library/tarfile.html#tarfile.TarFile) 將安全內部 alias 的內容存成一般檔案／目錄，封存不包含符號或硬連結；還原不依賴舊主機的絕對路徑。保留原本逐 blob SHA-256、manifest inventory 與整份快取 SHA-256 驗證；匯出逾 20 分鐘會回收該讀取子程序。
 
 本機重現相對／絕對內部 manifest 連結及內部目錄 alias，驗證匯出後實際內容一致、只有一般檔案／目錄；也驗證越界、循環、壞連結、FIFO、來源替換拒絕，以及降權順序與逾時回收；blob 本身為內部連結時仍核對內容指紋，壞內容依然拒絕。部署工具全套 **170 項通過**，未操作 Ubuntu 正式模型或服務。續跑使用上方 `--resume-backup` 同一段命令；安裝器會更新 root 保護的 worker，既有 image 快取重用，失敗的 root-owned 模型 partial 依既有規則重建。首次模型匯出與完整 SHA-256／隔離還原仍需數分鐘；首份成功後才啟用 23:30 timer。
+
+### 2026-10-21 Ollama 0.40.6 索引／子模型 digest 修正
+
+實機快照 `20261021T031358Z-efb05f44` 的錯誤為 `Ollama manifest inventory changed`，`restore_verified`／`recovery_error`／`operational_warning` 均未設定。這發生在模型快取驗證，先於 `capture()` 停止 backend。先前只補安全符號連結，未同時核對目前版本的索引格式，是前置調查不足；本機合成測試通過不能替代實機完整驗證。
+
+已查核官方 v0.40.6：[paths.go](https://github.com/ollama/ollama/blob/v0.40.6/manifest/paths.go) 同時讀 legacy／v2，優先 v2 並正規化公開 registry；[model_list.go](https://github.com/ollama/ollama/blob/v0.40.6/server/model_list.go) 的 API 可回傳所選 child digest；[manifest.go](https://github.com/ollama/ollama/blob/v0.40.6/manifest/manifest.go) 定義 child reference／inline JSON 指紋。原驗證只收集路徑元件恰為 `manifests` 的檔案原始 SHA，因此會把合法 v2 或所選子模型誤判成清單變動。
+
+新驗證逐一核對 blob 完整位元組 SHA-256、模型名稱與 registry／tag 對應、v2 優先序、child reference 或 inline canonical digest、config／layer 是否存在與大小；API 指向的 child 必須可由對應的 named manifest 到達且資料完整。不接受僅在其他 blob 出現的同一 digest；未安裝的其他平台 child 不會被當成已備份的本機模型。快取前後另讀取 API 比對 name／digest，將真正的清單變動分開報錯。保留所有越界／連結／檔案類型檢查，不以停用指紋驗證解決。
+
+本輪完整部署工具 **185 項通過**，含真實檔案系統 v2 連結匯出後驗證、舊格式、新 list、inline 欄位順序、缺少所選 child／權重、錯誤名稱、壞 blob 與 API 前後變動。沒有重新建置或修改 Ubuntu 網站 image。Ubuntu 請沿用上方同一段 `--resume-backup` 指令；原始前段驗收報告仍為 `finalize-20261020T214321Z.json`。
+
+為減少後續人工來回，worker 的私人 manifest／journal 現在記錄 `preflight`、`image-cache`、`model-cache`、`capture`、`isolated-restore`、`service-verification`；主批次在失敗時只讀本輪新 manifest 的選定錯誤／恢復旗標並顯示，拒絕拿舊備份錯誤當作本輪原因。不輸出設定、SQL、媒體清單或 pause marker 內的容器 ID。systemctl 啟動失敗改標示「systemd 備份服務」，不再誤導成 sudo 密碼問題。
+
+網站影響：模型／image 快取讀取會消耗 CPU／磁碟；只有一致性擷取階段會短暫停止 backend，登入／偵測／Chat／Agent 請求或串流可能中斷。worker 在擷取 finally 與失敗清理中恢復 backend，另有 systemd ExecStopPost，但不能只由程式存在就宣稱恢復成功，仍須 health／容器狀態。備份不覆寫正式 DB、不更換網站 image；此次是在停機前失敗，公開 health／DB 已另外實測正常。首次成功還原前不啟用每日 timer。
 
 ## 備份、狀態與停用
 

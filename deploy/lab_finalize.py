@@ -16,6 +16,7 @@ import stat
 import subprocess
 import sys
 import threading
+import time
 import requests
 
 from lab_backup_verify import keep_sudo_alive, private_write
@@ -75,6 +76,35 @@ class CommandFailure(Failed):
         super().__init__(f'{command} 執行失敗（exit {returncode}）：{hint}；私人紀錄：{log_path}')
 
 
+BACKUP_STATUS = '''import json, re, sys
+from pathlib import Path
+root = Path('/var/lib/sam-yolo-backups')
+paths = sorted(p for p in root.glob('*/manifest.json')
+    if re.fullmatch(r'\\d{8}T\\d{6}Z-[0-9a-f]{8}', p.parent.name)
+    and not p.is_symlink() and not p.parent.is_symlink()
+    and p.stat().st_mtime >= float(sys.argv[1]))
+if paths:
+    path = paths[-1]
+    data = json.loads(path.read_text())
+    result = {key: data.get(key) for key in ('stage', 'error', 'success',
+        'restore_verified', 'recovery_error', 'operational_warning')}
+    result['snapshot'] = path.parent.name
+else:
+    result = {'error': 'No manifest from this backup attempt'}
+result['paused_marker'] = (root / 'paused-backend.json').exists()
+print(json.dumps(result))
+'''
+
+
+def backup_failure_status(started):
+    """Only selected result fields; never print configuration, SQL or file lists."""
+    output = checked(['sudo', '-n', '/usr/bin/python3', '-I', '-c', BACKUP_STATUS, str(started)], timeout=30)
+    data = json.loads(output)
+    keys = ('stage', 'error', 'success', 'restore_verified', 'recovery_error',
+            'operational_warning', 'snapshot', 'paused_marker')
+    return {key: data[key] for key in keys if key in data}
+
+
 def checked(args, *, timeout=180, show=False, log_path=None):
     result = subprocess.run(args, capture_output=True, text=True, timeout=timeout)
     if result.returncode:
@@ -95,7 +125,9 @@ def checked(args, *, timeout=180, show=False, log_path=None):
             hint = '容器或檔案權限被拒絕，需檢查私人紀錄'
         else:
             hint = '子程序錯誤已保存，請檢查私人紀錄'
-        command = 'Docker' if args[:3] == ['sudo', '-n', 'docker'] else Path(args[0]).name
+        command = ('Docker' if args[:3] == ['sudo', '-n', 'docker'] else
+                   'systemd 備份服務' if args[:4] == ['sudo', '-n', 'systemctl', 'start']
+                   and args[4:] == ['sam-yolo-backup.service'] else Path(args[0]).name)
         raise CommandFailure(command, result.returncode, log_path, hint)
     if show and result.stdout:
         print(result.stdout[-7000:], flush=True)
@@ -355,6 +387,7 @@ def main(argv=()):
         # Release the shared deployment lock while the installed worker takes it.
         fcntl.flock(lock,fcntl.LOCK_UN)
         report['stage']='initial-managed-backup'
+        report['backup_started'] = time.time()
         print('建立目前部署備份與一次性 image 快取、隔離還原；擷取時 backend 短暫暫停，請稍候…',flush=True)
         checked(['sudo','-n','systemctl','start','sam-yolo-backup.service'],timeout=2800)
         report['backup_root']='/var/lib/sam-yolo-backups'
@@ -387,6 +420,15 @@ def main(argv=()):
             report['command_failure']={'exit_code':exc.returncode,'log':exc.log_path,'hint':exc.hint}
         print('FAIL ['+report['stage']+']: '+report['error'],flush=True)
         if report['stage']=='initial-managed-backup':
+            try:
+                summary = backup_failure_status(report['backup_started'])
+                report['backup_failure'] = summary
+                print('備份原因 [' + str(summary.get('stage') or 'unknown') + ']: '
+                      + str(summary.get('error') or summary.get('operational_warning') or '未提供原因'), flush=True)
+                print('恢復檢查：' + json.dumps({key: summary.get(key) for key in
+                    ('paused_marker', 'recovery_error')}, ensure_ascii=False), flush=True)
+            except Exception as diagnostic_error:
+                report['backup_diagnostic_error'] = type(diagnostic_error).__name__
             print('診斷：sudo journalctl -u sam-yolo-backup.service -n 20 --no-pager',flush=True)
     finally:
         if resources.thread.ident is not None:
