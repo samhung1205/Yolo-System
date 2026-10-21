@@ -24,7 +24,7 @@ Caddy／backend／nginx 由本專案 Compose 管理；MySQL 使用既有獨立�
 | 要做的事 | 文件 |
 |---|---|
 | 查服務、正常啟停、更新與回復 | [目前維運操作](docs/lab-operations.md) |
-| 完成尚未執行的每日備份／正式回歸 | [Phase 6 收尾批次](docs/lab-phase6-finalization.md) |
+| 查已完成的每日備份／正式回歸與驗收報告 | [Phase 6 收尾批次](docs/lab-phase6-finalization.md) |
 | 查已完成／待驗證的邊界 | [開發與部署狀態](docs/roadmap.md) |
 | 查初次 GPU 容器建置問題 | [後端容器專題](docs/lab-backend-container.md) |
 | 查 Compose 納管與設定由來 | [Compose 專題](docs/lab-compose.md) |
@@ -32,7 +32,7 @@ Caddy／backend／nginx 由本專案 Compose 管理；MySQL 使用既有獨立�
 | 查公開 IP 憑證與 Snap NNP 相容性 | [HTTPS 專題](docs/lab-public-https.md) |
 | 查最初的平台評估與診斷 | [歷史部署診斷](docs/archive/reports/deployment-diagnosis-20261020.md) |
 
-**目前尚待 Ubuntu 收尾報告；每日 23:30 排程不能先視為已啟用。** 最初成功還原基準與 Mac 副本已完成，新版完整備份的驗證與下載仍須依收尾文件完成。
+**Ubuntu 收尾批次已於 2026-10-21 回報 PASS：完整備份／隔離還原與服務恢復成功，每日台灣時間 23:30 排程已啟用，保留 7 份成功備份。** 前段完整功能／GPU 驗收引用原報告。新版完整備份的 Mac 副本與首次定時執行觀察仍待交接；詳見收尾文件與 roadmap。
 
 ## 操作邊界
 

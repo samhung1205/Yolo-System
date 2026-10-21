@@ -1,6 +1,22 @@
 # Phase 6 收尾批次
 
-2026-10-21：前段完整功能與 GPU 驗收已通過。Ubuntu `d4ab0fa` 的 `finalize-20261021T031358Z.json` 進入備份後，連結匯出成功，停在 `Ollama manifest inventory changed`；此文字是舊驗證器的失配訊息，不能據此認定模型真的變動。原驗證漏掉 Ollama 0.40.6 的 manifests-v2／manifest list，已補本機測試與修正，仍待實機續跑。此次尚未停止 backend 擷取資料；每日排程尚未啟用。2026-10-21 11:28 台灣時間，Mac 實際存取公開 HTTPS health 得到 status=ok／database=connected。
+2026-10-21：使用者回報 **Phase 6 lab finalization: PASS**。本輪為備份續跑模式；首份完整備份、SQL／檔案隔離還原、服務恢復與每日 23:30 Asia/Taipei timer 啟用皆通過，保留最近 7 份成功備份與最初基準。前段完整功能／GPU／HTTPS／既有資料與 Chat-Agent SSE 引用原始已通過報告，沒有聲稱本輪重新執行。
+
+## Ubuntu 成功驗收與目前操作
+
+| 項目 | 本輪證據 |
+|---|---|
+| 成功批次報告 | `/home/sam/.config/yolo-system/reports/finalize-20261021T033914Z.json` |
+| 已驗證的新快照 | `/var/lib/sam-yolo-backups/20261021T033914Z-65040ded` |
+| 本輪交付的修正版來源 | `dfa3341`；實際 image ID／模型 digest／來源檔案指紋在私人報告與 manifest |
+| 首份完整備份 | SQL、來源、媒體、checkpoint、設定、憑證及 image／Ollama 快取；完整隔離還原／檔案核對通過 |
+| 排程 | `timer enabled`；每天 23:30 Asia/Taipei；保留 7 份驗證成功快照；原始基準不動 |
+| 服務 | 批次核對服務恢復、DB health、image 運行狀態；未重啟共享主機／Docker／Ollama |
+| 引用的前段驗收 | `finalize-20261020T214321Z.json` 的功能／GPU／HTTPS／資料與 SSE 結果 |
+
+本次收尾已完成，日常使用依 [維運手冊](lab-operations.md)。同步後續純文件更新只需 Git pull，不需要再執行完整收尾或備份續跑。以下初次執行及故障排查段落保留為歷史／維護參考，段內的「尚未」指當時狀態。
+
+新快照與 `images/`、`models/` 的 Mac 副本仍待下載與驗證，原有 Mac 副本只涵蓋舊時間點；下載步驟見本文件「備份、狀態與停用」。首個由 timer 自動觸發的執行結果、實際憑證續期、整機重開機／全新硬體還原與高併發均沒有新增驗證證據，最新待辦見 [roadmap](roadmap.md)。
 
 ## 已完成的本機驗證
 
@@ -11,7 +27,7 @@
 - `lab_regression.py` 已在獨立 SQLite、測試 HTTPS 與真實 CPU 模型跑通：兩個臨時帳號、管理員權限、頭像歸屬／清理、單圖／100 張批次／ZIP、四影格影片、媒體權限、Desktop client、改密碼撤銷 JWT；臨時帳號清理成功。100 張合成圖片批次在本次 CPU 環境共 9.276 秒（含上傳／進度等待），只作測試紀錄，不當作真實資料的效能承諾。這不冒稱 Ubuntu GPU 驗收。
 - GitHub Actions workflow 已建立，採手動 Run workflow、唯讀權限、固定官方 action commit、15 分鐘上限，不配置付費 runner／儲存／排程；無權重／無媒體／無 .env 的獨立來源樹已實跑 173 passed、9 個 checkpoint 測試明確 deselected（26.77 秒），非 GPU 測試不依賴私人模型。workflow 已隨 `84dcbca` push；尚未取得 GitHub run 結果。私有庫執行前檢查帳號免費額度。遵循 [GitHub Actions 安全指引](https://docs.github.com/en/actions/reference/security/secure-use)。
 
-## Ubuntu 一次執行
+## 初次安裝／完整回歸指令（本輪已完成）
 
 現在以 GitHub 來源更新，不再套用舊的 tar 更新包。Ubuntu 已同步過 `84dcbca`，在工作目錄乾淨時直接拉取修正版；有本機修改時先依維運手冊保存，不使用 reset／clean 強制清除。
 
@@ -131,13 +147,28 @@ sudo systemctl start sam-yolo-backup.service
 
 第三行是手動要求一次備份，不需重裝。只有初次安裝成功才有每日排程；舊 `lab_backup_verify.py` 仍可人工使用，不能另放 cron 重複跑。
 
-備份在 `/var/lib/sam-yolo-backups/`，root 擁有、sam 的 primary group 可讀、其他人無權讀。VS Code Remote 可直接開此路徑下載。時間戳目錄包含 SQL、所有檔案清單與 SHA-256、完整未提交來源快照、媒體／checkpoint／私人設定與 Caddy data；`images/` 與 `models/` 保存每個版本一次，manifest 指向對應快取及 SHA-256。版本快取不隨每日快照自動刪除；先核對仍被哪些快照引用，再由管理員另行清理。**下載時間戳目錄時，也要下載其引用的 image／model 快取，才是完整的離機交接**；舊 Mac 副本仍只代表原時間點，不會自動同步。
+備份在 `/var/lib/sam-yolo-backups/`，root 擁有；根目錄與成功快照允許 sam 的 primary group 讀取，其他人無權讀。快取目錄的讀取權限與 VS Code Remote 下載步驟見下方。時間戳目錄包含 SQL、所有檔案清單與 SHA-256、完整未提交來源快照、媒體／checkpoint／私人設定與 Caddy data；`images/` 與 `models/` 保存每個版本一次，manifest 指向對應快取及 SHA-256。版本快取不隨每日快照自動刪除；先核對仍被哪些快照引用，再由管理員另行清理。**下載時間戳目錄時，也要下載其引用的 image／model 快取，才是完整的離機交接**；舊 Mac 副本仍只代表原時間點，不會自動同步。
 
-下載整個備份根目錄到 Mac 專案外私人資料夾後，可讀驗證（SNAPSHOT_NAME 換成批次實際列出的目錄名）：
+下載新快照與其引用快取到 Mac 專案外的私人資料夾，保留以下相對結構：
+
+```text
+Yolo-system-managed-backups/
+├── 20261021T033914Z-65040ded/
+├── images/
+└── models/
+```
+
+三個目錄都從 VS Code Remote 的 `/var/lib/sam-yolo-backups/` 下載；不要只下載 manifest，也不需要下載 root 專用的 `.maintenance.lock`。worker 的 umask 0077 會讓首次建立的 image／model 快取目錄可能是 0700；若 sam 無法瀏覽，Ubuntu 管理員可執行下面命令，僅將這兩個已屬於 sam primary group 的 root-owned 目錄設為 0750，不遞迴改檔案、不開放其他使用者：
+
+```bash
+sudo chmod 750 /var/lib/sam-yolo-backups/images /var/lib/sam-yolo-backups/models
+```
+
+Mac 目的地應為本人專用（0700）資料夾；下載完成後的只讀驗證：
 
 ```bash
 python3 /Users/SAM/Desktop/Agents/Yolo_system/deploy/verify_managed_backup.py \
-  /Users/SAM/Desktop/Yolo-system-managed-backups SNAPSHOT_NAME
+  /Users/SAM/Desktop/Yolo-system-managed-backups 20261021T033914Z-65040ded
 ```
 
 這個檢查器另有 6 項測試；不解出設定、不印 SQL、不重新啟動 MySQL，會拒絕漏下載或不符 SHA-256 的 image／模型快取。

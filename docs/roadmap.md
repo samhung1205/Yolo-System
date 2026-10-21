@@ -12,22 +12,27 @@
 | Agent 引擎 | 預設 `tool_calling`／gemma4；唯讀工具與權限隔離，DeepAgents 不採用 |
 | 部署前安全修正 | JWT 撤銷、登入節流、上傳／頭像歸屬、受保護媒體、LLM 政策、輪次唯一鍵 |
 | 實驗室公開部署 | Ubuntu GPU、Compose、HTTPS、關閉註冊、原有資料、Chat／Agent SSE 皆通過；使用者確認手機行動網路正常 |
-| 第一份備份 | 隔離 MySQL／檔案還原通過；Mac 副本完整 SQL 與 52 檔 SHA-256 核對通過 |
+| 最初基準備份（舊版本） | 隔離 MySQL／檔案還原通過；Mac 副本完整 SQL 與 52 檔 SHA-256 核對通過 |
 
 **平台已確定為實驗室伺服器，網站已部署成功，無須另外部署到 Vercel。** 10–50 個預計帳號不是 50 路同時推論的承諾。
 
-## Phase 6 維運收尾：已實作，待 Ubuntu 驗收
+## Phase 6 核心部署與維運收尾：實機批次驗收完成
 
-本機測試與 Ubuntu 回報分開記錄；以下狀態不代表尚未執行的備份排程已啟用。
+2026-10-21 使用者回報 `Phase 6 lab finalization: PASS`。本輪使用備份續跑模式：完整功能／GPU／HTTPS 與資料／SSE 驗收引用原報告；首份完整備份、隔離還原、服務恢復與 timer 啟用為本輪實跑。
 
 - [x] 維運、備份與中斷工作復原工具完成；最新部署工具 185 項通過（含模型內部連結、legacy／v2／manifest list、指紋／缺失 blob、API 清單變動與失敗階段診斷）；先前後端 190 項通過。新增四影格真實 CPU 影片追蹤／編碼／解碼驗證通過，使用合成資料與獨立工作目錄。
 - [x] Vite 8.3.4／React plugin 6.1.2，本機 build、audit 0 與瀏覽器流程通過；Ubuntu `de65239` 收尾批次已完成 backend／gateway 切換及後續完整 HTTPS 回歸。
 - [x] 獨立 SQLite／測試 HTTPS 的真實 CPU 回歸通過：兩帳號隔離、頭像、100 張批次、ZIP、影片、Desktop client、改密碼與 JWT。
 - [x] 手動 CI workflow 已建立；無 checkpoint 的隔離測試 173 通過、9 排除。已隨 `84dcbca` push，尚無 GitHub Actions run 結果。
 - [x] Ubuntu `de65239` 收尾已通過候選 image／GPU／影片、HTTPS 跨帳號／頭像／單圖／100 張批次／ZIP／影片／Desktop，以及既有資料與 Chat／Agent SSE；日誌已進入首份維運備份，證明前段驗收通過。
-- [ ] 首份完整維運備份／隔離還原與每日 **23:30 Asia/Taipei**／保留 7 份成功備份。Ubuntu `d4ab0fa` 續跑報告 `finalize-20261021T031358Z.json` 已通過連結匯出，但驗證因只認舊 manifest 格式而停在模型清單比對，尚未停止 backend 擷取 SQL／檔案。已依 Ollama 0.40.6 官方原始碼補 legacy／v2／子模型驗證，修正版待 Ubuntu 續跑；排程尚未啟用。公開 HTTPS／DB 另於 2026-10-21 11:28 台灣時間由 Mac 實際連線確認正常，這不是新的完整功能驗收。
-- [ ] 將新完整備份與引用的 image／Ollama 快取下載到 Mac，執行完整性核對；最初還原基準固定保留。
-- [ ] 記錄收尾後來源版本與 image、MySQL 啟停交接；有實際 GitHub run 後另補 CI 結果。
+- [x] Ubuntu 首份完整維運備份／SQL 與檔案隔離還原／服務恢復通過；每天 **23:30 Asia/Taipei** 的 timer 已啟用，保留最近 **7 份成功備份**，原始基準固定保留。成功報告：`/home/sam/.config/yolo-system/reports/finalize-20261021T033914Z.json`；新快照：`/var/lib/sam-yolo-backups/20261021T033914Z-65040ded`。
+- [x] 本次修正版交付來源 `dfa3341`；來源檔案、實際 image ID／模型 digest 與持久掛載記錄於私人快照 manifest／批次報告，啟停交接見維運手冊。MySQL restart policy 與 Ollama enabled／active 已由批次核對。
+
+### 後續交接與觀察（尚未完成）
+
+- [ ] 將新快照 `20261021T033914Z-65040ded` 與引用的 `images/`、`models/` 快取下載到 Mac，執行完整性核對；舊 Mac 副本與最初還原基準固定保留。
+- [ ] 觀察首次由 timer 自動觸發的 23:30 備份結果。手動初次備份已驗證，尚無首個定時執行回報。
+- [ ] 需要時手動執行 GitHub Actions 並補 run 結果；目前僅有 workflow 與本機 CI 等價驗證，沒有遠端成功 run 證據。
 
 不得把上述未驗證項目勾成完成。共享主機整機重開機、全新硬體災難復原、實際憑證續期週期與大規模併發尚未演練；不因一次批次成功就推論全部通過。現行日常操作見 [維運交接](lab-operations.md)。
 

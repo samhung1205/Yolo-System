@@ -1,8 +1,10 @@
 # 實驗室部署：目前操作與交接
 
-2026-10-20 公開入口核心驗收通過：[https://140.113.135.113](https://140.113.135.113)。報告 `public-verify-20261020T094649Z-2578684/report.json`：原有圖片／對話 SHA-256 一致、Bearer／signed URL／未登入保護、Chat SSE／保存（首片段 1.05 秒）及 Agent 工具／SSE／保存（5.13 秒）皆通過。未重建／重啟服務。使用者另已確認手機行動網路瀏覽器全流程正常；Mac 備份副本亦已實際核對通過。2026-10-21 Ubuntu `de65239` 已通過候選 GPU／影片、完整 HTTPS 功能、既有資料及 Chat／Agent SSE；備份服務已安裝，但首次 image 快取後因模型封存項目不符合規則停止，尚未擷取 SQL／媒體，timer 尚未啟用。網站與 DB health 正常；已確認模型目錄有兩個符號連結並完成安全匯出修正（實機待續跑）；操作見 [Phase 6 收尾批次](lab-phase6-finalization.md)，Phase 6 持續進行。
+2026-10-21 使用者回報 **Phase 6 lab finalization: PASS**。網站已部署在 [https://140.113.135.113](https://140.113.135.113)，完整功能／GPU／HTTPS／資料與 Chat-Agent SSE 已驗收；本輪備份續跑完成完整 SQL／檔案隔離還原、服務恢復，並啟用每天 **23:30 Asia/Taipei** 的備份 timer，保留最近 **7 份成功備份**。原始還原基準固定保留。
 
-最新續跑 `finalize-20261021T031358Z.json` 已通過模型連結匯出，停在清單指紋比對；尚未進到暫停 backend 的擷取階段。已依官方 0.40.6 補上 v2 索引／子模型驗證與失敗階段摘要，仍待 Ubuntu 續跑。Mac 於 2026-10-21 11:28 台灣時間只讀公開 HTTPS health：status=ok／database=connected；每日 timer 尚未啟用。備份擷取時登入、偵測與 AI 串流可能暫時中斷，請選維護時段執行；不將健康檢查當作全功能重測。
+本輪成功報告：`/home/sam/.config/yolo-system/reports/finalize-20261021T033914Z.json`。新完整快照：`/var/lib/sam-yolo-backups/20261021T033914Z-65040ded`。前段功能驗收引用原始報告，本輪沒有重新執行全部 API／LLM 測試；詳細證據與排查歷程見 [Phase 6 收尾批次](lab-phase6-finalization.md)。
+
+使用者先前已確認校外手機全流程及舊 Mac 備份副本正常；**新版快照連同 image／Ollama 快取的 Mac 副本仍待下載核對**。首個由 23:30 timer 自動觸發的備份結果尚待觀察。擷取資料時 backend 會短暫暫停，請避免在該時段開始重要工作。
 
 ## 服務位置與管理界線
 
@@ -11,7 +13,7 @@
 | Caddy／新 React build | 公網 IP 的 TCP 443；憑證在 `sam-yolo-caddy-data` | Compose 的 gateway；不公開管理 API |
 | FastAPI | 127.0.0.1:8000；`.env`／模型唯讀，static 持久掛載 | Compose 的 backend，單 worker |
 | 舊 nginx／React dist | 127.0.0.1:8080，僅維護診斷 | Compose 的 web |
-| MySQL | 127.0.0.1:13306；`sam-yolo-mysql-data` | 原 Docker 容器，尚未納管 Compose |
+| MySQL | 127.0.0.1:13306；`sam-yolo-mysql-data` | 獨立 Docker 容器，restart=unless-stopped；未納管 Compose |
 | Ollama | 127.0.0.1:11434；llama3.2／gemma4 | 原生 systemd；active／enabled 已查核，未做主機重開機演練 |
 
 Python 程式保留 sam 身分，需要 Docker 時先 `sudo -v`。不重啟共享 Docker daemon、GPU 驅動、主機或其他人的容器。
@@ -47,7 +49,7 @@ sudo docker compose --env-file "$HOME/.config/yolo-system/compose.env" \
   stop -t 120 gateway backend
 ```
 
-上述命令不停止 MySQL／Ollama，也不刪資料。MySQL 的 restart policy 將由收尾批次核對／補齊；整機開機仍未演練，獨立主機還原步驟見收尾文件，不使用 `down -v`／prune 或未核對名稱的 rm。
+上述命令不停止 MySQL／Ollama，也不刪資料。MySQL 的 restart policy 已由成功收尾批次核對為 unless-stopped；整機開機仍未演練，獨立主機還原步驟見收尾文件，不使用 `down -v`／prune 或未核對名稱的 rm。
 
 ## 已完成的校外驗收與 Mac 副本
 
@@ -71,19 +73,28 @@ python3 deploy/verify_downloaded_backup.py \
 
 已從此驗證通過的備份取回 `deploy/backend-linux.lock` 至 Mac 專案，118 個固定版本及關鍵 GPU／Agent 版本驗證通過；SHA-256 為 `76a616b975843fe2327e59ce2d11e418b4a76c9c9aa77d749ddb1bbb5a02cc77`。它記錄已驗證的 Ubuntu 建置環境，未鎖定 wheel／OS 產物雜湊，也不代表之後的環境變更已納入。
 
+## 每日備份的日常檢查
+
+```bash
+systemctl list-timers sam-yolo-backup.timer --all
+sudo journalctl -u sam-yolo-backup.service -n 30 --no-pager
+```
+
+timer 已啟用；備份 service 是 oneshot，完成後顯示 inactive 不代表失敗，應讀取最近 journal／快照 manifest 的 success 與 restore_verified。失敗快照不計入成功版本輪替。需要手動備份時，在維護時段執行 `sudo systemctl start sam-yolo-backup.service`；這會擷取新資料並短暫停止 backend，無須重跑完整部署／回歸批次。
+
 ## 備份與升級邊界
 
 現有 [備份／隔離還原工具](lab-backup.md) 可在維護時段人工執行。為確保 SQL／媒體一致，擷取期間會短暫停止本專案 backend；恢復服務後再用無網路 MySQL 隔離還原。模型快取以 Ollama 身分匯出，安全內部連結會存成一般內容，避免還原依賴舊路徑；越界或壞連結不接受。不要直接放入需要互動 sudo 密碼的無人排程；新收尾批次另安裝 root 保護的 stdlib worker，首份驗證成功後才啟用 23:30 timer。
 
-原始已驗證備份早於 HTTPS 更新，是該時間點的資料與設定；它不包含後續新增對話、Caddy 憑證 volume、Docker image 本體或完整 Git 原始碼。下一批維運需要建立目前部署的可重建交接資訊與新備份，再設計每日排程／容量與保留輪替。原始成功還原基準先固定保留，不能先刪掉。
+舊 Mac 副本與最初還原基準早於 HTTPS／本次維運收尾，不包含後續新增資料；固定保留，不以它宣稱目前版本已有離機副本。本次新完整快照已驗證來源、SQL、媒體、模型、設定、憑證與 image／Ollama 快取，接著須下載新快照與兩個快取目錄；具體結構與驗證指令見收尾文件。
 
 升級前先備份；記錄目前 image ID／來源版本與 Linux lock，於隔離候選 image 完成必要測試／GPU 驗證，再受控切換 backend 或 gateway，確認啟動／DB／API 與舊資料。當前收尾包含上傳解碼及影片追蹤依賴修正，候選 backend 必須先通過真實影片測試；僅在沒有進行中偵測／批次時切換，失敗回復原設定／image，不在運行容器內臨時 pip 安裝。失敗時只回復本專案 image／Compose 參數；不可把正式 DB 直接還原覆蓋成舊版本。涉及 migration 的回退須另做相容驗證。不要重跑初期 Compose 納管或舊更新包，它們針對舊基準，並非日常重啟指令。
 
-## Phase 6 尚未完成的部分
+## 已完成的收尾與後續交接
 
-- [Phase 6 收尾批次](lab-phase6-finalization.md) 已補齊上述實作：每日 23:30 備份、7 份成功版本輪替、空間／失敗紀錄、來源／憑證／image／Ollama 交接、隔離還原與服務恢復；Ubuntu 最新已安裝備份服務，停在首次 Ollama 封存檢查，尚未啟用 timer；不能把準備完成記成已啟用。
-- 來源版本交付；Ubuntu Linux lock 已從驗證備份同步回 Mac，程式與文件已隨 `84dcbca` commit／push，Ubuntu 已同步，health／DB 正常。
-- Mac 後端先前全套 190 通過（29.91 秒），本輪部署工具 153 項及真實 CPU 四影格追蹤通過，假模型 SSE 測試隔離本機 Ollama 清單；跨帳號／頭像／批次／影片／Desktop 的真實 CPU／暫存 SQLite／測試 HTTPS 回歸已通過，Ubuntu GPU／正式 HTTPS 版本由同一批次實測。手動 CI workflow 已建立，已 push／尚未取得 GitHub run 結果。
-- 同時推論量／峰值資源、背景影片與批次重啟時的受控復原。單 worker 保留，未承諾 50 路並行。
+- 完整回歸、GPU、HTTPS、資料保存、備份／隔離還原、服務恢復與每日 23:30 排程已通過；版本／image 與模型 digest 以成功私人報告／manifest 為準，來源與操作說明已隨 Git 交付。
+- 仍待新版完整備份的 Mac 副本驗證、首次由 timer 自動執行的觀察；最新清單統一見 [roadmap](roadmap.md)，不把舊 Mac 副本當成新版本交接。
+- 手動 GitHub Actions workflow 已交付，尚無 GitHub run 成功證據；不因 Ubuntu 通過就聲稱 CI 已跑過。
+- 共享主機重開機、新主機完整災難復原、實際憑證續期週期與大規模併發尚未演練；單 worker 與共享 GPU 邊界保留。
 
 httpOnly cookie、1000 張批次與空間關係推論維持另行安排。Caddy 的實際自動續期週期尚未觀察；shared host 不做未協調的整機重開機。
