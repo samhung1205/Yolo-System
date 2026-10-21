@@ -197,6 +197,96 @@ class ContainerRegressionTests(unittest.TestCase):
         self.assertEqual(report['command_failure']['exit_code'],125)
 
 
+class BackupResumeTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(); self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        self.config = self.root / 'config'; (self.config / 'reports').mkdir(parents=True)
+        (self.config / 'releases').mkdir()
+        self.path = self.config / 'reports/finalize-fixture.json'
+        self.states = {name: {'id': name, 'image': 'sha256:' + char * 64, 'running': True,
+                            'mounts': [{'Name': 'sam-yolo-mysql-data'}],
+                            'project': 'sam-yolo', 'service': name.removeprefix('sam-yolo-')}
+                       for name, char in zip(('sam-yolo-backend', 'sam-yolo-web', 'sam-yolo-gateway', 'sam-yolo-mysql'), 'abcd')}
+        self.evidence = {'success': False, 'stage': 'initial-managed-backup',
+                         'existing_data_and_sse': True, 'regression': {'success': True},
+                         'container_tests': ['Container custom YOLO GPU smoke test: PASS',
+                                             'Container YOLO video smoke test: PASS'],
+                         'candidate_backend_image': self.states['sam-yolo-backend']['image'],
+                         'backend_update': {}, 'gateway_update': {'image': self.states['sam-yolo-gateway']['image']}}
+        self.save()
+        self.batch = Mock(config=self.config, repo=self.root, stamp='fixture')
+        self.batch.request.return_value.json.return_value = {'registration_enabled': False}
+        self.batch.session.get.return_value.status_code = 200
+        self.batch.session.get.return_value.json.return_value = {'database': 'connected'}
+
+    def save(self):
+        self.path.write_text(json.dumps(self.evidence)); self.path.chmod(0o600)
+
+    def test_complete_checks_and_same_images_can_resume(self):
+        result = finalize.backup_resume_evidence(self.batch, self.path, self.states)
+        self.assertEqual(result['resumed_from'], str(self.path))
+        self.assertTrue(result['regression']['success'])
+        self.batch.health.assert_any_call(8000)
+        self.batch.health.assert_any_call()
+
+    def test_incomplete_or_older_checks_cannot_skip_verification(self):
+        for change in ({'regression': {'success': False}}, {'existing_data_and_sse': False},
+                       {'stage': 'https-regression'}, {'container_tests': ['Container custom YOLO GPU smoke test: PASS']}):
+            with self.subTest(change=change):
+                before = self.evidence.copy(); self.evidence.update(change); self.save()
+                with self.assertRaises(finalize.Failed):
+                    finalize.backup_resume_evidence(self.batch, self.path, self.states)
+                self.evidence = before
+
+    def test_changed_running_image_is_rejected(self):
+        self.states['sam-yolo-backend']['image'] = 'sha256:' + 'e' * 64
+        with self.assertRaisesRegex(finalize.Failed, 'image 已改變'):
+            finalize.backup_resume_evidence(self.batch, self.path, self.states)
+
+    def test_shared_report_or_symlink_is_rejected(self):
+        self.path.chmod(0o644)
+        with self.assertRaises(finalize.Failed):
+            finalize.backup_resume_evidence(self.batch, self.path, self.states)
+        self.path.chmod(0o600)
+        link = self.path.with_name('link.json'); link.symlink_to(self.path)
+        with self.assertRaises(finalize.Failed):
+            finalize.backup_resume_evidence(self.batch, link, self.states)
+
+    def test_https_or_registration_failure_prevents_resume(self):
+        self.batch.session.get.return_value.status_code = 503
+        with self.assertRaises(finalize.Failed):
+            finalize.backup_resume_evidence(self.batch, self.path, self.states)
+        self.batch.session.get.return_value.status_code = 200
+        self.batch.request.return_value.json.return_value = {'registration_enabled': True}
+        with self.assertRaises(finalize.Failed):
+            finalize.backup_resume_evidence(self.batch, self.path, self.states)
+
+    def test_resume_runs_backup_and_enable_without_build_or_regression(self):
+        previous = os.umask(0o077); self.addCleanup(os.umask, previous)
+        self.batch.inspect.side_effect = lambda name: self.states[name]
+        self.states['sam-yolo-mysql']['restart'] = 'unless-stopped'
+        resources = Mock(); resources.thread.ident = None
+        backup = self.root / 'backups'; snapshot = backup / '20261021T000000Z-12345678'
+        snapshot.mkdir(parents=True)
+        (snapshot / 'manifest.json').write_text(json.dumps({'success': True, 'restore_verified': True}))
+        actual_path = Path
+        def paths(value):
+            return backup if value == '/var/lib/sam-yolo-backups' else actual_path(value)
+        with patch.object(finalize.sys, 'platform', 'linux'), patch.object(finalize, 'Batch', return_value=self.batch), \
+             patch.object(finalize, 'Path', side_effect=paths), patch.object(finalize, 'ResourceSample', return_value=resources), \
+             patch.object(finalize, 'keep_sudo_alive'), patch.object(finalize, 'checked', return_value='enabled') as commands, \
+             patch.object(finalize, 'build_backend') as build, patch.object(finalize, 'update_gateway') as gateway, \
+             patch.object(finalize, 'Regression') as regression, redirect_stdout(io.StringIO()):
+            self.assertEqual(finalize.main(['--resume-backup', str(self.path)]), 0)
+        build.assert_not_called(); gateway.assert_not_called(); regression.assert_not_called()
+        self.assertTrue(any(call.args[0][-2:] == ['start', 'sam-yolo-backup.service'] for call in commands.call_args_list))
+        self.assertTrue(any('--enable' in call.args[0] for call in commands.call_args_list))
+        reports = [p for p in (self.config / 'reports').glob('finalize-*.json') if p != self.path]
+        self.assertEqual(len(reports), 1)
+        self.assertTrue(json.loads(reports[0].read_text())['success'])
+
+
 class BackendUpdateTests(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup)

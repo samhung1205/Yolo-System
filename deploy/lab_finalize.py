@@ -3,6 +3,7 @@
 Run as the project user after sudo -v. Tests new backend and gateway images;
 does not restart shared services, change firewall rules or touch other projects.
 """
+import argparse
 from datetime import datetime, timezone
 import fcntl
 import json
@@ -11,6 +12,7 @@ from pathlib import Path
 import pwd
 import re
 import shlex
+import stat
 import subprocess
 import sys
 import threading
@@ -243,13 +245,50 @@ def update_gateway(batch, previous, work):
         raise
 
 
-def main():
+def backup_resume_evidence(batch, path, states):
+    """Reuse completed checks only for the same deployed images and private report."""
+    path = Path(path).expanduser().absolute()
+    folder = batch.config / 'reports'
+    need(path.parent == folder and not path.is_symlink(), '請指定本帳號 reports 內的原始收尾報告')
+    info = path.lstat()
+    need(stat.S_ISREG(info.st_mode) and info.st_uid == os.getuid() and not info.st_mode & 0o077,
+         '續跑報告必須由本帳號持有且為私人檔案')
+    previous = json.loads(path.read_text())
+    need(previous.get('stage') == 'initial-managed-backup'
+         and previous.get('existing_data_and_sse') is True
+         and previous.get('regression', {}).get('success') is True,
+         '原報告未完成 HTTPS／影片／Desktop／資料與 SSE 驗收，不能略過')
+    tests = '\n'.join(previous.get('container_tests', []))
+    need('Container custom YOLO GPU smoke test: PASS' in tests
+         and 'Container YOLO video smoke test: PASS' in tests, '原報告缺少 GPU／影片驗證')
+    need(previous.get('candidate_backend_image') == states['sam-yolo-backend']['image']
+         and previous.get('gateway_update', {}).get('image') == states['sam-yolo-gateway']['image'],
+         '正式 image 已改變，請執行完整收尾驗收')
+    for name in ('sam-yolo-backend', 'sam-yolo-web', 'sam-yolo-gateway'):
+        need(states[name].get('project') == 'sam-yolo'
+             and states[name].get('service') == name.removeprefix('sam-yolo-'), '服務歸屬不符')
+    batch.health(8000)
+    batch.health()
+    response = batch.session.get('https://140.113.135.113/api/health', timeout=15)
+    need(response.status_code == 200 and response.json().get('database') == 'connected', 'HTTPS／DB 不正常')
+    need(batch.request('/api/auth/config', port=8000).json() == {'registration_enabled': False},
+         '正式註冊政策已改變')
+    fields = ('candidate_backend_image', 'container_tests', 'backend_update', 'gateway_update',
+              'regression', 'existing_data_and_sse')
+    return {**{key: previous[key] for key in fields}, 'resumed_from': str(path)}
+
+
+def main(argv=()):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--resume-backup', type=Path, help='從已完成前段驗收的私人報告續跑備份，不重建服務')
+    args = parser.parse_args(argv)
     need(sys.platform == 'linux' and os.getuid() != 0, '請在 Ubuntu 使用自己的帳號執行，先 sudo -v')
     os.umask(0o077)
     batch = Batch()
     stop = threading.Event()
     stamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
-    report = {'success':False, 'stage':'preflight', 'schedule':'23:30 Asia/Taipei'}
+    report = {'success':False, 'stage':'preflight', 'schedule':'23:30 Asia/Taipei',
+              'mode':'resume-backup' if args.resume_backup else 'full'}
     output = batch.config / 'reports' / ('finalize-' + stamp + '.json')
     output.parent.mkdir(parents=True, mode=0o700, exist_ok=True)
     work=batch.config/'releases'/('finalize-'+batch.stamp)
@@ -267,37 +306,41 @@ def main():
         need(all(state['running'] for state in original.values()),'服務尚未全部啟動')
         database=original['sam-yolo-mysql']
         need(any(m.get('Name')=='sam-yolo-mysql-data' for m in database['mounts']),'MySQL 歸屬不符')
-        report['stage']='backend-build'
-        image=build_backend(batch)
-        report['candidate_backend_image']=image
-        report['stage']='container-regression'
-        candidate={**original['sam-yolo-backend'],'image':image}
-        report['container_tests']=container_tests(batch,candidate,work/'container-regression.json')
-        print('PASS: 候選 backend 全套測試／合成影像／自訂模型 GPU；正式資料未掛入測試容器',flush=True)
-        report['stage']='backend-update'
-        report['backend_update']=update_backend(batch,original['sam-yolo-backend'],image,work)
-        report['stage']='frontend-gateway'
-        report['gateway_update']=update_gateway(batch,original['sam-yolo-gateway'],work)
-        report['stage']='https-regression'
-        regression=Regression('https://140.113.135.113',batch.repo)
-        report['regression']=regression.run()
-        need(report['regression']['success'],'HTTPS 跨帳號／圖片／頭像／批次／影片／Desktop 回歸失敗')
-        verification=Verify(batch.repo,'140.113.135.113')
-        verification.preflight()
-        for path,expected in (('/',200),('/agent?mode=explain_detection&detection_id=1',200),
-                              ('/api/not-a-route',404),('/docs',404),('/assets/not-a-file.js',404)):
-            response=verification.request(path,expected=expected,headers={'Authorization':None})
-            if expected==200:
-                need('text/html' in response.headers.get('Content-Type','')
-                     and response.headers.get('Cache-Control')=='no-store','新 gateway SPA 路由不符')
-        verification.session.headers['Authorization']='Bearer '+regression.admin
-        verification.database=verification.protected['sam-yolo-mysql']
-        verification.baseline=json.loads((batch.config/'releases/20261020T084747Z-2562377/report.json').read_text())['baseline_fingerprints']
-        verification.verify_existing()
-        verification.stream_check()
-        verification.stream_check(agent=True)
-        verification.unchanged()
-        report['existing_data_and_sse']=True
+        if args.resume_backup:
+            report.update(backup_resume_evidence(batch, args.resume_backup, original))
+            print('PASS: 原報告完整驗收／目前 image 與服務歸屬／HTTPS DB；直接續跑備份', flush=True)
+        else:
+            report['stage']='backend-build'
+            image=build_backend(batch)
+            report['candidate_backend_image']=image
+            report['stage']='container-regression'
+            candidate={**original['sam-yolo-backend'],'image':image}
+            report['container_tests']=container_tests(batch,candidate,work/'container-regression.json')
+            print('PASS: 候選 backend 全套測試／合成影像／自訂模型 GPU；正式資料未掛入測試容器',flush=True)
+            report['stage']='backend-update'
+            report['backend_update']=update_backend(batch,original['sam-yolo-backend'],image,work)
+            report['stage']='frontend-gateway'
+            report['gateway_update']=update_gateway(batch,original['sam-yolo-gateway'],work)
+            report['stage']='https-regression'
+            regression=Regression('https://140.113.135.113',batch.repo)
+            report['regression']=regression.run()
+            need(report['regression']['success'],'HTTPS 跨帳號／圖片／頭像／批次／影片／Desktop 回歸失敗')
+            verification=Verify(batch.repo,'140.113.135.113')
+            verification.preflight()
+            for path,expected in (('/',200),('/agent?mode=explain_detection&detection_id=1',200),
+                                  ('/api/not-a-route',404),('/docs',404),('/assets/not-a-file.js',404)):
+                response=verification.request(path,expected=expected,headers={'Authorization':None})
+                if expected==200:
+                    need('text/html' in response.headers.get('Content-Type','')
+                         and response.headers.get('Cache-Control')=='no-store','新 gateway SPA 路由不符')
+            verification.session.headers['Authorization']='Bearer '+regression.admin
+            verification.database=verification.protected['sam-yolo-mysql']
+            verification.baseline=json.loads((batch.config/'releases/20261020T084747Z-2562377/report.json').read_text())['baseline_fingerprints']
+            verification.verify_existing()
+            verification.stream_check()
+            verification.stream_check(agent=True)
+            verification.unchanged()
+            report['existing_data_and_sse']=True
         report['stage']='restart-policy'
         if database['restart'] != 'unless-stopped':
             batch.docker('update','--restart','unless-stopped',database['id'])
@@ -326,11 +369,18 @@ def main():
         fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
         batch.health(8000)
         batch.health()
-        verification.verify_existing()
-        verification.unchanged()
+        if verification:
+            verification.verify_existing()
+            verification.unchanged()
+        for name, state in original.items():
+            current = batch.inspect(name)
+            expected_image = (report['candidate_backend_image'] if name == 'sam-yolo-backend' else
+                              report['gateway_update']['image'] if name == 'sam-yolo-gateway' else state['image'])
+            need(current['image'] == expected_image and current['running'], '備份後服務版本／運行狀態改變')
         report['stage']='complete'
         report['success']=True
-        print('PASS: 每日 23:30 備份／7 份成功版本輪替／當前完整 SQL 與檔案隔離還原／服務恢復／舊資料一致',flush=True)
+        suffix = '／舊資料一致' if verification else '／前段驗收引用原報告'
+        print('PASS: 每日 23:30 備份／7 份成功版本輪替／當前完整 SQL 與檔案隔離還原／服務恢復' + suffix,flush=True)
     except (Exception,KeyboardInterrupt) as exc:
         report['error']=str(exc) if isinstance(exc,(Failed,RuntimeError)) else type(exc).__name__
         if isinstance(exc, CommandFailure):
@@ -355,4 +405,4 @@ def main():
 
 
 if __name__=='__main__':
-    raise SystemExit(main())
+    raise SystemExit(main(sys.argv[1:]))

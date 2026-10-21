@@ -1,6 +1,6 @@
 # 實驗室部署：目前操作與交接
 
-2026-10-20 公開入口核心驗收通過：[https://140.113.135.113](https://140.113.135.113)。報告 `public-verify-20261020T094649Z-2578684/report.json`：原有圖片／對話 SHA-256 一致、Bearer／signed URL／未登入保護、Chat SSE／保存（首片段 1.05 秒）及 Agent 工具／SSE／保存（5.13 秒）皆通過。未重建／重啟服務。使用者另已確認手機行動網路瀏覽器全流程正常；Mac 備份副本亦已實際核對通過。2026-10-21 Ubuntu 已跑過候選回歸並切換 backend／gateway；HTTPS 權限、頭像、單圖與 100 張批次／ZIP 通過，影片因缺 lap 停止，備份排程尚未安裝。已補固定依賴與切換前影片測試；修正與續跑見 [Phase 6 收尾批次](lab-phase6-finalization.md)，Phase 6 持續進行。
+2026-10-20 公開入口核心驗收通過：[https://140.113.135.113](https://140.113.135.113)。報告 `public-verify-20261020T094649Z-2578684/report.json`：原有圖片／對話 SHA-256 一致、Bearer／signed URL／未登入保護、Chat SSE／保存（首片段 1.05 秒）及 Agent 工具／SSE／保存（5.13 秒）皆通過。未重建／重啟服務。使用者另已確認手機行動網路瀏覽器全流程正常；Mac 備份副本亦已實際核對通過。2026-10-21 Ubuntu `de65239` 已通過候選 GPU／影片、完整 HTTPS 功能、既有資料及 Chat／Agent SSE；備份服務已安裝，但首次 image 快取後因模型封存項目不符合規則停止，尚未擷取 SQL／媒體，timer 尚未啟用。網站與 DB health 正常；診斷與受控備份續跑見 [Phase 6 收尾批次](lab-phase6-finalization.md)，Phase 6 持續進行。
 
 ## 服務位置與管理界線
 
@@ -79,7 +79,7 @@ python3 deploy/verify_downloaded_backup.py \
 
 ## Phase 6 尚未完成的部分
 
-- [Phase 6 收尾批次](lab-phase6-finalization.md) 已補齊上述實作：每日 23:30 備份、7 份成功版本輪替、空間／失敗紀錄、來源／憑證／image／Ollama 交接、隔離還原與服務恢復；Ubuntu 最新停在 HTTPS 影片回歸，尚未進入備份安裝；不能把準備完成記成已啟用。
+- [Phase 6 收尾批次](lab-phase6-finalization.md) 已補齊上述實作：每日 23:30 備份、7 份成功版本輪替、空間／失敗紀錄、來源／憑證／image／Ollama 交接、隔離還原與服務恢復；Ubuntu 最新已安裝備份服務，停在首次 Ollama 封存檢查，尚未啟用 timer；不能把準備完成記成已啟用。
 - 來源版本交付；Ubuntu Linux lock 已從驗證備份同步回 Mac，程式與文件已隨 `84dcbca` commit／push，Ubuntu 已同步，health／DB 正常。
 - Mac 後端先前全套 190 通過（29.91 秒），本輪部署工具 153 項及真實 CPU 四影格追蹤通過，假模型 SSE 測試隔離本機 Ollama 清單；跨帳號／頭像／批次／影片／Desktop 的真實 CPU／暫存 SQLite／測試 HTTPS 回歸已通過，Ubuntu GPU／正式 HTTPS 版本由同一批次實測。手動 CI workflow 已建立，已 push／尚未取得 GitHub run 結果。
 - 同時推論量／峰值資源、背景影片與批次重啟時的受控復原。單 worker 保留，未承諾 50 路並行。

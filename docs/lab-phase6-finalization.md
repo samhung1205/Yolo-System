@@ -1,11 +1,11 @@
 # Phase 6 收尾批次
 
-2026-10-21：Ubuntu `d233630` 已通過候選 backend 回歸／GPU 並切換 backend／gateway；HTTPS 管理員權限、頭像、單圖、100 張批次與 ZIP 通過，接著影片失敗。日誌已確認容器缺少追蹤依賴 `lap`。本輪補上固定依賴與切換前的真實影片 gate，**仍待 Ubuntu 重驗，不能先標記 Phase 6 全部完成**。每日備份尚未安裝；既有網站、校外手機驗收與第一份備份維持先前通過結果。
+2026-10-21：Ubuntu `de65239` 已通過候選 backend 完整回歸／GPU／影片、HTTPS 權限與完整功能、既有資料與 Chat／Agent SSE。備份服務已安裝；`finalize-20261020T214321Z.json` 進入首次維運備份，image 快取成功後因 `Unsafe native model archive` 停止，尚未擷取 SQL／檔案或啟用每日排程。網站與 DB health 正常，Phase 6 維運仍待完成；原始備份維持先前通過結果。
 
 ## 已完成的本機驗證
 
 - 上一輪後端全套 **190 passed（29.91 秒）**：獨立工作目錄／隨機測試 key／合成圖片，不讀正式 `.env` 或私人媒體；使用本機核准 checkpoint，非 Ubuntu GPU 重驗。新增 Ultralytics HEIF 包裝下的格式白名單、壞檔拒絕與暫存清理測試。
-- 部署工具涵蓋備份失敗恢復、輪替範圍、root／使用者權限界線、暫存還原歸屬、來源更新與 gateway 回退。最新全套 **153 項通過**（含本機假 Docker Unix API、候選 backend 不動正式服務、忙碌拒絕切換、啟動失敗回復、私人設定競爭保護、影片依賴失敗／輸出截斷拒絕與 CI 補充依賴）。
+- 部署工具涵蓋備份失敗恢復、輪替範圍、root／使用者權限界線、暫存還原歸屬、來源更新與 gateway 回退。最新全套 **159 項通過**（含本機假 Docker Unix API、候選 backend 不動正式服務、忙碌拒絕切換、啟動失敗回復、私人設定競爭保護、影片依賴失敗／輸出截斷拒絕與 CI 補充依賴）。
 - Vite 8.3.4／React plugin 6.1.2，production build 通過，npm audit 為 0；Node 最低 20.19 或 22.12，部署使用 Node 22 image。依 [Vite 8 遷移文件](https://vite.dev/guide/migration) 更新，沒有執行 audit fix --force。
 - Playwright 實際瀏覽器：production build 登入／工作台、Agent query／重新整理、登出、未登入路由保護與關閉註冊頁通過。API 使用獨立 SQLite，沒有使用正式帳密／資料庫。favicon 404 與選取不存在的測試偵測 404 為預期診斷，沒有 JS 執行例外。
 - `lab_regression.py` 已在獨立 SQLite、測試 HTTPS 與真實 CPU 模型跑通：兩個臨時帳號、管理員權限、頭像歸屬／清理、單圖／100 張批次／ZIP、四影格影片、媒體權限、Desktop client、改密碼撤銷 JWT；臨時帳號清理成功。100 張合成圖片批次在本次 CPU 環境共 9.276 秒（含上傳／進度等待），只作測試紀錄，不當作真實資料的效能承諾。這不冒稱 Ubuntu GPU 驗收。
@@ -76,6 +76,28 @@ Ubuntu 報告 `finalize-20261020T184510Z.json` 已通過候選回歸及服務切
 候選 image 現在必須先通過 `backend_smoke.py --video`：合成四影格 64×64 MP4、核准的 ASFF 模型真實 CUDA 追蹤、預覽／metadata、輸出影片實際解碼四影格。測試使用容器內暫存資料且無網路；任何失敗會在 backend／gateway 切換之前停止。完整 HTTPS 影片／Desktop／資料權限驗收依然保留。
 
 本機以 lap 0.5.13 跑過相同影片流程的真實 CPU 推論／追蹤／輸出解碼，另有 153 項部署工具測試全部通過；本輪尚未在 Ubuntu 重跑 GPU／HTTPS，也尚未啟用每日備份。續跑使用上方同一段 Git 更新與收尾指令，不重跑舊套用包。
+
+## 2026-10-21 首次模型快取失敗與受控續跑
+
+Ubuntu 備份 `20261020T214632Z-1f089380`：managed preflight／image 快取成功，隨後 `error=Unsafe native model archive`，沒有 recovery_error，公開 health／DB 正常。依 worker 的順序，此次尚未暫停 backend、擷取 SQL／媒體或進入隔離還原。封存中被拒絕的項目類型仍待只讀診斷；不先推定是模型損壞，也不略過安全檢查。
+
+`lab_finalize.py --resume-backup` 可引用同一帳號私人 reports 內的原始報告，只有原報告確實完成候選 GPU／影片、HTTPS／Desktop 與資料／SSE 驗收，且 backend／gateway image 未變、三個 Compose 服務歸屬正確、HTTPS／DB 與關閉註冊政策正常，才直接重試備份階段。報告缺失／權限不符／驗收不完整或 image 改變時拒絕續跑，須改走完整流程。不建置或切換 backend／gateway、不建立新測試帳號／對話。備份 worker 的 busy／空間、SQL／檔案一致性與完整隔離還原檢查照常執行；首份成功且 worker 版本吻合後才 enable timer。
+
+修正封存原因並更新 Git 後，Ubuntu 可使用：
+
+```bash
+(
+set -eu
+conda activate yolo-backend
+cd "$HOME/apps/Yolo_system"
+git pull --ff-only origin main
+sudo -v
+python deploy/lab_finalize.py --resume-backup \
+  "$HOME/.config/yolo-system/reports/finalize-20261020T214321Z.json"
+)
+```
+
+續跑報告記錄 `mode=resume-backup`、`resumed_from` 及原驗收證據，備份與還原是本輪實跑；不把引用的舊 HTTPS／SSE 結果標為新測試。image 快取可重用，不刪原始基準或已有快取；有錯誤時保留私人報告。新增 6 項續跑測試，部署工具全套 159 項本機通過；其中實跑假服務驗證只啟動備份與 enable、不建置 gateway／backend 或執行 Regression。模型封存的修正仍待診斷，尚不能因入口完成就宣稱備份已成功。
 
 ## 備份、狀態與停用
 
