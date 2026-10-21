@@ -20,12 +20,12 @@
 
 本機測試與 Ubuntu 回報分開記錄；以下狀態不代表尚未執行的備份排程已啟用。
 
-- [x] 維運、備份與中斷工作復原工具完成；最新部署工具 159 項通過（含備份續跑拒絕條件與不重建服務）；先前後端 190 項通過。新增四影格真實 CPU 影片追蹤／編碼／解碼驗證通過，使用合成資料與獨立工作目錄。
+- [x] 維運、備份與中斷工作復原工具完成；最新部署工具 170 項通過（含模型內部連結匯出、越界拒絕、降權／逾時及受控備份續跑）；先前後端 190 項通過。新增四影格真實 CPU 影片追蹤／編碼／解碼驗證通過，使用合成資料與獨立工作目錄。
 - [x] Vite 8.3.4／React plugin 6.1.2，本機 build、audit 0 與瀏覽器流程通過；Ubuntu `d233630` 收尾批次已完成 backend／gateway 切換，後續 HTTPS 回歸仍待全部通過。
 - [x] 獨立 SQLite／測試 HTTPS 的真實 CPU 回歸通過：兩帳號隔離、頭像、100 張批次、ZIP、影片、Desktop client、改密碼與 JWT。
 - [x] 手動 CI workflow 已建立；無 checkpoint 的隔離測試 173 通過、9 排除。已隨 `84dcbca` push，尚無 GitHub Actions run 結果。
 - [x] Ubuntu `de65239` 收尾已通過候選 image／GPU／影片、HTTPS 跨帳號／頭像／單圖／100 張批次／ZIP／影片／Desktop，以及既有資料與 Chat／Agent SSE；日誌已進入首份維運備份，證明前段驗收通過。
-- [ ] 首份包含目前來源、SQL、媒體、模型、image、Ollama 與憑證的備份／隔離還原。Ubuntu `finalize-20261020T214321Z.json` 已安裝備份服務，首次執行 image 快取成功，模型封存被 `Unsafe native model archive` 拒絕，尚未擷取 SQL／檔案、尚未啟用每日 **23:30 Asia/Taipei**／保留 7 份成功備份。網站／DB health 正常；模型項目類型仍待只讀診斷。
+- [ ] 首份包含目前來源、SQL、媒體、模型、image、Ollama 與憑證的備份／隔離還原。Ubuntu `finalize-20261020T214321Z.json` 已安裝備份服務，首次執行 image 快取成功，模型封存被 `Unsafe native model archive` 拒絕，尚未擷取 SQL／檔案、尚未啟用每日 **23:30 Asia/Taipei**／保留 7 份成功備份。網站／DB health 正常；目錄診斷確認 2 個符號連結。已補安全內部連結內容匯出，可使用受控備份續跑，修正版仍待 Ubuntu 成功還原／啟用 timer。
 - [ ] 將新完整備份與引用的 image／Ollama 快取下載到 Mac，執行完整性核對；最初還原基準固定保留。
 - [ ] 記錄收尾後來源版本與 image、MySQL 啟停交接；有實際 GitHub run 後另補 CI 結果。
 

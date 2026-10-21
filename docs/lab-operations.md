@@ -1,6 +1,6 @@
 # 實驗室部署：目前操作與交接
 
-2026-10-20 公開入口核心驗收通過：[https://140.113.135.113](https://140.113.135.113)。報告 `public-verify-20261020T094649Z-2578684/report.json`：原有圖片／對話 SHA-256 一致、Bearer／signed URL／未登入保護、Chat SSE／保存（首片段 1.05 秒）及 Agent 工具／SSE／保存（5.13 秒）皆通過。未重建／重啟服務。使用者另已確認手機行動網路瀏覽器全流程正常；Mac 備份副本亦已實際核對通過。2026-10-21 Ubuntu `de65239` 已通過候選 GPU／影片、完整 HTTPS 功能、既有資料及 Chat／Agent SSE；備份服務已安裝，但首次 image 快取後因模型封存項目不符合規則停止，尚未擷取 SQL／媒體，timer 尚未啟用。網站與 DB health 正常；診斷與受控備份續跑見 [Phase 6 收尾批次](lab-phase6-finalization.md)，Phase 6 持續進行。
+2026-10-20 公開入口核心驗收通過：[https://140.113.135.113](https://140.113.135.113)。報告 `public-verify-20261020T094649Z-2578684/report.json`：原有圖片／對話 SHA-256 一致、Bearer／signed URL／未登入保護、Chat SSE／保存（首片段 1.05 秒）及 Agent 工具／SSE／保存（5.13 秒）皆通過。未重建／重啟服務。使用者另已確認手機行動網路瀏覽器全流程正常；Mac 備份副本亦已實際核對通過。2026-10-21 Ubuntu `de65239` 已通過候選 GPU／影片、完整 HTTPS 功能、既有資料及 Chat／Agent SSE；備份服務已安裝，但首次 image 快取後因模型封存項目不符合規則停止，尚未擷取 SQL／媒體，timer 尚未啟用。網站與 DB health 正常；已確認模型目錄有兩個符號連結並完成安全匯出修正（實機待續跑）；操作見 [Phase 6 收尾批次](lab-phase6-finalization.md)，Phase 6 持續進行。
 
 ## 服務位置與管理界線
 
@@ -71,7 +71,7 @@ python3 deploy/verify_downloaded_backup.py \
 
 ## 備份與升級邊界
 
-現有 [備份／隔離還原工具](lab-backup.md) 可在維護時段人工執行。為確保 SQL／媒體一致，擷取期間會短暫停止本專案 backend；恢復服務後再用無網路 MySQL 隔離還原。不要直接放入需要互動 sudo 密碼的無人排程；新收尾批次另安裝 root 保護的 stdlib worker，首份驗證成功後才啟用 23:30 timer。
+現有 [備份／隔離還原工具](lab-backup.md) 可在維護時段人工執行。為確保 SQL／媒體一致，擷取期間會短暫停止本專案 backend；恢復服務後再用無網路 MySQL 隔離還原。模型快取以 Ollama 身分匯出，安全內部連結會存成一般內容，避免還原依賴舊路徑；越界或壞連結不接受。不要直接放入需要互動 sudo 密碼的無人排程；新收尾批次另安裝 root 保護的 stdlib worker，首份驗證成功後才啟用 23:30 timer。
 
 原始已驗證備份早於 HTTPS 更新，是該時間點的資料與設定；它不包含後續新增對話、Caddy 憑證 volume、Docker image 本體或完整 Git 原始碼。下一批維運需要建立目前部署的可重建交接資訊與新備份，再設計每日排程／容量與保留輪替。原始成功還原基準先固定保留，不能先刪掉。
 

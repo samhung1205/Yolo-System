@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import sys
 import tempfile
+import time
 import subprocess
 import tarfile
 import unittest
@@ -118,23 +119,26 @@ class MaintenanceTests(unittest.TestCase):
             self.assertEqual(set(archive.getnames()),set(files))
             self.assertEqual(archive.extractfile('source/README.md').read(),b'uncommitted source')
 
-    def model_cache(self,corrupt=False):
+    def model_cache(self,corrupt=False,aliases=False,blob_alias=False):
         models=self.root/'native'
         (models/'blobs').mkdir(parents=True)
         blob=b'local model fixture'
         digest=hashlib.sha256(blob).hexdigest()
         (models/'blobs'/('sha256-'+digest)).write_bytes(b'corrupt' if corrupt else blob)
+        if blob_alias:
+            source = models/'blobs'/('sha256-'+digest)
+            source.rename(models/'payload')
+            source.symlink_to('../payload')
         manifests=models/'manifests/registry/library/test';manifests.mkdir(parents=True)
         metadata=json.dumps({'layers':[{'digest':'sha256:'+digest}]}).encode()
         (manifests/'latest').write_bytes(metadata)
+        if aliases:
+            (manifests/'relative').symlink_to('latest')
+            (manifests/'absolute').symlink_to((manifests/'latest').resolve())
         self.worker.report['ollama_models']={'models':[{'name':'test:latest','digest':hashlib.sha256(metadata).hexdigest()}]}
         self.worker.config.update(ollama_models=str(models),ollama_uid=os.getuid(),ollama_gid=os.getgid())
-        run=subprocess.run
-        def as_current(*args,**kwargs):
-            for key in ('user','group','extra_groups'):kwargs.pop(key,None)
-            kwargs['env']={**kwargs.get('env',{}),'COPYFILE_DISABLE':'1'}
-            return run(*args,**kwargs)
-        with patch.object(app.subprocess,'run',side_effect=as_current),patch.object(app,'trusted'),patch.object(app.os,'chown'):
+        with patch.object(app.os,'setgroups'),patch.object(app.os,'setgid'),patch.object(app.os,'setuid'), \
+             patch.object(app,'trusted'),patch.object(app.os,'chown'):
             self.worker.cache_models()
 
     def test_native_model_cache_checks_manifest_and_blob_content(self):
@@ -144,6 +148,108 @@ class MaintenanceTests(unittest.TestCase):
 
     def test_corrupt_native_model_blob_is_rejected(self):
         with self.assertRaisesRegex(RuntimeError,'blob fingerprint'):self.model_cache(corrupt=True)
+
+    def test_two_internal_manifest_aliases_become_portable_files(self):
+        self.model_cache(aliases=True)
+        path = self.root / self.worker.report['native_models']['path']
+        with tarfile.open(path) as archive:
+            members = archive.getmembers()
+            self.assertTrue(all(item.isfile() or item.isdir() for item in members))
+            latest = archive.extractfile('manifests/registry/library/test/latest').read()
+            for alias in ('relative', 'absolute'):
+                self.assertEqual(archive.extractfile('manifests/registry/library/test/' + alias).read(), latest)
+
+    def test_internal_blob_link_is_exported_and_fingerprinted(self):
+        self.model_cache(blob_alias=True)
+        self.assertIn('native_models', self.worker.report)
+
+    def test_corrupt_internal_blob_link_still_fails_fingerprint(self):
+        with self.assertRaisesRegex(RuntimeError, 'blob fingerprint'):
+            self.model_cache(blob_alias=True, corrupt=True)
+
+
+class NativeModelSourceTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(); self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name) / 'models'; self.root.mkdir()
+        (self.root / 'data').mkdir(); (self.root / 'data/blob').write_bytes(b'model fixture')
+
+    def archive(self):
+        output = io.BytesIO()
+        app.write_native_models(self.root, output)
+        output.seek(0)
+        return output
+
+    def test_internal_directory_alias_and_hardlink_have_full_contents(self):
+        (self.root / 'alias').symlink_to('data', target_is_directory=True)
+        os.link(self.root / 'data/blob', self.root / 'hardlink')
+        with tarfile.open(fileobj=self.archive()) as archive:
+            self.assertTrue(all(item.isfile() or item.isdir() for item in archive))
+            self.assertEqual(archive.extractfile('alias/blob').read(), b'model fixture')
+            self.assertEqual(archive.extractfile('hardlink').read(), b'model fixture')
+
+    def test_external_link_rejected_before_any_compression(self):
+        outside = self.root.parent / 'private'; outside.write_bytes(b'not model data')
+        for target in (str(outside.resolve()), '../private'):
+            with self.subTest(target=target):
+                link = self.root / 'link'; link.symlink_to(target)
+                output = io.BytesIO()
+                with self.assertRaisesRegex(app.ModelSourceError, 'leaves model store'):
+                    app.write_native_models(self.root, output)
+                self.assertEqual(output.getvalue(), b'')
+                link.unlink()
+
+    def test_replaced_store_root_is_rejected(self):
+        alias = self.root.parent / 'root-link'; alias.symlink_to(self.root, target_is_directory=True)
+        with self.assertRaisesRegex(app.ModelSourceError, 'root changed'):
+            app.write_native_models(alias, io.BytesIO())
+
+    def test_cyclic_directory_link_rejected_before_compression(self):
+        (self.root / 'data/loop').symlink_to('..', target_is_directory=True)
+        output = io.BytesIO()
+        with self.assertRaisesRegex(app.ModelSourceError, 'Cyclic'):
+            app.write_native_models(self.root, output)
+        self.assertEqual(output.getvalue(), b'')
+
+    def test_dangling_link_and_fifo_are_rejected(self):
+        link = self.root / 'link'; link.symlink_to('absent')
+        with self.assertRaisesRegex(app.ModelSourceError, 'Broken'):
+            self.archive()
+        link.unlink(); os.mkfifo(self.root / 'pipe')
+        with self.assertRaisesRegex(app.ModelSourceError, 'Unsupported'):
+            self.archive()
+
+    def test_changed_file_is_rejected_before_reading_bytes(self):
+        original_open = os.open
+        def replace(path, flags):
+            if Path(path).name == 'blob':
+                Path(path).unlink(); Path(path).write_bytes(b'new bytes')
+            return original_open(path, flags)
+        with patch.object(app.os, 'open', side_effect=replace):
+            with self.assertRaisesRegex(app.ModelSourceError, 'file changed'):
+                self.archive()
+
+    def test_export_drops_groups_gid_uid_before_reading_model_tree(self):
+        steps = []
+        config = {'ollama_models': str(self.root), 'ollama_uid': 1008, 'ollama_gid': 1008}
+        def write(root, output):
+            output.write(json.dumps(steps).encode()); output.flush()
+        output = tempfile.TemporaryFile(); self.addCleanup(output.close)
+        with patch.object(app.os, 'setgroups', side_effect=lambda groups: steps.append(['groups', groups])), \
+             patch.object(app.os, 'setgid', side_effect=lambda gid: steps.append(['gid', gid])), \
+             patch.object(app.os, 'setuid', side_effect=lambda uid: steps.append(['uid', uid])), \
+             patch.object(app, 'write_native_models', side_effect=write):
+            app.capture_native_models(config, output)
+        output.seek(0)
+        self.assertEqual(json.load(output), [['groups', []], ['gid', 1008], ['uid', 1008]])
+
+    def test_export_timeout_stops_and_reaps_the_reader(self):
+        output = tempfile.TemporaryFile(); self.addCleanup(output.close)
+        config = {'ollama_models': str(self.root), 'ollama_uid': os.getuid(), 'ollama_gid': os.getgid()}
+        with patch.object(app.os, 'setgroups'), patch.object(app.os, 'setgid'), patch.object(app.os, 'setuid'), \
+             patch.object(app, 'write_native_models', side_effect=lambda *args: time.sleep(5)):
+            with self.assertRaisesRegex(RuntimeError, 'timed out'):
+                app.capture_native_models(config, output, timeout=0.01)
 
 
 class InstallerTests(unittest.TestCase):

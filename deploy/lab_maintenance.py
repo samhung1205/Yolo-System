@@ -156,6 +156,100 @@ def capture_user_files(config, archive, manifest):
     need(os.waitstatus_to_exitcode(status) == 0, 'User source capture failed')
 
 
+class ModelSourceError(RuntimeError):
+    """Fixed diagnostic messages only; never include source contents or paths."""
+
+
+def write_native_models(root, output):
+    """Materialize internal aliases; emit only ordinary files and directories."""
+    if Path(root).is_symlink() or not Path(root).is_dir():
+        raise ModelSourceError('Native model store root changed')
+    root = Path(root).resolve(strict=True)
+    entries = []
+
+    def visit(path, name, ancestors):
+        try:
+            target = path.resolve(strict=True)
+        except (OSError, RuntimeError):
+            raise ModelSourceError('Broken or cyclic native model link') from None
+        if not target.is_relative_to(root):
+            raise ModelSourceError('Native model link leaves model store')
+        info = target.stat()
+        identity = (info.st_dev, info.st_ino)
+        if stat.S_ISDIR(info.st_mode):
+            if identity in ancestors:
+                raise ModelSourceError('Cyclic native model directory link')
+            entries.append((target, name, info))
+            for child in sorted(target.iterdir()):
+                visit(child, name / child.name, ancestors | {identity})
+        elif stat.S_ISREG(info.st_mode):
+            entries.append((target, name, info))
+        else:
+            raise ModelSourceError('Unsupported native model source type')
+
+    # Validate the entire small metadata tree before reading/compressing GBs.
+    visit(root, Path('.'), set())
+    with tarfile.open(fileobj=output, mode='w:gz', compresslevel=1, dereference=True) as archive:
+        for target, name, planned in entries:
+            if stat.S_ISDIR(planned.st_mode):
+                info = archive.gettarinfo(str(target), arcname=name.as_posix())
+                if not info.isdir():
+                    raise ModelSourceError('Native model directory changed')
+                archive.addfile(info)
+            else:
+                fd = os.open(target, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+                with os.fdopen(fd, 'rb') as source:
+                    before = os.fstat(source.fileno())
+                    if not stat.S_ISREG(before.st_mode) or any(
+                        getattr(before, key) != getattr(planned, key)
+                        for key in ('st_dev', 'st_ino', 'st_size', 'st_mtime_ns')
+                    ):
+                        raise ModelSourceError('Native model file changed')
+                    info = archive.gettarinfo(fileobj=source, arcname=name.as_posix())
+                    archive.addfile(info, source)
+                    after = os.fstat(source.fileno())
+                    if (before.st_size, before.st_mtime_ns) != (after.st_size, after.st_mtime_ns):
+                        raise ModelSourceError('Native model file changed')
+    output.flush()
+
+
+def capture_native_models(config, output, *, timeout=1200):
+    """Read model contents only after permanently dropping to the Ollama UID."""
+    with tempfile.TemporaryFile() as diagnostic:
+        pid = os.fork()
+        if pid == 0:
+            try:
+                os.setgroups([])
+                os.setgid(config['ollama_gid'])
+                os.setuid(config['ollama_uid'])
+                write_native_models(config['ollama_models'], output)
+                os._exit(0)
+            except BaseException as exc:
+                message = str(exc) if isinstance(exc, ModelSourceError) else type(exc).__name__
+                diagnostic.write(message.encode()); diagnostic.flush()
+                os._exit(1)
+        deadline = time.monotonic() + timeout
+        reaped = False
+        try:
+            while True:
+                finished, status = os.waitpid(pid, os.WNOHANG)
+                if finished:
+                    reaped = True
+                    break
+                need(time.monotonic() < deadline, 'Native model capture timed out')
+                time.sleep(0.05)
+        finally:
+            if not reaped:
+                try:
+                    os.kill(pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                os.waitpid(pid, 0)
+        if os.waitstatus_to_exitcode(status) != 0:
+            diagnostic.seek(0)
+            raise RuntimeError('Native model capture failed: ' + diagnostic.read().decode())
+
+
 class Maintenance:
     def __init__(self, config, root=ROOT):
         self.config, self.root = config, root
@@ -326,10 +420,7 @@ class Maintenance:
                 trusted(temporary)
                 temporary.unlink()
             with temporary.open('xb') as output:
-                result=subprocess.run(['/usr/bin/tar','-C',self.config['ollama_models'],'-czf','-','.'],
-                    env=self.env,stdout=output,stderr=subprocess.DEVNULL,timeout=1200,
-                    user=self.config['ollama_uid'],group=self.config['ollama_gid'],extra_groups=[])
-                need(result.returncode==0,'Native model archive failed')
+                capture_native_models(self.config, output)
             manifests=set()
             with tarfile.open(temporary) as archive:
                 for member in archive:

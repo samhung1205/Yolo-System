@@ -5,7 +5,7 @@
 ## 已完成的本機驗證
 
 - 上一輪後端全套 **190 passed（29.91 秒）**：獨立工作目錄／隨機測試 key／合成圖片，不讀正式 `.env` 或私人媒體；使用本機核准 checkpoint，非 Ubuntu GPU 重驗。新增 Ultralytics HEIF 包裝下的格式白名單、壞檔拒絕與暫存清理測試。
-- 部署工具涵蓋備份失敗恢復、輪替範圍、root／使用者權限界線、暫存還原歸屬、來源更新與 gateway 回退。最新全套 **159 項通過**（含本機假 Docker Unix API、候選 backend 不動正式服務、忙碌拒絕切換、啟動失敗回復、私人設定競爭保護、影片依賴失敗／輸出截斷拒絕與 CI 補充依賴）。
+- 部署工具涵蓋備份失敗恢復、輪替範圍、root／使用者權限界線、暫存還原歸屬、來源更新與 gateway 回退。最新全套 **170 項通過**（含本機假 Docker Unix API、候選 backend 不動正式服務、忙碌拒絕切換、啟動失敗回復、私人設定競爭保護、影片依賴失敗／輸出截斷拒絕與 CI 補充依賴）。
 - Vite 8.3.4／React plugin 6.1.2，production build 通過，npm audit 為 0；Node 最低 20.19 或 22.12，部署使用 Node 22 image。依 [Vite 8 遷移文件](https://vite.dev/guide/migration) 更新，沒有執行 audit fix --force。
 - Playwright 實際瀏覽器：production build 登入／工作台、Agent query／重新整理、登出、未登入路由保護與關閉註冊頁通過。API 使用獨立 SQLite，沒有使用正式帳密／資料庫。favicon 404 與選取不存在的測試偵測 404 為預期診斷，沒有 JS 執行例外。
 - `lab_regression.py` 已在獨立 SQLite、測試 HTTPS 與真實 CPU 模型跑通：兩個臨時帳號、管理員權限、頭像歸屬／清理、單圖／100 張批次／ZIP、四影格影片、媒體權限、Desktop client、改密碼撤銷 JWT；臨時帳號清理成功。100 張合成圖片批次在本次 CPU 環境共 9.276 秒（含上傳／進度等待），只作測試紀錄，不當作真實資料的效能承諾。這不冒稱 Ubuntu GPU 驗收。
@@ -79,7 +79,7 @@ Ubuntu 報告 `finalize-20261020T184510Z.json` 已通過候選回歸及服務切
 
 ## 2026-10-21 首次模型快取失敗與受控續跑
 
-Ubuntu 備份 `20261020T214632Z-1f089380`：managed preflight／image 快取成功，隨後 `error=Unsafe native model archive`，沒有 recovery_error，公開 health／DB 正常。依 worker 的順序，此次尚未暫停 backend、擷取 SQL／媒體或進入隔離還原。封存中被拒絕的項目類型仍待只讀診斷；不先推定是模型損壞，也不略過安全檢查。
+Ubuntu 備份 `20261020T214632Z-1f089380`：managed preflight／image 快取成功，隨後 `error=Unsafe native model archive`，沒有 recovery_error，公開 health／DB 正常。依 worker 的順序，此次尚未暫停 backend、擷取 SQL／媒體或進入隔離還原。快速目錄診斷確認 12 個目錄、21 個一般檔案與 2 個符號連結，與舊版拒絕所有連結項目的規則相符。尚未由這份統計確認兩個連結的目標；修正版僅處理可解析且位於模型目錄內的連結，越界／損壞連結仍拒絕。
 
 `lab_finalize.py --resume-backup` 可引用同一帳號私人 reports 內的原始報告，只有原報告確實完成候選 GPU／影片、HTTPS／Desktop 與資料／SSE 驗收，且 backend／gateway image 未變、三個 Compose 服務歸屬正確、HTTPS／DB 與關閉註冊政策正常，才直接重試備份階段。報告缺失／權限不符／驗收不完整或 image 改變時拒絕續跑，須改走完整流程。不建置或切換 backend／gateway、不建立新測試帳號／對話。備份 worker 的 busy／空間、SQL／檔案一致性與完整隔離還原檢查照常執行；首份成功且 worker 版本吻合後才 enable timer。
 
@@ -97,7 +97,15 @@ python deploy/lab_finalize.py --resume-backup \
 )
 ```
 
-續跑報告記錄 `mode=resume-backup`、`resumed_from` 及原驗收證據，備份與還原是本輪實跑；不把引用的舊 HTTPS／SSE 結果標為新測試。image 快取可重用，不刪原始基準或已有快取；有錯誤時保留私人報告。新增 6 項續跑測試，部署工具全套 159 項本機通過；其中實跑假服務驗證只啟動備份與 enable、不建置 gateway／backend 或執行 Regression。模型封存的修正仍待診斷，尚不能因入口完成就宣稱備份已成功。
+續跑報告記錄 `mode=resume-backup`、`resumed_from` 及原驗收證據，備份與還原是本輪實跑；不把引用的舊 HTTPS／SSE 結果標為新測試。image 快取可重用，不刪原始基準或已有快取；有錯誤時保留私人報告。新增 6 項續跑測試，部署工具全套 159 項本機通過；其中實跑假服務驗證只啟動備份與 enable、不建置 gateway／backend 或執行 Regression。以下連結匯出修正已完成本機驗證，Ubuntu 首份成功備份／還原與 timer 啟用仍待續跑，不能因工具完成就宣稱備份成功。
+
+### 模型符號連結的可攜式匯出修正
+
+原始 `/usr/bin/tar` 會保留連結，但後續驗證只接受一般檔案／目錄，因此正常的模型內部 alias 也會被拒絕。現在由 root worker fork 子程序，先清除附加群組並永久降為 Ollama 的 GID／UID，再用標準庫匯出；不以 root 身分讀取 Ollama 可寫入的模型內容，也不改原始模型目錄。
+
+匯出先掃描小型目錄資訊，解析每個來源，要求解析後仍在模型根目錄內；拒絕根目錄被替換為連結、越界／損壞／循環連結、特殊檔案與擷取途中檔案變更，再讀取／壓縮大型資料。以 [Python tarfile 的 dereference 行為](https://docs.python.org/3.11/library/tarfile.html#tarfile.TarFile) 將安全內部 alias 的內容存成一般檔案／目錄，封存不包含符號或硬連結；還原不依賴舊主機的絕對路徑。保留原本逐 blob SHA-256、manifest inventory 與整份快取 SHA-256 驗證；匯出逾 20 分鐘會回收該讀取子程序。
+
+本機重現相對／絕對內部 manifest 連結及內部目錄 alias，驗證匯出後實際內容一致、只有一般檔案／目錄；也驗證越界、循環、壞連結、FIFO、來源替換拒絕，以及降權順序與逾時回收；blob 本身為內部連結時仍核對內容指紋，壞內容依然拒絕。部署工具全套 **170 項通過**，未操作 Ubuntu 正式模型或服務。續跑使用上方 `--resume-backup` 同一段命令；安裝器會更新 root 保護的 worker，既有 image 快取重用，失敗的 root-owned 模型 partial 依既有規則重建。首次模型匯出與完整 SHA-256／隔離還原仍需數分鐘；首份成功後才啟用 23:30 timer。
 
 ## 備份、狀態與停用
 
