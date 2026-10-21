@@ -30,6 +30,7 @@ Usage (from the repo root, yolo-backend env):
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -214,7 +215,9 @@ def run_case(engine_name, provider, model, case, session, users):
 # --------------------------------------------------------------------------- #
 def score(case, engine_name, run, session):
     answer = run["answer"] or ""
-    lowered = answer.lower()
+    # Filenames may escape underscores in Markdown prose. Apply the same
+    # normalization to required and forbidden text so exclusions stay strict.
+    lowered = answer.replace(r"\_", "_").lower()
     checks: dict[str, bool] = {}
 
     for index, group in enumerate(case.get("include", [])):
@@ -256,11 +259,35 @@ def score(case, engine_name, run, session):
 # --------------------------------------------------------------------------- #
 # Report
 # --------------------------------------------------------------------------- #
-def write_report(rows, args):
+def write_report(rows, args, *, source=None, source_sha256=None):
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    now = datetime.now(timezone.utc).isoformat()
+    result = {"generated_at": now, "provider": args.provider, "rows": rows}
+    if source is not None:
+        # Preserve the original run timestamp, answers, tool calls and timings.
+        result = {**source, "rows": rows}
+        changes = [
+            {"case": old["case"], "engine": old["engine"], "model": old["model"],
+             "attempt": old["attempt"], "previous_passed": old["passed"],
+             "previous_checks": old["checks"], "corrected_checks": new["checks"]}
+            for old, new in zip(source["rows"], rows)
+            if old["checks"] != new["checks"]
+        ]
+        if changes:
+            summaries = []
+            for engine, model in sorted({(c["engine"], c["model"]) for c in changes}):
+                old_rows = [r for r in source["rows"] if (r["engine"], r["model"]) == (engine, model)]
+                new_rows = [r for r in rows if (r["engine"], r["model"]) == (engine, model)]
+                summaries.append({"engine": engine, "model": model, "total": len(new_rows),
+                                  "previous_passed": sum(r["passed"] for r in old_rows),
+                                  "corrected_passed": sum(r["passed"] for r in new_rows)})
+            result["rescore_history"] = [*source.get("rescore_history", []), {
+                "rescored_at": now, "source_sha256": source_sha256,
+                "method": "markdown_underscore_content_matching_v1",
+                "new_model_calls": False, "changes": changes, "summaries": summaries,
+            }]
     (RESULTS_DIR / "agent_engine_eval_results.json").write_text(
-        json.dumps({"generated_at": datetime.now(timezone.utc).isoformat(), "provider": args.provider, "rows": rows},
-                   ensure_ascii=False, indent=2),
+        json.dumps(result, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
 
@@ -268,11 +295,25 @@ def write_report(rows, args):
     lines = [
         "# Agent engine eval",
         "",
-        f"- Generated at: `{datetime.now(timezone.utc).isoformat(timespec='seconds')}`",
+        f"- Generated at (original model run): `{result['generated_at']}`",
         f"- Provider: `{args.provider}` · repeats: {args.repeat} · cases: {len({r['case'] for r in rows})}",
         "- Data: seeded in-memory SQLite world (see `evaluate_agent_engines.py`); real tool code, no YOLO",
-        "",
-        "## Summary",
+    ]
+    if result.get("rescore_history"):
+        lines += ["", "## 評分補正紀錄", "",
+                  "以原始保存回答重新評分，沒有重新呼叫模型；回答、工具呼叫、耗時與原始執行日期保留。",
+                  "內容比對會還原 Markdown 跳脫底線（例如 `harbor\\_1.jpg` → `harbor_1.jpg`），必要與禁止字詞採用相同規則。",
+                  "原始檢查結果與來源 SHA-256 保存在 JSON 的 `rescore_history`，其他模型的失敗仍照實列出。", ""]
+        for entry in result["rescore_history"]:
+            lines.append(f"- 補正時間：`{entry['rescored_at']}`；來源 SHA-256：`{entry['source_sha256']}`。")
+            for change in entry["changes"]:
+                previous = "PASS" if change["previous_passed"] else "FAIL"
+                corrected = "PASS" if all(change["corrected_checks"].values()) else "FAIL"
+                lines.append(f"  - `{change['engine']}` / `{change['model']}` / `{change['case']}` / attempt {change['attempt']}: {previous} → {corrected}。")
+            for summary in entry["summaries"]:
+                lines.append(f"  - `{summary['engine']}` + `{summary['model']}`：原始 {summary['previous_passed']}/{summary['total']} → 補正 {summary['corrected_passed']}/{summary['total']}。")
+        lines += ["", "這是既有固定案例的重新評分，不代表所有使用情境都保證通過。"]
+    lines += ["", "## Summary",
         "",
         "| Engine | Model | Cases passed | Checks passed | Grounded numbers | zh-TW | Avg s | Max s |",
         "|---|---|---|---|---|---|---|---|",
@@ -341,7 +382,8 @@ def main():
 
     session, users = build_world()
     if args.rescore:
-        saved = json.loads((RESULTS_DIR / "agent_engine_eval_results.json").read_text(encoding="utf-8"))
+        saved_bytes = (RESULTS_DIR / "agent_engine_eval_results.json").read_bytes()
+        saved = json.loads(saved_bytes)
         by_id = {c["id"]: c for c in cases}
         args.provider = saved.get("provider", args.provider)
         rows = []
@@ -352,7 +394,11 @@ def main():
             checks = score(by_id[row["case"]], row["engine"], run, session)
             rows.append({**row, **run, "checks": checks, "passed": all(checks.values())})
         args.repeat = max(r["attempt"] for r in rows) + 1
-        print(write_report(rows, args))
+        # A filtered re-score must not silently discard unrelated saved cases.
+        if len(rows) != len(saved["rows"]):
+            parser.error("--rescore requires all saved cases; remove --cases")
+        print(write_report(rows, args, source=saved,
+                           source_sha256=hashlib.sha256(saved_bytes).hexdigest()))
         return
 
     rows = []

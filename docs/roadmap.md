@@ -9,7 +9,7 @@
 | 共用 FastAPI／MySQL 核心 | Web 與 Desktop 透過 API 存取；migration 最新 `0013` |
 | Web 主要流程 | 登入、帳號管理、單圖、100 張批次、歷史、下載、Chat／Agent 與報告已實作 |
 | 桌面版 | 共用 API、單圖／影片、Chat／Agent；維護模式，Webcam／RTSP 仍本機推論 |
-| Agent 引擎 | 預設 `tool_calling`／gemma4；唯讀工具與權限隔離，DeepAgents 不採用 |
+| Agent 引擎 | 預設 `tool_calling`／gemma4；唯讀工具與權限隔離，DeepAgents 不採用；固定案例於 2026-10-22 修正評分後為 [32/32](../tests/evals/results/agent_engine_eval_report.md)（原始回答重新評分，非新模型實測） |
 | 部署前安全修正 | JWT 撤銷、登入節流、上傳／頭像歸屬、受保護媒體、LLM 政策、輪次唯一鍵 |
 | 實驗室公開部署 | Ubuntu GPU、Compose、HTTPS、關閉註冊、原有資料、Chat／Agent SSE 皆通過；使用者確認手機行動網路正常 |
 | 最初基準備份（舊版本） | 隔離 MySQL／檔案還原通過；Mac 副本完整 SQL 與 52 檔 SHA-256 核對通過 |

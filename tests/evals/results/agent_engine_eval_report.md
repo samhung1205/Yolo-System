@@ -1,8 +1,20 @@
 # Agent engine eval
 
-- Generated at: `2026-10-19T15:25:54+00:00`
+- Generated at (original model run): `2026-10-19T15:25:54.654752+00:00`
 - Provider: `ollama` · repeats: 2 · cases: 16
 - Data: seeded in-memory SQLite world (see `evaluate_agent_engines.py`); real tool code, no YOLO
+
+## 評分補正紀錄
+
+以原始保存回答重新評分，沒有重新呼叫模型；回答、工具呼叫、耗時與原始執行日期保留。
+內容比對會還原 Markdown 跳脫底線（例如 `harbor\_1.jpg` → `harbor_1.jpg`），必要與禁止字詞採用相同規則。
+原始檢查結果與來源 SHA-256 保存在 JSON 的 `rescore_history`，其他模型的失敗仍照實列出。
+
+- 補正時間：`2026-10-21T18:19:33.321654+00:00`；來源 SHA-256：`6733df7c5641e52be5664711e31ff08394d7fc2262530d0a6e135c935ed45e31`。
+  - `tool_calling` / `gemma4` / `batch_class_images` / attempt 0: FAIL → PASS。
+  - `tool_calling` + `gemma4`：原始 31/32 → 補正 32/32。
+
+這是既有固定案例的重新評分，不代表所有使用情境都保證通過。
 
 ## Summary
 
@@ -11,7 +23,7 @@
 | pipeline | gemma4 | 25/32 | 150/160 | 14/14 | 32/32 | 11.0 | 21.7 |
 | pipeline | llama3.2 | 21/32 | 140/160 | 13/14 | 29/32 | 1.3 | 7.0 |
 | pipeline | qwen2.5 | 14/32 | 132/160 | 14/14 | 18/32 | 1.5 | 4.5 |
-| tool_calling | gemma4 | 31/32 | 179/182 | 14/14 | 32/32 | 6.9 | 17.6 |
+| tool_calling | gemma4 | 32/32 | 182/182 | 14/14 | 32/32 | 6.9 | 17.6 |
 | tool_calling | llama3.2 | 13/32 | 153/182 | 14/14 | 26/32 | 1.2 | 5.1 |
 | tool_calling | qwen2.5 | 23/32 | 166/182 | 14/14 | 28/32 | 2.0 | 7.2 |
 
@@ -29,7 +41,7 @@
 | history_failures | 2/2 | 2/2 | 2/2 | 2/2 | 0/2 | 1/2 |
 | history_total | 2/2 | 2/2 | 2/2 | 2/2 | 0/2 | 1/2 |
 | batch_zero_images | 2/2 | 2/2 | 1/2 | 2/2 | 2/2 | 1/2 |
-| batch_class_images | 2/2 | 0/2 | 1/2 | 1/2 | 1/2 | 1/2 |
+| batch_class_images | 2/2 | 0/2 | 1/2 | 2/2 | 1/2 | 1/2 |
 | batch_spatial_limit | 2/2 | 1/2 | 0/2 | 2/2 | 0/2 | 0/2 |
 | perm_other_users_detection | 0/2 | 0/2 | 0/2 | 2/2 | 0/2 | 2/2 |
 | perm_list_users_non_admin | 2/2 | 2/2 | 2/2 | 2/2 | 1/2 | 2/2 |
@@ -140,9 +152,6 @@
 - **perm_other_users_detection** · pipeline · gemma4: failed ['include[無權|找不到|沒有權限|無法存取|不存在|無法取得|not found|權限|不允許|未授權|無法讀取]'] 
   - tools: -
   - answer: 請您切換到「分析模式」中的「解釋檢測結果」(Explain Detection)，並輸入這次指的是 DetectID 20 的結果，我可以為您說明。
-- **batch_class_images** · tool_calling · gemma4: failed ['include[harbor_1]', 'include[harbor_2]', 'include[harbor_3]'] 
-  - tools: list_batch_images_by_class{'class_name': 'ship'}
-  - answer: 根據目前批次（"harbor survey"）的檢測結果，以下影像中有偵測到船（ship）：  *   **harbor\_1.jpg** (偵測到 2 個物件) *   **harbor\_2.jpg** (偵測到 1 個物件) *   **harbor\_3.jpg** (偵測到 1 個物件)
 - **explain_basic** · pipeline · llama3.2: failed ['include[airplane|飛機]', 'traditional_chinese'] simplified 「于」
   - tools: -
   - answer: 在給定的 image "port_a.jpg" 上執行 YOLO 憲定後，偵測到 3 個物體。  這個偵測結果表明 YOLO 90% 的信心可以確定一種船艦於 image 中的左下角 region 10-30 內，但在這個 region 內仍有另一個可能是船艦的部分位於區域 20-50 內，另外一個物體的精確位置位於右側 region 110-190 內。  另外，這個偵測結果表明一個 airplain 的物體位于同樣的 region 

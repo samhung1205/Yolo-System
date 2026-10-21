@@ -781,7 +781,7 @@ data: {"type":"error","message":"錯誤訊息"}
 | `tool_calling`（預設） | LangChain v1 `create_agent`：模型自行決定呼叫哪些唯讀工具（`app/agents/tool_agent.py`、`langchain_tools.py`），每次請求最多 `AGENT_MAX_TOOL_CALLS` 次工具呼叫 |
 | `pipeline` | 依 mode / 關鍵字決定流程，後端先查好資料，再呼叫一次 LLM（`app/agents/graph.py`） |
 
-預設值依據 `tests/evals/evaluate_agent_engines.py` 評測（2026-10-19）：tool_calling + gemma4 31/32 題通過。provider 為 ollama 且未指定模型時，Agent 用 `AGENT_OLLAMA_MODEL`（預設 `gemma4`），Chat 仍用 `OLLAMA_MODEL`。
+預設值依據 `tests/evals/evaluate_agent_engines.py` 評測（2026-10-19）：tool_calling + gemma4 原始 31/32，2026-10-22 修正 Markdown 跳脫底線比對後，以原始回答重新評分為 **32/32**（182/182 checks），沒有重新呼叫模型；補正與原始檢查保留於[評測報告](../tests/evals/results/agent_engine_eval_report.md)。provider 為 ollama 且未指定模型時，Agent 用 `AGENT_OLLAMA_MODEL`（預設 `gemma4`），Chat 仍用 `OLLAMA_MODEL`。
 
 - `tool_calling` 遇到以下情況自動改走 `pipeline`：`provider=mock`、`mode=report`（報告 markdown 需保持確定性）、`AGENT_ENABLE_VISION=true` 時的 `explain_detection`（只有 pipeline 會附圖）
 - 各 mode 可用工具：`explain_detection` → 偵測詳情 / 比較；`history_analysis` → 歷史統計 / 近期清單 / 模型表現 / 偵測詳情；`batch_analysis` → 批次統計 / 依類別查影像；`admin_help` → 使用者清單 / 全站統計（僅 admin）；`general_chat` → 無工具；`auto` → 全部一般工具（admin 另含管理工具）

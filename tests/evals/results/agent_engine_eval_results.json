@@ -2314,11 +2314,11 @@
       "engine": "tool_calling",
       "model": "gemma4",
       "attempt": 0,
-      "passed": false,
+      "passed": true,
       "checks": {
-        "include[harbor_1]": false,
-        "include[harbor_2]": false,
-        "include[harbor_3]": false,
+        "include[harbor_1]": true,
+        "include[harbor_2]": true,
+        "include[harbor_3]": true,
         "exclude[empty_sea]": true,
         "traditional_chinese": true,
         "no_engine_error": true
@@ -3940,6 +3940,48 @@
       "errors": [],
       "calls": [],
       "seconds": 0.58
+    }
+  ],
+  "rescore_history": [
+    {
+      "rescored_at": "2026-10-21T18:19:33.321654+00:00",
+      "source_sha256": "6733df7c5641e52be5664711e31ff08394d7fc2262530d0a6e135c935ed45e31",
+      "method": "markdown_underscore_content_matching_v1",
+      "new_model_calls": false,
+      "changes": [
+        {
+          "case": "batch_class_images",
+          "engine": "tool_calling",
+          "model": "gemma4",
+          "attempt": 0,
+          "previous_passed": false,
+          "previous_checks": {
+            "include[harbor_1]": false,
+            "include[harbor_2]": false,
+            "include[harbor_3]": false,
+            "exclude[empty_sea]": true,
+            "traditional_chinese": true,
+            "no_engine_error": true
+          },
+          "corrected_checks": {
+            "include[harbor_1]": true,
+            "include[harbor_2]": true,
+            "include[harbor_3]": true,
+            "exclude[empty_sea]": true,
+            "traditional_chinese": true,
+            "no_engine_error": true
+          }
+        }
+      ],
+      "summaries": [
+        {
+          "engine": "tool_calling",
+          "model": "gemma4",
+          "total": 32,
+          "previous_passed": 31,
+          "corrected_passed": 32
+        }
+      ]
     }
   ]
 }

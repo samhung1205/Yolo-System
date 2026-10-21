@@ -70,11 +70,14 @@ VITE_API_BASE_URL='' npm run build
 | 沒有私人模型 | `python -m pytest -q -m 'not checkpoints'`；回報被排除項目 |
 | Web | `npm run build`，再查實際瀏覽器流程與窄螢幕 |
 | 部署工具 | 專案根目錄 `python3 -m unittest discover -s deploy/tests -q` |
+| Agent 評分規則 | yolo-backend 環境，在專案根目錄 `python -m unittest discover -s tests/evals -p 'test_*.py' -q` |
 | 文件 | 專案根目錄 `python3 scripts/check_docs.py` |
 | 文件檢查器 | `python3 -m unittest discover -s scripts/tests -q` |
 | 提交差異 | `python3 scripts/check_docs.py --staged`、`git -c core.whitespace=cr-at-eol diff --check` |
 
 沒有 `npm test` 或 lint script，請勿宣稱已執行。真實 GPU／MySQL／Ollama／HTTPS 與單元測試結果分開，完整歷史驗證見 [歷史索引](archive/README.md)。
+
+Agent 評測可執行 `python tests/evals/evaluate_agent_engines.py --rescore`，使用固定的記憶體 SQLite 測試資料重新評分已保存的回答，不呼叫 LLM 或正式 DB。內容必要／禁止字詞比對會還原 Markdown 跳脫底線，避免檔名 `harbor\_1.jpg` 被誤判。重新評分保留原始執行時間與回答，JSON 的 `rescore_history` 記錄來源 SHA-256、原始檢查與補正差異；報告區分模型執行與評分補正，不把重新評分當成新的模型實測。`--rescore` 不可搭配只涵蓋部分既存案例的 `--cases`，避免覆寫掉其他結果。
 
 ## 影片與容器依賴
 
