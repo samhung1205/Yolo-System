@@ -5,6 +5,7 @@ import modelService, { pickDefaultSelection } from "../services/modelService";
 import ModelPicker from "../components/ModelPicker";
 import { useAssistantState } from "../state/assistantState";
 import { normalizeApiError } from "../services/api";
+import ConfirmDialog from "../components/ConfirmDialog";
 
 const CONVERSATION_LIMIT = 100;
 
@@ -21,6 +22,15 @@ export default function ChatPage() {
   const [initLoading, setInitLoading] = useState(true);
   const [error, setError] = useAssistantState("chat", "error", "");
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [deleteError, setDeleteError] = useState("");
+  const sidebarHeadingRef = useRef(null);
+  // The deleted row (and its trigger) unmounts; land focus on the list heading.
+  const focusListAfterDeleteRef = useRef(false);
+  useEffect(() => {
+    if (!focusListAfterDeleteRef.current) return;
+    focusListAfterDeleteRef.current = false;
+    sidebarHeadingRef.current?.focus();
+  }, [conversations]);
   const [deletingConversationId, setDeletingConversationId] = useState(null);
 
   // Mirrors activeConversationId so async handlers can check the *current*
@@ -49,6 +59,7 @@ export default function ChatPage() {
     () => conversations.find((item) => item.conversation_id === activeConversationId) || null,
     [activeConversationId, conversations]
   );
+  const confirmDeleteConversation = conversations.find((item) => item.conversation_id === confirmDeleteId) || null;
 
   useEffect(() => {
     let active = true;
@@ -96,7 +107,7 @@ export default function ChatPage() {
           return;
         }
         setConversations(rows);
-        // Don't auto-open if the user already clicked "New" or another
+        // Don't auto-open if the user already clicked "新對話" or another
         // conversation while this request was in flight.
         if (rows.length > 0 && !userNavigatedRef.current) {
           await handleOpenConversation(rows[0].conversation_id, mounted, { auto: true });
@@ -167,8 +178,9 @@ export default function ChatPage() {
         setQuestion("");
       }
       setConfirmDeleteId(null);
+      focusListAfterDeleteRef.current = true;
     } catch (err) {
-      setError(normalizeApiError(err, "刪除對話失敗"));
+      setDeleteError(normalizeApiError(err, "刪除對話失敗，請稍後再試。"));
     } finally {
       setDeletingConversationId(null);
     }
@@ -234,25 +246,37 @@ export default function ChatPage() {
         {showConversations ? "返回對話" : "查看歷史對話"}
       </button>
       <p className="sr-only" role="status">{loading ? "AI 正在回覆" : messages.length ? "對話內容已更新" : "輸入訊息開始對話"}</p>
+      {confirmDeleteConversation && (
+        <ConfirmDialog
+          title="刪除這則對話？"
+          confirmLabel="確認刪除"
+          busy={deletingConversationId === confirmDeleteConversation.conversation_id}
+          error={deleteError}
+          onConfirm={() => handleDeleteConversation(confirmDeleteConversation.conversation_id)}
+          onCancel={() => { setConfirmDeleteId(null); setDeleteError(""); }}
+        >
+          <p>「{confirmDeleteConversation.title}」的 {confirmDeleteConversation.turn_count} 輪問答會被刪除，無法復原。</p>
+        </ConfirmDialog>
+      )}
       <section className={`chat-layout${showConversations ? " conversations-open" : ""}`}>
 
         <aside id="conversation-list" className="panel chat-sidebar" aria-label="歷史對話">
           <div className="section-title chat-sidebar-header">
             <div>
-              <h2>歷史對話</h2>
+              <h2 ref={sidebarHeadingRef} tabIndex={-1}>歷史對話</h2>
               <span className="muted small">
-                {conversations.length} conversations · latest {CONVERSATION_LIMIT}
+                {conversations.length} 則對話 · 顯示最近 {CONVERSATION_LIMIT} 則
               </span>
             </div>
             <button type="button" className="button button-secondary" onClick={handleNewConversation}>
-              New
+              新對話
             </button>
           </div>
 
           <div className="chat-conversation-scroll">
             <div className="list-stack chat-conversation-list">
               {initLoading ? (
-                <p className="muted small">載入聊天紀錄...</p>
+                <p className="muted small">載入聊天紀錄…</p>
               ) : (
                 <>
                 {conversations.map((item) => (
@@ -272,46 +296,24 @@ export default function ChatPage() {
                     >
                       <span className="chat-conversation-title" title={item.title}>{item.title}</span>
                       <span className="chat-conversation-meta">
-                        {item.provider} · {item.turn_count} turns
+                        {item.provider} · {item.turn_count} 輪
                       </span>
                     </button>
 
-                    {confirmDeleteId === item.conversation_id ? (
-                      <div className="chat-delete-confirm" role="group" aria-label={`確認刪除 ${item.title}`}>
-                        <span>確定刪除？</span>
-                        <button
-                          type="button"
-                          className="chat-delete-confirm-button"
-                          disabled={deletingConversationId === item.conversation_id || loading}
-                          onClick={() => handleDeleteConversation(item.conversation_id)}
-                        >
-                          {deletingConversationId === item.conversation_id ? "刪除中..." : "刪除"}
-                        </button>
-                        <button
-                          type="button"
-                          className="chat-delete-cancel-button"
-                          disabled={deletingConversationId === item.conversation_id}
-                          onClick={() => setConfirmDeleteId(null)}
-                        >
-                          取消
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        className="chat-conversation-delete"
-                        disabled={Boolean(deletingConversationId) || loading}
-                        onClick={() => setConfirmDeleteId(item.conversation_id)}
-                        aria-label={`刪除對話 ${item.title}`}
-                        title="刪除對話"
-                      >
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                          <polyline points="3 6 5 6 21 6" />
-                          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                          <path d="M10 11v6M14 11v6M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-                        </svg>
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      className="chat-conversation-delete"
+                      disabled={Boolean(deletingConversationId) || loading}
+                      onClick={() => setConfirmDeleteId(item.conversation_id)}
+                      aria-label={`刪除對話 ${item.title}`}
+                      title="刪除對話"
+                    >
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <polyline points="3 6 5 6 21 6" />
+                        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                        <path d="M10 11v6M14 11v6M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                      </svg>
+                    </button>
                   </div>
                 ))}
                 {!conversations.length ? <p className="muted">尚無聊天紀錄。</p> : null}
@@ -325,7 +327,7 @@ export default function ChatPage() {
           <div className="chat-header">
             <h2>{activeConversation?.title || "新對話"}</h2>
             <span className="muted">
-              {activeConversation ? `${activeConversation.turn_count} turns` : "尚未建立對話"}
+              {activeConversation ? `${activeConversation.turn_count} 輪對話` : "尚未建立對話"}
             </span>
           </div>
 
@@ -334,7 +336,7 @@ export default function ChatPage() {
               <>{messages.map((item) => (
                 <div key={item.id} className="chat-turn">
                   <div className="chat-bubble chat-bubble-user">
-                    <span className="chat-role">You</span>
+                    <span className="chat-role">你</span>
                     <p>{item.question}</p>
                   </div>
                   <div className="chat-bubble chat-bubble-assistant">
@@ -345,7 +347,7 @@ export default function ChatPage() {
                   </div>
                 </div>
               ))}
-              {pendingQuestion && <div className="chat-turn"><div className="chat-bubble chat-bubble-user"><span className="chat-role">You</span><p>{pendingQuestion}</p></div><p role="status" className="muted">AI 正在回覆…</p></div>}
+              {pendingQuestion && <div className="chat-turn"><div className="chat-bubble chat-bubble-user"><span className="chat-role">你</span><p>{pendingQuestion}</p></div><p role="status" className="muted">AI 正在回覆…</p></div>}
               </>
             ) : (
               <div className="chat-empty">

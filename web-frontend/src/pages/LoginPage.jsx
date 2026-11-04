@@ -100,7 +100,7 @@ export default function LoginPage() {
           <div className="auth-brand-icon">
             <ScanIcon />
           </div>
-          <span className="auth-brand-name">YOLO Detection Platform</span>
+          <span className="auth-brand-name">YOLO System</span>
         </div>
 
         <div className="auth-divider" />
@@ -109,7 +109,7 @@ export default function LoginPage() {
         <div>
           <h1>歡迎回來</h1>
           <p className="muted" style={{ maxWidth: "46ch" }}>
-            登入後可執行物件偵測、查詢歷史紀錄，並使用 AI Agent 分析結果。
+            登入後可執行物件偵測、查詢歷史紀錄，並使用 AI 助理分析結果。
           </p>
         </div>
 
@@ -161,7 +161,7 @@ export default function LoginPage() {
           )}
 
           <button type="submit" className="button" aria-disabled={loading || undefined}>
-            {loading ? "登入中..." : "登入"}
+            {loading ? "登入中…" : "登入"}
           </button>
         </form>
 

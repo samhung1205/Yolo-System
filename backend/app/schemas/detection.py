@@ -101,5 +101,13 @@ class BatchRead(BaseModel):
     updated_at: datetime
 
 
+class BatchClassCount(BaseModel):
+    class_name: str
+    count: int
+
+
 class BatchDetailRead(BatchRead):
     tasks: list[DetectionTaskSummaryRead]
+    # Deterministic DB aggregate across every task in the batch, so the UI can
+    # show per-class totals without asking the Agent to count.
+    class_counts: list[BatchClassCount] = Field(default_factory=list)

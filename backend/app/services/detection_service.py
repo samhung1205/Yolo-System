@@ -612,7 +612,8 @@ def list_batches(
 
 def get_batch(db: Session, *, current_user: User, batch_id: int) -> BatchDetailRead:
     batch = _get_owned_batch(db, current_user=current_user, batch_id=batch_id)
-    return _serialize_batch_detail(batch)
+    class_counts = detection_repository.count_objects_by_class_for_batch(db, batch.id)
+    return _serialize_batch_detail(batch, class_counts=class_counts)
 
 
 def build_batch_results_zip(db: Session, *, current_user: User, batch_id: int) -> tuple[bytes, str]:
@@ -937,10 +938,13 @@ def _serialize_batch(batch: DetectionBatch) -> BatchRead:
     )
 
 
-def _serialize_batch_detail(batch: DetectionBatch) -> BatchDetailRead:
+def _serialize_batch_detail(
+    batch: DetectionBatch, *, class_counts: list[tuple[str, int]] | None = None
+) -> BatchDetailRead:
     return BatchDetailRead(
         **_serialize_batch(batch).model_dump(),
         tasks=[_serialize_task_summary(task) for task in batch.tasks],
+        class_counts=[{"class_name": name, "count": count} for name, count in class_counts or []],
     )
 
 

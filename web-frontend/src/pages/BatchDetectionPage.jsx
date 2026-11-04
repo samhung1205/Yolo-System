@@ -5,15 +5,18 @@ import ClassThresholdEditor from "../components/ClassThresholdEditor";
 import YoloModelSelect from "../components/YoloModelSelect";
 import ThresholdSummary from "../components/ThresholdSummary";
 import ZoomableImage from "../components/ZoomableImage";
-import Modal from "../components/Modal";
+import ConfirmDialog from "../components/ConfirmDialog";
+import useYoloModelName from "../hooks/useYoloModelName";
 import detectionService from "../services/detectionService";
 import { buildAssetUrl, normalizeApiError } from "../services/api";
+import { statusLabel } from "../utils/labels";
 
 const POLL_INTERVAL_MS = 2000;
 const ACTIVE_STATUSES = new Set(["pending", "processing"]);
 
 export default function BatchDetectionPage() {
   const navigate = useNavigate();
+  const modelName = useYoloModelName();
 
   const [modelsError, setModelsError] = useState("");
   const [modelsRevision, setModelsRevision] = useState(0);
@@ -217,6 +220,11 @@ export default function BatchDetectionPage() {
     }
   }
 
+  const batchTasks = selectedBatch?.tasks || [];
+  const totalObjects = (selectedBatch?.class_counts || []).reduce((sum, row) => sum + row.count, 0);
+  const zeroDetectionTasks = batchTasks.filter((task) => task.status === "completed" && task.object_count === 0);
+  const failedTasks = batchTasks.filter((task) => task.status === "failed");
+
   const progressPercent = selectedBatch?.total_files
     ? Math.round((selectedBatch.processed_count / selectedBatch.total_files) * 100)
     : 0;
@@ -307,7 +315,7 @@ export default function BatchDetectionPage() {
           {error ? <div className="alert alert-error" role="alert" aria-live="assertive">{error}</div> : null}
 
           <button type="submit" className="button" disabled={!files.length || !modelKey || uploading || modelsLoading || Boolean(modelsError)}>
-            {uploading ? "上傳中..." : `開始批次偵測（${files.length || 0} 張）`}
+            {uploading ? "上傳中…" : `開始批次偵測（${files.length || 0} 張）`}
           </button>
         </form>
       </section>
@@ -324,7 +332,7 @@ export default function BatchDetectionPage() {
           </div>
           <div className="batch-review-scroll">
             {batchesLoading ? (
-              <p className="muted">載入中...</p>
+              <p className="muted">載入中…</p>
             ) : (
               <div className="list-stack">
                 {batches.map((batch) => (
@@ -337,10 +345,10 @@ export default function BatchDetectionPage() {
                     onClick={() => handleSelectBatch(batch.id)}
                   >
                     <div className="list-item-title">
-                      #{batch.id} · {batch.name || "batch upload"}
+                      #{batch.id} · {batch.name || "未命名批次"}
                     </div>
                     <div className="muted small">
-                      <span className={`status-badge status-${batch.status}`}>{batch.status}</span>{" "}
+                      <span className={`status-badge status-${batch.status}`}>{statusLabel(batch.status)}</span>{" "}
                       {batch.processed_count}/{batch.total_files} 張
                       {batch.failed_count ? ` · ${batch.failed_count} 失敗` : ""}
                     </div>
@@ -368,42 +376,44 @@ export default function BatchDetectionPage() {
           </div>
 
           <div className="batch-review-scroll">
-            {confirmDelete && selectedBatch && <Modal aria-labelledby="batch-delete-title" onClose={() => { if (!deleting) setConfirmDelete(false); }}>
-              <div className="modal-panel">
-                <h2 id="batch-delete-title">刪除批次 #{selectedBatch.id}？</h2>
+            {confirmDelete && selectedBatch && (
+              <ConfirmDialog
+                title={`刪除批次 #${selectedBatch.id}？`}
+                cancelLabel="保留批次"
+                confirmLabel="確認刪除整批"
+                busy={deleting}
+                error={deleteError}
+                onConfirm={() => handleDeleteBatch(selectedBatch.id)}
+                onCancel={() => { setConfirmDelete(false); setDeleteError(""); }}
+              >
                 <p>此操作會刪除整批 {selectedBatch.total_files} 張影像的偵測紀錄與結果檔案，無法復原。</p>
-                <div className="action-row">
-                  <button autoFocus type="button" className="button button-secondary" disabled={deleting} onClick={() => setConfirmDelete(false)}>保留批次</button>
-                  <button type="button" className="button button-danger" disabled={deleting} onClick={() => handleDeleteBatch(selectedBatch.id)}>{deleting ? "刪除中…" : "確認刪除整批"}</button>
-                </div>
-                {deleteError && <p role="alert">{deleteError}</p>}
-              </div>
-            </Modal>}
+              </ConfirmDialog>
+            )}
             {pollError && <div className="alert alert-error" role="status">{pollError}
               {lastUpdated && <span>最後更新：{lastUpdated.toLocaleTimeString("zh-TW")}</span>}
               <button type="button" className="button-ghost" onClick={() => setPollRevision((value) => value + 1)}>立即重新連線</button>
             </div>}
-            {deleteError ? <div className="alert alert-error" role="alert">{deleteError}</div> : null}
+            {deleteError && !confirmDelete ? <div className="alert alert-error" role="alert">{deleteError}</div> : null}
 
             {selectedBatch ? (
               <div className="detail-stack">
                 <div className="detail-grid">
                   <div>
-                    <span className="detail-label">Batch ID</span>
+                    <span className="detail-label">批次編號</span>
                     <strong>{selectedBatch.id}</strong>
                   </div>
                   <div>
-                    <span className="detail-label">Status</span>
+                    <span className="detail-label">狀態</span>
                     <span className={`status-badge status-${selectedBatch.status}`}>
-                      {selectedBatch.status}
+                      {statusLabel(selectedBatch.status)}
                     </span>
                   </div>
                   <div>
-                    <span className="detail-label">Model</span>
-                    <strong>{selectedBatch.model_key || selectedBatch.model_name}</strong>
+                    <span className="detail-label">模型</span>
+                    <strong>{modelName(selectedBatch.model_key, selectedBatch.model_name)}</strong>
                   </div>
                   <div>
-                    <span className="detail-label">Progress</span>
+                    <span className="detail-label">進度</span>
                     <strong>
                       {selectedBatch.processed_count}/{selectedBatch.total_files}
                     </strong>
@@ -428,6 +438,45 @@ export default function BatchDetectionPage() {
                   </div>
                 ) : null}
 
+                {batchTasks.length ? (
+                  <section className="batch-summary" aria-labelledby="batch-summary-title">
+                    <h3 id="batch-summary-title">
+                      結果彙總{ACTIVE_STATUSES.has(selectedBatch.status) ? "（處理中，數字會隨進度更新）" : ""}
+                    </h3>
+                    <div className="batch-summary-stats">
+                      <div><span className="detail-label">物件總數</span><strong>{totalObjects}</strong></div>
+                      <div><span className="detail-label">沒有偵測到物件</span><strong>{zeroDetectionTasks.length} 張</strong></div>
+                      <div><span className="detail-label">偵測失敗</span><strong>{failedTasks.length} 張</strong></div>
+                    </div>
+                    {selectedBatch.class_counts?.length ? (
+                      <div className="table-wrapper">
+                        <table className="batch-class-table">
+                          <thead>
+                            <tr><th scope="col">類別</th><th scope="col">數量</th><th scope="col">占全部物件</th></tr>
+                          </thead>
+                          <tbody>
+                            {selectedBatch.class_counts.map((row) => (
+                              <tr key={row.class_name}>
+                                <td>{row.class_name}</td>
+                                <td>{row.count}</td>
+                                <td>{Math.round((row.count / totalObjects) * 100)}%</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <p className="muted small">這批影像目前沒有偵測到任何物件。</p>
+                    )}
+                    {zeroDetectionTasks.length ? (
+                      <details className="batch-zero-list">
+                        <summary>查看沒有偵測到物件的 {zeroDetectionTasks.length} 張影像</summary>
+                        <ul>{zeroDetectionTasks.map((task) => <li key={task.id}>{task.source_filename}</li>)}</ul>
+                      </details>
+                    ) : null}
+                  </section>
+                ) : null}
+
                 {selectedBatch.skipped_files?.length ? (
                   <p className="muted small">
                     已略過 {selectedBatch.skipped_files.length} 個非圖片檔案：
@@ -443,18 +492,18 @@ export default function BatchDetectionPage() {
                       navigate(`/agent?mode=batch_analysis&batch_id=${selectedBatch.id}`)
                     }
                   >
-                    用 Agent 分析這批
+                    請 AI 解讀這批結果
                   </button>
                   <button
                     type="button"
                     className="button button-secondary"
                     disabled={
                       downloadingAsset === "batch-zip" ||
-                      !(selectedBatch.tasks || []).some((task) => task.result_image_url)
+                      !batchTasks.some((task) => task.result_image_url)
                     }
                     onClick={handleDownloadBatchZip}
                   >
-                    {downloadingAsset === "batch-zip" ? "打包中..." : "整批下載（ZIP）"}
+                    {downloadingAsset === "batch-zip" ? "打包中…" : "整批下載（ZIP）"}
                   </button>
                 </div>
 
@@ -465,24 +514,24 @@ export default function BatchDetectionPage() {
                 ) : null}
 
                 <div className="batch-task-grid">
-                  {(selectedBatch.tasks || []).map((task) => (
+                  {batchTasks.map((task) => (
                     <div key={task.id} className="batch-task-card">
                       {task.result_image_url ? (
                         <ZoomableImage
                           src={buildAssetUrl(task.result_image_url)}
                           alt={task.source_filename}
-                          title={task.source_filename || `Detection ${task.id}`}
+                          title={task.source_filename || `偵測 #${task.id}`}
                           imageClassName="batch-task-thumb"
                           triggerClassName="batch-task-image-trigger"
                         />
                       ) : (
                         <div className="batch-task-thumb batch-task-thumb-placeholder">
-                          {task.status === "failed" ? "失敗" : "處理中..."}
+                          {task.status === "failed" ? "失敗" : "處理中…"}
                         </div>
                       )}
                       <div className="batch-task-meta">
                         <span className="muted small">{task.source_filename}</span>
-                        <span className={`status-badge status-${task.status}`}>{task.status}</span>
+                        <span className={`status-badge status-${task.status}`}>{statusLabel(task.status)}</span>
                         <span className="muted small">{task.object_count} 個物件</span>
                         {task.status === "failed" && <p className="field-hint field-hint-warning">{task.error_message || "此影像偵測失敗，請檢查檔案後重新上傳。"}</p>}
                         {task.result_image_url ? (
@@ -492,7 +541,7 @@ export default function BatchDetectionPage() {
                             disabled={downloadingAsset === `task-${task.id}`}
                             onClick={() => handleDownloadTaskImage(task)}
                           >
-                            {downloadingAsset === `task-${task.id}` ? "下載中..." : "下載"}
+                            {downloadingAsset === `task-${task.id}` ? "下載中…" : "下載"}
                           </button>
                         ) : null}
                       </div>

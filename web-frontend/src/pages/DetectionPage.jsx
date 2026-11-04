@@ -293,7 +293,7 @@ export default function DetectionPage() {
             {previewUrl ? (
               <ZoomableImage
                 src={previewUrl}
-                alt="Original preview"
+                alt={`${file?.name ?? "圖片"} 原圖`}
                 title="原始影像"
               />
             ) : (
@@ -336,7 +336,7 @@ export default function DetectionPage() {
         <section className="panel">
           <div className="section-title">
             <h2>AI 深入分析</h2>
-            <span className="muted small">Detection ID: {result.id}</span>
+            <span className="muted small">偵測 #{result.id}</span>
           </div>
           <div className="agent-shortcut-row">
             <button
@@ -346,7 +346,7 @@ export default function DetectionPage() {
                 navigate(`/agent?mode=explain_detection&detection_id=${result.id}`)
               }
             >
-              Ask Agent to Explain
+              請 AI 解釋結果
             </button>
             <button
               type="button"
@@ -355,7 +355,7 @@ export default function DetectionPage() {
                 navigate(`/agent?mode=report&detection_id=${result.id}`)
               }
             >
-              Generate Report
+              產生分析報告
             </button>
           </div>
         </section>
@@ -402,7 +402,7 @@ export default function DetectionPage() {
                     <th scope="col">#</th>
                     <th scope="col">類別</th>
                     <th scope="col">信心值</th>
-                    <th scope="col">Bounding Box</th>
+                    <th scope="col">框座標（x1, y1, x2, y2）</th>
                   </tr>
                 </thead>
                 <tbody>

@@ -88,7 +88,8 @@ export function normalizeApiError(error, fallbackMessage = "Request failed") {
   }
 
   if (Array.isArray(detail) && detail.length > 0) {
-    return detail[0]?.msg || fallbackMessage;
+    // Pydantic prefixes custom validator messages with "Value error, ".
+    return detail[0]?.msg?.replace(/^Value error,\s*/, "") || fallbackMessage;
   }
 
   return error?.message || fallbackMessage;

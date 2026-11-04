@@ -14,7 +14,7 @@ export default function ZoomableImage({
   alt,
   imageClassName = "result-image",
   triggerClassName = "",
-  title = "Image preview",
+  title = "影像預覽",
 }) {
   const [open, setOpen] = useState(false);
   const [zoom, setZoom] = useState(1);
@@ -108,26 +108,26 @@ export default function ZoomableImage({
         type="button"
         className={`zoomable-image-trigger ${triggerClassName}`.trim()}
         onClick={openViewer}
-        aria-label={`Open larger view: ${alt}`}
+        aria-label={`放大檢視：${alt}`}
       >
         <img className={imageClassName} src={src} alt={alt} loading="lazy" />
-        <span className="zoomable-image-hint" aria-hidden="true">View</span>
+        <span className="zoomable-image-hint" aria-hidden="true">放大</span>
       </button>
 
       {open ? (
-        <Modal className="image-viewer-overlay" aria-label={title} onClose={closeViewer}>
+        <Modal className="image-viewer-overlay" aria-label={title} onClose={closeViewer} initialFocusRef={closeButtonRef}>
           <section
             className="image-viewer-dialog"
           >
             <header className="image-viewer-toolbar">
               <strong>{title}</strong>
-              <div className="image-viewer-actions" aria-label="Image zoom controls">
+              <div className="image-viewer-actions" aria-label="影像縮放控制">
                 <button
                   type="button"
                   className="button-ghost image-viewer-control"
                   onClick={() => changeZoom(-ZOOM_STEP)}
                   disabled={zoom <= MIN_ZOOM}
-                  aria-label="Zoom out"
+                  aria-label="縮小"
                 >
                   -
                 </button>
@@ -139,12 +139,12 @@ export default function ZoomableImage({
                   className="button-ghost image-viewer-control"
                   onClick={() => changeZoom(ZOOM_STEP)}
                   disabled={zoom >= MAX_ZOOM}
-                  aria-label="Zoom in"
+                  aria-label="放大"
                 >
                   +
                 </button>
                 <button type="button" className="button-ghost" onClick={resetView}>
-                  Reset
+                  重設
                 </button>
                 <button
                   autoFocus
@@ -153,7 +153,7 @@ export default function ZoomableImage({
                   className="button button-secondary"
                   onClick={closeViewer}
                 >
-                  Close
+                  關閉
                 </button>
               </div>
             </header>

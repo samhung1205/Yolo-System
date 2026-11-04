@@ -133,7 +133,6 @@ img {
   letter-spacing: -0.01em;
 }
 
-.brand-kicker,
 .eyebrow {
   font-size: 0.78rem;
   letter-spacing: 0.12em;
@@ -215,6 +214,9 @@ img {
 
 .assistant-tabs a:hover { color: var(--accent-strong); background: var(--accent-subtle); }
 .assistant-tabs a[aria-current="page"] { color: var(--accent-strong); border-bottom-color: currentColor; }
+.assistant-tabs-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 16px; border-bottom: 1px solid var(--line); }
+.assistant-tabs-row .assistant-tabs { border-bottom: 0; margin-bottom: -1px; }
+.assistant-switch-note { margin: 0; max-width: 52ch; line-height: 1.5; }
 .assistant-actions { display: flex; justify-content: flex-end; }
 .analysis-current-context { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; overflow-wrap: anywhere; font-size: .875rem; }
 .analysis-current-context span { color: var(--muted); }
@@ -833,18 +835,6 @@ th {
   line-height: 1.2;
 }
 
-.history-page-chip {
-  padding: 5px 10px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-pill);
-  background: var(--panel-alt);
-  color: var(--muted);
-  font-size: 0.76rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
 .history-list-scroll,
 .history-detail-scroll {
   min-height: 0;
@@ -999,8 +989,7 @@ th {
 }
 
 .chat-conversation-open:focus-visible,
-.chat-conversation-delete:focus-visible,
-.chat-delete-confirm button:focus-visible {
+.chat-conversation-delete:focus-visible {
   outline: 3px solid var(--accent-dim);
   outline-offset: 2px;
 }
@@ -1040,40 +1029,6 @@ th {
 .chat-conversation-delete:disabled {
   opacity: 0.4;
   cursor: not-allowed;
-}
-
-.chat-delete-confirm {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  flex-wrap: wrap;
-  gap: 7px;
-  padding-top: 9px;
-  border-top: 1px solid var(--line);
-  color: var(--danger-text);
-  font-size: 0.78rem;
-  font-weight: 700;
-}
-
-.chat-delete-confirm button {
-  border-radius: 8px;
-  padding: 5px 9px;
-  font-size: 0.78rem;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.chat-delete-confirm-button {
-  border: 1px solid var(--danger-border);
-  background: var(--danger-bg);
-  color: var(--danger-text);
-}
-
-.chat-delete-cancel-button {
-  border: 1px solid var(--line);
-  background: var(--panel);
-  color: var(--muted);
 }
 
 .chat-main {
@@ -1417,20 +1372,6 @@ th {
   align-items: center;
 }
 
-/* Inline delete confirmation */
-.inline-confirm {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.inline-confirm-label {
-  font-size: 0.88rem;
-  color: var(--danger);
-  font-weight: 500;
-}
-
 /* ── Phase 5 補完: Modal / Form extras / Table actions ──────── */
 
 .modal-overlay {
@@ -1602,8 +1543,7 @@ th {
   font-weight: 600;
   padding: 3px 9px;
   border-radius: var(--radius-pill);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
+  white-space: nowrap;
 }
 
 .status-completed  { background: #dcfce7; color: #15803d; }
@@ -2282,6 +2222,23 @@ a.button { display: inline-flex; align-items: center; justify-content: center; w
 .modal-panel h2 { margin: 0; font-size: 1.25rem; }
 .modal-panel p { margin: 0; line-height: 1.65; }
 .agent-main { grid-template-rows: minmax(0, 1fr) auto; }
+.agent-main.has-context { grid-template-rows: auto minmax(0, 1fr) auto; }
+@media (min-width: 1101px) {
+  /* Header, tabs and the action row take ~300px; size the conversation to the
+     rest of the viewport so the composer never starts below the fold. */
+  .assistant-workspace .agent-layout { min-height: 0; height: max(420px, calc(100dvh - 330px)); }
+  .assistant-workspace .agent-main { min-height: 0; height: 100%; max-height: none; }
+}
+.agent-waiting { margin: 4px 0 0; }
+.batch-summary { display: grid; gap: 12px; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel-alt); }
+.batch-summary h3 { margin: 0; font-size: 1rem; }
+.batch-summary-stats { display: flex; flex-wrap: wrap; gap: 12px 32px; font-variant-numeric: tabular-nums; }
+.batch-summary-stats > div { display: grid; gap: 2px; }
+.batch-summary-stats strong { font-size: 1.25rem; }
+.batch-summary .table-wrapper { max-height: 240px; overflow: auto; }
+.batch-class-table td:not(:first-child), .batch-class-table th:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }
+.batch-zero-list summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; color: var(--accent-strong); font-weight: 600; }
+.batch-zero-list ul { margin: 0; padding-left: 20px; overflow-wrap: anywhere; }
 .agent-controls { max-height: calc(100dvh - 160px); overflow-y: auto; }
 .batch-review-header { flex-wrap: wrap; }
 .batch-review-header h2 { margin: 0; white-space: nowrap; }

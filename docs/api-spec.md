@@ -689,7 +689,9 @@ data: {"type":"error","message":"錯誤訊息"}
 ### GET /api/detections/batches/{batch_id}
 > 取得批次詳情，包含所有 task 摘要，供前端輪詢進度
 
-**Response 200**：`BatchDetailRead`（= `BatchRead` + `tasks: DetectionTaskSummaryRead[]`）
+**Response 200**：`BatchDetailRead`（= `BatchRead` + `tasks: DetectionTaskSummaryRead[]` + `class_counts`）
+
+`class_counts` 為整批物件依類別的資料庫聚合（`[{"class_name": "person", "count": 12}]`，依數量遞減），處理中會隨進度變化。新增欄位、向下相容；`POST /api/detections/batch` 的 202 回應中為空陣列。零偵測張數可由 `tasks` 中 `status=completed` 且 `object_count=0` 計算。
 
 ### DELETE /api/detections/batches/{batch_id}
 > 刪除批次、其下所有 task 與相關靜態檔案

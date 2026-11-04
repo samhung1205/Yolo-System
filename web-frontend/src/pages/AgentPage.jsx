@@ -51,14 +51,14 @@ function applyToolEvent(liveTools = [], event) {
 function getDefaultMessage(mode, detectionId, batchId) {
   if (detectionId) {
     if (mode === "explain_detection") {
-      return `請解釋這筆 detection 結果 (ID: ${detectionId})`;
+      return `請解釋這筆偵測結果（偵測 #${detectionId}）`;
     }
     if (mode === "report") {
-      return `請幫我產生這筆 detection 的 markdown 報告 (ID: ${detectionId})`;
+      return `請幫我產生這筆偵測的 Markdown 報告（偵測 #${detectionId}）`;
     }
   }
   if (mode === "batch_analysis" && batchId) {
-    return `請統計這批影像 (Batch ID: ${batchId}) 中各類別總數，並指出有幾張影像沒偵測到任何物件。`;
+    return `請摘要這批影像（批次 #${batchId}）的偵測結果，指出值得人工複查的影像與類別。`;
   }
   if (mode === "history_analysis") {
     return "請分析我的偵測歷史紀錄，摘要各狀態數量、常見類別與平均推論時間，並指出值得注意的趨勢。";
@@ -204,6 +204,11 @@ export default function AgentPage() {
   }, [setError]);
 
   const isAdminOnlyMode = mode === "admin_help" && !user?.is_admin;
+  // General chat lives in its own tab, and admin-only modes are only listed for
+  // admins; a mode arriving through a `mode=` shortcut stays selectable.
+  const visibleModes = modes.filter((m) => m.key === mode
+    || (m.key !== "general_chat" && (user?.is_admin || !(m.admin_only || m.key === "admin_help"))));
+  const contextLabel = batchId ? `批次 #${batchId}` : detectionId ? `偵測 #${detectionId}` : "";
   const detectionModes = ["explain_detection", "report"];
   const requiresDetectionId = detectionModes.includes(mode);
   const requiresBatchId = mode === "batch_analysis";
@@ -338,7 +343,7 @@ export default function AgentPage() {
       }
     } catch (err) {
       if (err?.name === "AbortError") return;
-      setError(err.message || "Streaming request failed");
+      setError(err.message || "回覆串流中斷，請重試。");
       setMessages((prev) => {
         const updated = [...prev];
         if (updated[updated.length - 1]?.isStreaming) updated.pop();
@@ -377,7 +382,7 @@ export default function AgentPage() {
 
       if (response.success === false) {
         throw new Error(
-          response.answer || response.errors?.[0] || "Agent 無法完成這次請求"
+          response.answer || response.errors?.[0] || "分析助理無法完成這次請求"
         );
       }
 
@@ -399,7 +404,7 @@ export default function AgentPage() {
       });
     } catch (err) {
       if (controller.signal.aborted) return;
-      setError(normalizeApiError(err, "Agent 請求失敗"));
+      setError(normalizeApiError(err, "分析請求失敗"));
       setMessages((prev) => {
         const updated = [...prev];
         if (updated[updated.length - 1]?.isStreaming) updated.pop();
@@ -486,18 +491,9 @@ export default function AgentPage() {
 
       {isAdminOnlyMode ? (
         <div className="alert alert-warning" role="status">
-          <strong>admin_help</strong> 模式僅管理員可用。
+          「管理員協助」模式僅管理員可用，請改選其他分析模式。
         </div>
       ) : null}
-
-      {needsArtifact && <div className="analysis-current-context" role="status">
-        <span>分析依據</span>
-        <strong>{selectedArtifact
-          ? selectedArtifact.source_filename || selectedArtifact.name || `批次 #${batchId}`
-          : detectionId || batchId ? "正在確認所選資料…" : "尚未選擇資料"}</strong>
-        {(detectionId || batchId) && <span>{batchId ? "批次" : "偵測"} #{batchId || detectionId}</span>}
-        {(detectionId || batchId) && !artifactReady && <span>資料尚未確認可用，請在分析設定檢查。</span>}
-      </div>}
 
       <p className="sr-only" role="status">{loading ? "分析助理正在回覆" : messages.length ? "分析回覆已更新" : "輸入訊息開始分析"}</p>
       <div className={`agent-layout${settingsOpen ? " settings-open" : ""}`}>
@@ -512,12 +508,13 @@ export default function AgentPage() {
               onChange={(e) => handleModeChange(e.target.value)}
               disabled={loading}
             >
-              {modes.map((m) => (
+              {visibleModes.map((m) => (
                 <option key={m.key} value={m.key} disabled={(m.admin_only || m.key === "admin_help") && !user?.is_admin}>
                   {m.label}
                 </option>
               ))}
             </select>
+            <span className="field-hint">不需要讀取偵測資料的一般問答，請改用「一般對話」分頁。</span>
           </label>
 
           {mode === "auto" && <label className="field">
@@ -534,19 +531,19 @@ export default function AgentPage() {
               onChange={requiresBatchId || (mode === "auto" && contextKind === "batch") ? handleBatchIdChange : handleDetectionIdChange}
               onAvailabilityChange={setArtifactReady} onSelectionChange={setSelectedArtifact} disabled={loading} />
             {missingContext && <p className="field-hint field-hint-warning" role="status">請先選擇已完成的結果，再送出分析。</p>}
-            {autoModeMissingDetectionId && <p className="muted small">未選資料時，自動模式使用一般聊天；影像分析請先選擇結果。</p>}
+            {autoModeMissingDetectionId && <p className="muted small">未選資料時，自動模式只做一般問答；要分析影像請先選擇結果。</p>}
           </>}
 
           {mode === "report" && detectionId ? (
             <div className="report-download-actions">
-              <span className="detail-label">Deterministic Report</span>
+              <span className="detail-label">確定性報告（不經 AI 改寫）</span>
               <button
                 type="button"
                 className="button button-secondary"
                 onClick={() => handleReportDownload("markdown")}
                 disabled={Boolean(reportDownloading)}
               >
-                {reportDownloading === "markdown" ? "準備中..." : "下載 Markdown"}
+                {reportDownloading === "markdown" ? "準備中…" : "下載 Markdown"}
               </button>
               <button
                 type="button"
@@ -554,32 +551,40 @@ export default function AgentPage() {
                 onClick={() => handleReportDownload("pdf")}
                 disabled={Boolean(reportDownloading)}
               >
-                {reportDownloading === "pdf" ? "產生中..." : "下載 PDF"}
+                {reportDownloading === "pdf" ? "產生中…" : "下載 PDF"}
               </button>
             </div>
           ) : null}
 
           {conversationId ? (
             <div className="agent-meta">
-              <span className="detail-label">Conversation</span>
+              <span className="detail-label">對話編號</span>
               <code className="small">{conversationId}</code>
             </div>
           ) : null}
         </aside>
 
-        <div className="panel agent-main">
+        <div className={needsArtifact ? "panel agent-main has-context" : "panel agent-main"}>
+          {needsArtifact && <div className="analysis-current-context" role="status">
+            <span>分析依據</span>
+            <strong>{selectedArtifact
+              ? selectedArtifact.source_filename || selectedArtifact.name || `批次 #${batchId}`
+              : detectionId || batchId ? "正在確認所選資料…" : "尚未選擇資料"}</strong>
+            {(detectionId || batchId) && <span>{batchId ? "批次" : "偵測"} #{batchId || detectionId}</span>}
+            {(detectionId || batchId) && !artifactReady && <span>資料尚未確認可用，請在分析設定檢查。</span>}
+          </div>}
           <div ref={threadRef} className="agent-thread" role="region" aria-label="分析對話" tabIndex={0} aria-busy={loading}>
             {messages.length ? (
               messages.map((msg, index) =>
                 msg.role === "user" ? (
                   <div key={index} className="agent-message agent-message-user">
-                    <span className="chat-role">You</span>
+                    <span className="chat-role">你</span>
                     <p>{msg.content}</p>
                   </div>
                 ) : (
                   <div key={index} className="agent-message agent-message-assistant">
                     <span className="chat-role">
-                      Agent
+                      分析助理
                       {msg.mode ? (
                         <span className="agent-mode-badge"> · {BUILTIN_MODES.find((item) => item.key === msg.mode)?.label || msg.mode}</span>
                       ) : null}
@@ -587,6 +592,11 @@ export default function AgentPage() {
                         <span className="agent-streaming-indicator"> ▍</span>
                       ) : null}
                     </span>
+                    {msg.isStreaming && !msg.content && !msg.live_tools?.length ? (
+                      <p className="muted small agent-waiting">
+                        {contextLabel ? `正在讀取${contextLabel} 並整理回覆…` : "正在整理回覆…"}
+                      </p>
+                    ) : null}
                     {msg.isStreaming && msg.live_tools?.length ? (
                       <ul className="agent-tool-progress" aria-live="polite">
                         {msg.live_tools.map((item, toolIndex) => (
@@ -599,7 +609,7 @@ export default function AgentPage() {
                     ) : null}
                     <div className="markdown-report">
                       <ReactMarkdown remarkPlugins={MARKDOWN_PLUGINS}>
-                        {msg.content || (msg.isStreaming ? "" : "(no answer)")}
+                        {msg.content || (msg.isStreaming ? "" : "（沒有回覆內容）")}
                       </ReactMarkdown>
                     </div>
 
@@ -611,7 +621,9 @@ export default function AgentPage() {
               )
             ) : (
               <div className="chat-empty">
-                <p className="muted">選擇分析資料，再輸入問題開始對話。</p>
+                <p className="muted">{needsArtifact && selectedArtifact
+                  ? "已選好分析資料，輸入問題即可開始。"
+                  : "選擇分析資料，再輸入問題開始對話。"}</p>
               </div>
             )}
           </div>
@@ -623,7 +635,7 @@ export default function AgentPage() {
                 aria-label="傳送給分析助理的訊息"
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                placeholder="輸入要問 Agent 的問題"
+                placeholder="輸入要問分析助理的問題"
                 readOnly={loading}
                 disabled={isAdminOnlyMode}
                 onCompositionStart={() => {

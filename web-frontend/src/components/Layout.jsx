@@ -47,8 +47,7 @@ export default function Layout() {
       <aside id="app-navigation" className="sidebar" aria-label="網站導覽"
         onClick={(event) => { if (event.target.closest("a")) setMenuOpen(false); }}>
         <div className="brand-block">
-          <div className="brand-kicker">YOLO System</div>
-          <p className="brand-title">Web Console</p>
+          <p className="brand-title">YOLO System</p>
           <p className="muted">AI 物件偵測分析平台</p>
         </div>
 

@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 
+import ConfirmDialog from "../components/ConfirmDialog";
 import ZoomableImage from "../components/ZoomableImage";
+import useYoloModelName from "../hooks/useYoloModelName";
 import detectionService from "../services/detectionService";
 import { buildAssetUrl, normalizeApiError } from "../services/api";
+import { sourceLabel, statusLabel } from "../utils/labels";
 
 const STATUS_OPTIONS = ["", "completed", "failed", "processing", "pending"];
 const SOURCE_OPTIONS = ["", "image", "video"];
@@ -23,6 +26,7 @@ function formatRecordDate(value) {
 
 export default function DetectionHistoryPage() {
   const navigate = useNavigate();
+  const modelName = useYoloModelName();
 
   const [items, setItems] = useState([]);
   const [selected, setSelected] = useState(null);
@@ -49,8 +53,6 @@ export default function DetectionHistoryPage() {
   const detailScrollRef = useRef(null);
   const listHeadingRef = useRef(null);
   const detailHeadingRef = useRef(null);
-  const deleteTriggerRef = useRef(null);
-  const cancelDeleteRef = useRef(null);
   // Set before a state change that unmounts or hides the focused control;
   // resolved after the next render so focus never falls back to <body>.
   const pendingFocusRef = useRef(null);
@@ -97,7 +99,7 @@ export default function DetectionHistoryPage() {
         return pages;
       } catch (err) {
         if (err?.name !== "CanceledError") {
-          setError(normalizeApiError(err, "無法載入 detection history"));
+          setError(normalizeApiError(err, "無法載入偵測紀錄"));
         }
         return null;
       } finally {
@@ -137,7 +139,7 @@ export default function DetectionHistoryPage() {
       // On narrow screens the list is hidden once the detail opens.
       pendingFocusRef.current = () => (trigger?.offsetParent ? null : detailHeadingRef.current);
     } catch (err) {
-      setError(normalizeApiError(err, "無法載入 detection detail"));
+      setError(normalizeApiError(err, "無法載入這筆偵測的詳情"));
     }
   }
 
@@ -147,14 +149,9 @@ export default function DetectionHistoryPage() {
       listScrollRef.current?.querySelector('[aria-pressed="true"]') || listHeadingRef.current;
   }
 
-  function openDeleteConfirm() {
-    setConfirmDelete(true);
-    pendingFocusRef.current = () => cancelDeleteRef.current;
-  }
-
   function cancelDeleteConfirm() {
     setConfirmDelete(false);
-    pendingFocusRef.current = () => deleteTriggerRef.current;
+    setDeleteError("");
   }
 
   async function handleDelete() {
@@ -179,9 +176,8 @@ export default function DetectionHistoryPage() {
         await loadHistory(clamped);
       }
     } catch (err) {
-      setDeleteError(normalizeApiError(err, "刪除失敗"));
-      setConfirmDelete(false);
-      pendingFocusRef.current = () => deleteTriggerRef.current;
+      // Keep the dialog open so the failure is shown where the user acted.
+      setDeleteError(normalizeApiError(err, "刪除失敗，請稍後再試。"));
     } finally {
       setDeleting(false);
     }
@@ -214,8 +210,7 @@ export default function DetectionHistoryPage() {
         <div>
           <h1>偵測紀錄</h1>
           <p className="muted">
-            Review past detection tasks, object counts, statuses, and available analysis actions.{" "}
-            <strong>{total}</strong> records total.
+            查看過去的偵測結果、物件數量與狀態，並可交給 AI 分析或下載。共 <strong>{total}</strong> 筆。
           </p>
         </div>
       </section>
@@ -223,7 +218,7 @@ export default function DetectionHistoryPage() {
       {/* Filter Bar */}
       <div className="filter-bar">
         <label className="filter-label">
-          Status
+          狀態
           <select
             className="filter-select"
             value={filterStatus}
@@ -231,14 +226,14 @@ export default function DetectionHistoryPage() {
           >
             {STATUS_OPTIONS.map((s) => (
               <option key={s} value={s}>
-                {s || "All"}
+                {s ? statusLabel(s) : "全部"}
               </option>
             ))}
           </select>
         </label>
 
         <label className="filter-label">
-          Type
+          類型
           <select
             className="filter-select"
             value={filterSource}
@@ -246,7 +241,7 @@ export default function DetectionHistoryPage() {
           >
             {SOURCE_OPTIONS.map((s) => (
               <option key={s} value={s}>
-                {s || "All"}
+                {s ? sourceLabel(s) : "全部"}
               </option>
             ))}
           </select>
@@ -279,12 +274,11 @@ export default function DetectionHistoryPage() {
                 顯示 {rangeStart}-{rangeEnd}，共 {total} 筆
               </span>
             </div>
-            <span className="history-page-chip">Page {page}</span>
           </div>
 
           <div className="history-list-scroll" ref={listScrollRef}>
             {loading ? (
-              <p className="muted">載入中...</p>
+              <p className="muted">載入中…</p>
             ) : (
               <div className="list-stack">
                 {items.map((item) => (
@@ -304,26 +298,28 @@ export default function DetectionHistoryPage() {
                       </time>
                     </div>
                     <div className="list-item-meta">
-                      <span className={`status-badge status-${item.status}`}>{item.status}</span>
-                      <span>{item.source_type}</span>
-                      <span>{item.object_count} objects</span>
+                      <span className={`status-badge status-${item.status}`}>{statusLabel(item.status)}</span>
+                      <span>{sourceLabel(item.source_type)}</span>
+                      <span>{item.object_count} 個物件</span>
                     </div>
                   </button>
                 ))}
-                {!items.length ? <p className="muted">尚無符合條件的記錄。</p> : null}
+                {!items.length ? <p className="muted">{filterStatus || filterSource
+                  ? "沒有符合篩選條件的紀錄，可清除篩選後再看。"
+                  : "還沒有偵測紀錄。到「物件偵測」上傳一張圖片開始。"}</p> : null}
               </div>
             )}
           </div>
 
           {/* Pagination remains visible while the records scroll. */}
-          <nav className="pagination-row history-pagination" aria-label="Detection records pagination">
+          <nav className="pagination-row history-pagination" aria-label="偵測紀錄分頁">
             <button
               type="button"
               className="button button-ghost"
               disabled={page <= 1 || loading}
               onClick={() => handlePageChange(page - 1)}
             >
-              ← Prev
+              上一頁
             </button>
             <span className="muted small">
               {page} / {totalPages}
@@ -334,7 +330,7 @@ export default function DetectionHistoryPage() {
               disabled={page >= totalPages || loading}
               onClick={() => handlePageChange(page + 1)}
             >
-              Next →
+              下一頁
             </button>
           </nav>
         </div>
@@ -348,84 +344,64 @@ export default function DetectionHistoryPage() {
                 className="button-ghost history-mobile-back"
                 onClick={closeMobileDetail}
               >
-                ← Task List
+                ← 返回清單
               </button>
               <h2 ref={detailHeadingRef} tabIndex={-1}>結果詳情</h2>
             </div>
-            {selected && !confirmDelete && (
+            {selected && (
               <button
-                ref={deleteTriggerRef}
                 type="button"
                 className="button button-danger"
                 disabled={deleting}
-                onClick={openDeleteConfirm}
+                onClick={() => setConfirmDelete(true)}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ marginRight: 6 }}><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
                 刪除
               </button>
             )}
-            {selected && confirmDelete && (
-              <div
-                className="inline-confirm"
-                role="group"
-                aria-label={`刪除偵測 #${selected.id}`}
-                onKeyDown={(event) => {
-                  if (event.key === "Escape" && !deleting) {
-                    event.preventDefault();
-                    cancelDeleteConfirm();
-                  }
-                }}
-              >
-                <span className="inline-confirm-label">確定刪除？</span>
-                <button
-                  type="button"
-                  className="button button-danger"
-                  aria-disabled={deleting || undefined}
-                  onClick={handleDelete}
-                >
-                  {deleting ? "刪除中…" : "確認"}
-                </button>
-                <button
-                  ref={cancelDeleteRef}
-                  type="button"
-                  className="button-ghost"
-                  disabled={deleting}
-                  onClick={cancelDeleteConfirm}
-                >
-                  取消
-                </button>
-              </div>
-            )}
           </div>
 
+          {selected && confirmDelete && (
+            <ConfirmDialog
+              title={`刪除偵測 #${selected.id}？`}
+              confirmLabel="確認刪除"
+              busy={deleting}
+              error={deleteError}
+              onConfirm={handleDelete}
+              onCancel={cancelDeleteConfirm}
+            >
+              <p>會刪除「{selected.source_filename}」的偵測紀錄、{selected.objects?.length ?? 0} 個物件與結果檔案，無法復原。</p>
+            </ConfirmDialog>
+          )}
+
           <div className="history-detail-scroll" ref={detailScrollRef}>
-            {deleteError ? <div className="alert alert-error" role="alert" aria-live="assertive">{deleteError}</div> : null}
+            {deleteError && !confirmDelete ? <div className="alert alert-error" role="alert" aria-live="assertive">{deleteError}</div> : null}
 
             {selected ? (
               <div className="detail-stack">
                 <div className="detail-grid">
                   <div>
-                    <span className="detail-label">Task ID</span>
+                    <span className="detail-label">偵測編號</span>
                     <strong>{selected.id}</strong>
                   </div>
                   <div>
-                    <span className="detail-label">Model</span>
-                    <strong>{selected.model_name}</strong>
+                    <span className="detail-label">模型</span>
+                    <strong>{modelName(selected.model_key, selected.model_name)}</strong>
                   </div>
                   <div>
-                    <span className="detail-label">Status</span>
-                    <span className={`status-badge status-${selected.status}`}>{selected.status}</span>
+                    <span className="detail-label">狀態</span>
+                    <span className={`status-badge status-${selected.status}`}>{statusLabel(selected.status)}</span>
                   </div>
                   <div>
-                    <span className="detail-label">Inference</span>
+                    <span className="detail-label">推論時間</span>
                     <strong>{selected.inference_ms ?? "-"} ms</strong>
                   </div>
                   <div>
-                    <span className="detail-label">Type</span>
-                    <strong>{selected.source_type}</strong>
+                    <span className="detail-label">類型</span>
+                    <strong>{sourceLabel(selected.source_type)}</strong>
                   </div>
                   <div>
-                    <span className="detail-label">Objects</span>
+                    <span className="detail-label">物件數</span>
                     <strong>{selected.objects?.length ?? 0}</strong>
                   </div>
                 </div>
@@ -436,14 +412,14 @@ export default function DetectionHistoryPage() {
                     className="button button-secondary"
                     onClick={() => navigate(`/agent?mode=explain_detection&detection_id=${selected.id}`)}
                   >
-                    Explain with Agent
+                    請 AI 解釋結果
                   </button>
                   <button
                     type="button"
                     className="button button-secondary"
                     onClick={() => navigate(`/agent?mode=report&detection_id=${selected.id}`)}
                   >
-                    Generate Report
+                    產生分析報告
                   </button>
                   {selected.result_image_url ? (
                     <button
@@ -457,7 +433,7 @@ export default function DetectionHistoryPage() {
                         )
                       }
                     >
-                      {downloadingAsset === selected.result_image_url ? "Downloading..." : "下載"}
+                      {downloadingAsset === selected.result_image_url ? "下載中…" : "下載結果圖"}
                     </button>
                   ) : null}
                   {selected.result_video_url ? (
@@ -472,7 +448,7 @@ export default function DetectionHistoryPage() {
                         )
                       }
                     >
-                      {downloadingAsset === selected.result_video_url ? "下載中..." : "下載結果影片"}
+                      {downloadingAsset === selected.result_video_url ? "下載中…" : "下載結果影片"}
                     </button>
                   ) : null}
                 </div>
@@ -480,8 +456,8 @@ export default function DetectionHistoryPage() {
                 {selected.result_image_url ? (
                   <ZoomableImage
                     src={buildAssetUrl(selected.result_image_url)}
-                    alt="Detection detail result"
-                    title={`Detection #${selected.id}`}
+                    alt={`${selected.source_filename} 的偵測結果`}
+                    title={`偵測 #${selected.id}`}
                   />
                 ) : null}
 
@@ -491,9 +467,9 @@ export default function DetectionHistoryPage() {
                       <thead>
                         <tr>
                           <th scope="col">#</th>
-                          <th scope="col">Class</th>
-                          <th scope="col">Confidence</th>
-                          <th scope="col">Bounding Box</th>
+                          <th scope="col">類別</th>
+                          <th scope="col">信心值</th>
+                          <th scope="col">框座標（x1, y1, x2, y2）</th>
                         </tr>
                       </thead>
                       <tbody>

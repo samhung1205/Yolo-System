@@ -116,7 +116,7 @@ export default function RegisterPage() {
           {success ? <div className="alert alert-success" role="status" aria-live="polite">{success}</div> : null}
 
           <button type="submit" className="button" disabled={loading || Boolean(success)}>
-            {loading ? "註冊中..." : success ? "帳號已建立，請返回登入" : "註冊"}
+            {loading ? "註冊中…" : success ? "帳號已建立，請返回登入" : "註冊"}
           </button>
         </form>
 

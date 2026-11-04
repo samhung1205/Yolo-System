@@ -131,7 +131,7 @@ export default function ProfilePage() {
         <div className="detail-stack profile-detail">
           <div className="detail-grid">
             <div>
-              <span className="detail-label">Username</span>
+              <span className="detail-label">使用者名稱</span>
               <strong>{user?.username || "-"}</strong>
             </div>
             <div>
@@ -139,19 +139,19 @@ export default function ProfilePage() {
               <strong>{user?.email || "-"}</strong>
             </div>
             <div>
-              <span className="detail-label">Nickname</span>
+              <span className="detail-label">暱稱</span>
               <strong>{user?.nickname || "-"}</strong>
             </div>
             <div>
-              <span className="detail-label">Role</span>
-              <strong>{user?.is_admin ? "管理員" : "User"}</strong>
+              <span className="detail-label">角色</span>
+              <strong>{user?.is_admin ? "管理員" : "一般使用者"}</strong>
             </div>
             <div>
-              <span className="detail-label">Status</span>
-              <strong>{user?.is_active ? "Active" : "Inactive"}</strong>
+              <span className="detail-label">帳號狀態</span>
+              <strong>{user?.is_active ? "啟用" : "停用"}</strong>
             </div>
             <div>
-              <span className="detail-label">Since</span>
+              <span className="detail-label">建立日期</span>
               <strong>{user?.register_time ? String(user.register_time).slice(0, 10) : "-"}</strong>
             </div>
           </div>
@@ -170,7 +170,7 @@ export default function ProfilePage() {
               {saveError ? <div className="alert alert-error" role="alert" aria-live="assertive">{saveError}</div> : null}
 
               <label className="field">
-                <span>Nickname</span>
+                <span>暱稱</span>
                 <input
                   ref={nicknameInputRef}
                   value={nickname}
@@ -180,7 +180,7 @@ export default function ProfilePage() {
               </label>
 
               <label className="field">
-                <span>New Password</span>
+                <span>新密碼</span>
                 <input
                   type="password"
                   value={newPassword}
@@ -192,7 +192,7 @@ export default function ProfilePage() {
 
               {newPassword ? (
                 <label className="field">
-                  <span>Current Password</span>
+                  <span>目前密碼</span>
                   <input
                     type="password"
                     value={currentPassword}
@@ -205,7 +205,7 @@ export default function ProfilePage() {
 
               {newPassword ? (
                 <label className="field">
-                  <span>Confirm Password</span>
+                  <span>確認新密碼</span>
                   <input
                     type="password"
                     value={confirmPassword}
@@ -218,7 +218,7 @@ export default function ProfilePage() {
 
               <div className="action-row">
                 <button type="submit" className="button" aria-disabled={saving || undefined}>
-                  {saving ? "儲存中..." : "儲存"}
+                  {saving ? "儲存中…" : "儲存"}
                 </button>
                 <button type="button" className="button button-ghost" disabled={saving} onClick={closeEdit}>
                   取消

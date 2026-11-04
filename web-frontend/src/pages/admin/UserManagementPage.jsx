@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 
+import ConfirmDialog from "../../components/ConfirmDialog";
 import Modal from "../../components/Modal";
+import authService from "../../services/authService";
 import userService from "../../services/userService";
 import { normalizeApiError } from "../../services/api";
 
@@ -36,6 +38,9 @@ export default function UserManagementPage() {
   const [editError, setEditError] = useState("");
   const [editSaving, setEditSaving] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [deleteError, setDeleteError] = useState("");
+  const currentUserId = authService.getCurrentUser()?.id;
+  const confirmDeleteUser = users.find((user) => user.id === confirmDeleteId) || null;
 
   async function loadUsers(keyword = "", page = usersPage) {
     setLoading(true);
@@ -80,12 +85,13 @@ export default function UserManagementPage() {
   async function handleDelete(userId) {
     if (deletingUser) return;
     setDeletingUser(userId);
+    setDeleteError("");
     try {
       await userService.deleteUser(userId);
       setConfirmDeleteId(null);
       await loadUsers(search);
     } catch (err) {
-      setError(normalizeApiError(err, "刪除使用者失敗"));
+      setDeleteError(normalizeApiError(err, "刪除使用者失敗，請稍後再試。"));
     } finally { setDeletingUser(null); }
   }
 
@@ -146,7 +152,7 @@ export default function UserManagementPage() {
 
             <form className="form-grid" onSubmit={handleEditSave}>
               <label className="field">
-                <span>Nickname</span>
+                <span>暱稱</span>
                 <input
                   value={editForm.nickname}
                   onChange={(e) => setEditForm((p) => ({ ...p, nickname: e.target.value }))}
@@ -165,7 +171,7 @@ export default function UserManagementPage() {
               </label>
 
               <label className="field">
-                <span>New Password</span>
+                <span>新密碼</span>
                 <input
                   type="password"
                   value={editForm.password}
@@ -182,7 +188,7 @@ export default function UserManagementPage() {
                     checked={editForm.is_admin}
                     onChange={(e) => setEditForm((p) => ({ ...p, is_admin: e.target.checked }))}
                   />
-                  <span>Admin</span>
+                  <span>管理員權限</span>
                 </label>
                 <label className="field-checkbox">
                   <input
@@ -190,13 +196,13 @@ export default function UserManagementPage() {
                     checked={editForm.is_active}
                     onChange={(e) => setEditForm((p) => ({ ...p, is_active: e.target.checked }))}
                   />
-                  <span>Active</span>
+                  <span>啟用帳號</span>
                 </label>
               </div>
 
               <div className="agent-shortcut-row">
                 <button type="submit" className="button" disabled={editSaving}>
-                  {editSaving ? "儲存中..." : "儲存"}
+                  {editSaving ? "儲存中…" : "儲存"}
                 </button>
                 <button type="button" className="button button-ghost" disabled={editSaving} onClick={() => setEditTarget(null)}>
                   取消
@@ -206,6 +212,19 @@ export default function UserManagementPage() {
           </div>
         </Modal>
       ) : null}
+
+      {confirmDeleteUser && (
+        <ConfirmDialog
+          title={`刪除使用者 ${confirmDeleteUser.username}？`}
+          confirmLabel="確認刪除"
+          busy={deletingUser === confirmDeleteUser.id}
+          error={deleteError}
+          onConfirm={() => handleDelete(confirmDeleteUser.id)}
+          onCancel={() => { setConfirmDeleteId(null); setDeleteError(""); }}
+        >
+          <p>此帳號的偵測紀錄、批次、對話與上傳檔案會一併刪除，無法復原。若只是暫停使用，請改用「編輯」取消「啟用帳號」。</p>
+        </ConfirmDialog>
+      )}
 
       <section className="admin-workspace">
         <details className="panel admin-create">
@@ -222,7 +241,7 @@ export default function UserManagementPage() {
               />
             </label>
             <label className="field">
-              <span>Username</span>
+              <span>使用者名稱</span>
               <input
                 value={form.username}
                 onChange={(e) => setForm((p) => ({ ...p, username: e.target.value }))}
@@ -231,7 +250,7 @@ export default function UserManagementPage() {
               />
             </label>
             <label className="field">
-              <span>Nickname</span>
+              <span>暱稱</span>
               <input
                 value={form.nickname}
                 onChange={(e) => setForm((p) => ({ ...p, nickname: e.target.value }))}
@@ -240,7 +259,7 @@ export default function UserManagementPage() {
               />
             </label>
             <label className="field">
-              <span>Password</span>
+              <span>密碼</span>
               <input
                 type="password"
                 value={form.password}
@@ -250,7 +269,7 @@ export default function UserManagementPage() {
               />
             </label>
             <button type="submit" className="button" disabled={submitting}>
-              {submitting ? "建立中..." : "建立使用者"}
+              {submitting ? "建立中…" : "建立使用者"}
             </button>
           </form>
         </details>
@@ -264,7 +283,7 @@ export default function UserManagementPage() {
                 onChange={(e) => setSearch(e.target.value)}
                 aria-label="搜尋使用者名稱、Email 或暱稱"
                 onKeyDown={(event) => { if (event.key === "Enter") loadUsers(search, 1); }}
-                placeholder="Search username / email / nickname"
+                placeholder="搜尋使用者名稱、Email 或暱稱"
               />
               <button
                 type="button"
@@ -282,19 +301,19 @@ export default function UserManagementPage() {
             <button type="button" className="button-ghost" disabled={loading || usersPage >= usersPages} onClick={() => loadUsers(search, usersPage + 1)}>下一頁</button>
           </nav>
           {loading ? (
-            <p className="muted">載入中...</p>
+            <p className="muted">載入中…</p>
           ) : (
             <div className="table-wrapper">
               <table>
                 <thead>
                   <tr>
-                    <th scope="col">ID</th>
-                    <th scope="col">Username</th>
+                    <th scope="col">編號</th>
+                    <th scope="col">使用者名稱</th>
                     <th scope="col">Email</th>
-                    <th scope="col">Nickname</th>
-                    <th scope="col">Role</th>
-                    <th scope="col">Status</th>
-                    <th scope="col">Actions</th>
+                    <th scope="col">暱稱</th>
+                    <th scope="col">角色</th>
+                    <th scope="col">狀態</th>
+                    <th scope="col">操作</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -304,49 +323,31 @@ export default function UserManagementPage() {
                       <td>{user.username}</td>
                       <td>{user.email || "-"}</td>
                       <td>{user.nickname || "-"}</td>
-                      <td>{user.is_admin ? "Admin" : "User"}</td>
+                      <td>{user.is_admin ? "管理員" : "一般使用者"}</td>
                       <td>
                         <span className={`status-badge ${user.is_active ? "status-completed" : "status-failed"}`}>
-                          {user.is_active ? "Active" : "Inactive"}
+                          {user.is_active ? "啟用" : "停用"}
                         </span>
                       </td>
                       <td>
-                        {confirmDeleteId === user.id ? (
-                          <div className="inline-confirm">
-                            <span className="inline-confirm-label">確定？</span>
-                            <button
-                              type="button"
-                              className="button button-danger"
-                              disabled={Boolean(deletingUser)} onClick={() => handleDelete(user.id)}
-                            >
-                              確認
-                            </button>
-                            <button
-                              type="button"
-                              className="button-ghost"
-                              onClick={() => setConfirmDeleteId(null)}
-                            >
-                              取消
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="table-actions">
-                            <button
-                              type="button"
-                              className="button button-secondary"
-                              onClick={() => openEdit(user)}
-                            >
-                              Edit
-                            </button>
+                        <div className="table-actions">
+                          <button
+                            type="button"
+                            className="button button-secondary"
+                            onClick={() => openEdit(user)}
+                          >
+                            編輯
+                          </button>
+                          {user.id !== currentUserId ? (
                             <button
                               type="button"
                               className="button button-danger"
                               onClick={() => setConfirmDeleteId(user.id)}
                             >
-                              Delete
+                              刪除
                             </button>
-                          </div>
-                        )}
+                          ) : null}
+                        </div>
                       </td>
                     </tr>
                   ))}

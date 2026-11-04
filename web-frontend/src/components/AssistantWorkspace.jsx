@@ -18,13 +18,17 @@ export default function AssistantWorkspace() {
               : "詢問一般問題，或切換至偵測分析，讓回覆以已保存的結果為依據。"}</p>
           </div>
         </header>
-        <nav className="assistant-tabs" aria-label="AI 助理功能">
-          <NavLink to="/chat" end>一般對話</NavLink>
-          <NavLink to="/agent" end>偵測分析</NavLink>
-        </nav>
-        {(state.chat.loading || state.agent.loading) && <p className="muted small" role="status">
-          切換分頁會停止接收目前回覆，並保留草稿與已收到的內容；後端可能仍在處理。
-        </p>}
+        {/* The reply warning sits beside the tabs so it never pushes the
+            fixed-height conversation panel below the fold. */}
+        <div className="assistant-tabs-row">
+          <nav className="assistant-tabs" aria-label="AI 助理功能">
+            <NavLink to="/chat" end>一般對話</NavLink>
+            <NavLink to="/agent" end>偵測分析</NavLink>
+          </nav>
+          {(state.chat.loading || state.agent.loading) && <p className="muted small assistant-switch-note" role="status">
+            切換分頁會停止接收目前回覆，並保留草稿與已收到的內容；後端可能仍在處理。
+          </p>}
+        </div>
         <Outlet />
       </div>
     </AssistantStateContext.Provider>

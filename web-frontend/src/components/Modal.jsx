@@ -2,7 +2,8 @@ import { useLayoutEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 
 /** Native modal behavior keeps background content inert and contains focus. */
-export default function Modal({ children, onClose, className = "modal-overlay", ...props }) {
+/** `initialFocusRef` overrides showModal()'s default of focusing the first control. */
+export default function Modal({ children, onClose, className = "modal-overlay", initialFocusRef, ...props }) {
   const dialogRef = useRef(null);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
@@ -11,6 +12,7 @@ export default function Modal({ children, onClose, className = "modal-overlay", 
     const trigger = document.activeElement;
     const previousOverflow = document.body.style.overflow;
     dialog.showModal();
+    initialFocusRef?.current?.focus();
     document.body.style.overflow = "hidden";
     return () => {
       dialog.close();
