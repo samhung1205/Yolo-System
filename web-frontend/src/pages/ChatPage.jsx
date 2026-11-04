@@ -35,6 +35,7 @@ export default function ChatPage() {
   // True while an IME (e.g. Chinese/Japanese/Korean input method) composition
   // is in progress, so the confirm-selection Enter key doesn't submit the form.
   const isComposingRef = useRef(false);
+  const questionInputRef = useRef(null);
   // Scrollable thread container — the CSS caps its height, so we auto-scroll
   // to the latest message instead of letting the page grow unbounded.
   const threadRef = useRef(null);
@@ -356,11 +357,12 @@ export default function ChatPage() {
           <form className="chat-form" onSubmit={handleSubmit}>
             <div className="chat-input-wrapper">
               <textarea
+                ref={questionInputRef}
                 aria-label="傳送給 AI 的訊息"
                 value={question}
                 onChange={(event) => setQuestion(event.target.value)}
                 placeholder="請輸入想問 AI 的問題"
-                disabled={loading}
+                readOnly={loading}
                 onCompositionStart={() => {
                   isComposingRef.current = true;
                 }}
@@ -393,11 +395,16 @@ export default function ChatPage() {
                   />
                 )}
                 <div className="chat-input-spacer" />
-                {loading && <button type="button" className="button-ghost" onClick={() => { requestRef.current?.abort(); setError("已停止接收回覆；後端作業可能仍在進行。"); }}>停止接收</button>}
+                {loading && <button type="button" className="button-ghost" onClick={() => {
+                  requestRef.current?.abort();
+                  setError("已停止接收回覆；後端作業可能仍在進行。");
+                  // The stop button unmounts once loading ends; keep focus in the composer.
+                  questionInputRef.current?.focus();
+                }}>停止接收</button>}
                 <button
                   type="submit"
                   className="chat-send-btn"
-                  disabled={loading || !question.trim()}
+                  aria-disabled={loading || !question.trim() || undefined}
                   aria-label="送出訊息"
                 >
                   {loading ? (

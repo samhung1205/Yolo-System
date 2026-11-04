@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 
 import authService from "../services/authService";
@@ -30,6 +30,18 @@ export default function ProfilePage() {
     return () => { mounted = false; };
   }, []);
 
+  const editTriggerRef = useRef(null);
+  const nicknameInputRef = useRef(null);
+  // Toggling edit mode unmounts the focused control; restore focus afterwards.
+  const pendingFocusRef = useRef(null);
+
+  useEffect(() => {
+    const target = pendingFocusRef.current;
+    if (!target) return;
+    pendingFocusRef.current = null;
+    target.current?.focus();
+  }, [editing]);
+
   function openEdit() {
     setNickname(user?.nickname || "");
     setCurrentPassword("");
@@ -38,10 +50,17 @@ export default function ProfilePage() {
     setSaveError("");
     setSaveSuccess(false);
     setEditing(true);
+    pendingFocusRef.current = nicknameInputRef;
+  }
+
+  function closeEdit() {
+    setEditing(false);
+    pendingFocusRef.current = editTriggerRef;
   }
 
   async function handleSave(event) {
     event.preventDefault();
+    if (saving) return;
     setSaveError("");
     setSaveSuccess(false);
 
@@ -62,7 +81,7 @@ export default function ProfilePage() {
     }
 
     if (!Object.keys(payload).length) {
-      setEditing(false);
+      closeEdit();
       return;
     }
 
@@ -79,7 +98,7 @@ export default function ProfilePage() {
       await authService.fetchCurrentUser();
       setUser(updated);
       setSaveSuccess(true);
-      setEditing(false);
+      closeEdit();
     } catch (err) {
       setSaveError(normalizeApiError(err, "儲存失敗"));
     } finally {
@@ -139,7 +158,7 @@ export default function ProfilePage() {
 
           {!editing ? (
             <div>
-              <button type="button" className="button button-secondary" onClick={openEdit}>
+              <button ref={editTriggerRef} type="button" className="button button-secondary" onClick={openEdit}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ marginRight: 6 }}><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                 編輯個人資料
               </button>
@@ -153,6 +172,7 @@ export default function ProfilePage() {
               <label className="field">
                 <span>Nickname</span>
                 <input
+                  ref={nicknameInputRef}
                   value={nickname}
                   onChange={(e) => setNickname(e.target.value)}
                   placeholder="顯示名稱（留空會清除暱稱）"
@@ -197,10 +217,10 @@ export default function ProfilePage() {
               ) : null}
 
               <div className="action-row">
-                <button type="submit" className="button" disabled={saving}>
+                <button type="submit" className="button" aria-disabled={saving || undefined}>
                   {saving ? "儲存中..." : "儲存"}
                 </button>
-                <button type="button" className="button button-ghost" onClick={() => setEditing(false)}>
+                <button type="button" className="button button-ghost" disabled={saving} onClick={closeEdit}>
                   取消
                 </button>
               </div>

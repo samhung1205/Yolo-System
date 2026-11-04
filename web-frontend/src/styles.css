@@ -2194,7 +2194,9 @@ select { font: inherit; }
 .app-layout { grid-template-columns: 248px minmax(0, 1fr); }
 .sidebar { background: var(--panel); backdrop-filter: none; padding: 28px 18px; }
 .content-shell { padding: 28px 32px; }
-.page-stack { gap: var(--space-section); }
+/* minmax(0, 1fr) lets wide tables scroll inside .table-wrapper instead of
+   stretching the page column past the viewport on phones. */
+.page-stack { grid-template-columns: minmax(0, 1fr); gap: var(--space-section); }
 .page-header { padding: 0 0 18px; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; box-shadow: none; }
 .page-header h1, .auth-panel h1 { font-size: clamp(1.65rem, 2.5vw, 2rem); line-height: 1.25; letter-spacing: -.025em; }
 .page-header p { margin: 10px 0 0; max-width: 65ch; line-height: 1.6; }
@@ -2243,9 +2245,25 @@ a.button { display: inline-flex; align-items: center; justify-content: center; w
 .threshold-summary-title { display: inline; }
 .threshold-summary-values { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 6px; color: var(--muted); font-size: .875rem; font-weight: 400; font-variant-numeric: tabular-nums; }
 .threshold-summary-values > span { white-space: nowrap; }
-.field .yolo-model-description { display: grid; gap: 4px; overflow-wrap: anywhere; }
+.yolo-model-field > label { font-weight: 600; }
+.yolo-model-description { display: grid; gap: 10px; min-width: 0; }
+.yolo-model-description > p { display: grid; gap: 2px; margin: 0; color: var(--muted); font-size: .82rem; line-height: 1.45; overflow-wrap: anywhere; }
+.field .yolo-model-description span { font-weight: 400; }
+.yolo-model-description-name { color: var(--text); }
 .yolo-model-description-label { font-size: .75rem; }
 .yolo-model-field select { min-width: 0; max-width: 100%; }
+.model-class-list { display: grid; justify-items: start; gap: 4px; }
+.model-class-list ul { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.model-class-list li { padding: 3px 9px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel-alt); color: var(--text); font-size: .8125rem; line-height: 1.4; }
+.model-class-toggle { min-height: 44px; border: 0; padding-inline: 4px; color: var(--accent-strong); font-weight: 600; }
+.detection-empty-result { display: grid; gap: 10px; justify-items: start; padding: 20px; border: 1px dashed var(--line); border-radius: 12px; background: var(--panel-alt); }
+.detection-empty-result p { margin: 0; max-width: 65ch; line-height: 1.6; }
+.detection-empty-title { font-weight: 700; }
+.result-stale-note { margin: 0 0 12px; }
+.button[aria-disabled="true"], .button-ghost[aria-disabled="true"] { opacity: .65; cursor: not-allowed; }
+.chat-send-btn[aria-disabled="true"] { opacity: .35; cursor: not-allowed; }
+.chat-send-btn[aria-disabled="true"]:hover { background: var(--accent); }
+.chat-send-btn[aria-disabled="true"]:active { transform: none; }
 .advanced-settings .table-wrapper { max-height: 360px; overflow: auto; }
 .threshold-controls { background: var(--panel-alt); border-color: var(--line); }
 .threshold-row .threshold-hint { color: var(--muted); font-size: .8125rem; line-height: 1.5; }
@@ -2274,6 +2292,9 @@ a.button { display: inline-flex; align-items: center; justify-content: center; w
   .agent-controls { max-height: none; }
   .detection-workspace { grid-template-columns: minmax(230px, 280px) minmax(0, 1fr); align-items: start; }
   .detection-media-grid { grid-template-columns: minmax(0, 1fr); }
+  /* Stacked panels take natural height, so empty placeholders stay compact. */
+  .detection-media-panel.is-empty { grid-template-rows: auto auto; }
+  .detection-media-panel.is-empty .detection-media-body { min-height: 0; }
 }
 @media (max-width: 900px) {
   .detection-workspace { grid-template-columns: minmax(0, 1fr); }
@@ -2299,6 +2320,11 @@ a.button { display: inline-flex; align-items: center; justify-content: center; w
   .agent-main { padding: 16px; }
   .admin-user-list .inline-form { max-width: none; }
   .detection-media-body { min-height: 220px; }
+}
+@media (max-width: 720px) {
+  /* The title row stacks as a column here, where a 320px flex-basis would
+     become the search form's height. */
+  .admin-user-list .inline-form { flex: 0 0 auto; width: 100%; }
 }
 
 .loading-spinner { animation: pending-turn .8s linear infinite; }

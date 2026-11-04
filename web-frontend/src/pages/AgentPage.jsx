@@ -99,6 +99,7 @@ export default function AgentPage() {
   // True while an IME (e.g. Chinese/Japanese/Korean input method) composition
   // is in progress, so the confirm-selection Enter key doesn't submit the form.
   const isComposingRef = useRef(false);
+  const messageInputRef = useRef(null);
   // Tracks the last message we auto-filled, so we can safely replace it when
   // the mode / detection id / batch id changes without clobbering user-typed text.
   const [lastDefaultMessage, setLastDefaultMessage] = useAssistantState("agent", "lastDefaultMessage", () =>
@@ -216,6 +217,8 @@ export default function AgentPage() {
   function handleStop() {
     abortRef.current?.abort();
     setError("已停止接收回覆；後端作業可能仍在進行。");
+    // The stop button unmounts once loading ends; keep focus in the composer.
+    messageInputRef.current?.focus();
   }
 
   async function handleSubmit(event) {
@@ -616,11 +619,13 @@ export default function AgentPage() {
           <form className="chat-form" onSubmit={handleSubmit}>
             <div className="chat-input-wrapper">
               <textarea
+                ref={messageInputRef}
                 aria-label="傳送給分析助理的訊息"
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 placeholder="輸入要問 Agent 的問題"
-                disabled={loading || isAdminOnlyMode}
+                readOnly={loading}
+                disabled={isAdminOnlyMode}
                 onCompositionStart={() => {
                   isComposingRef.current = true;
                 }}
@@ -657,7 +662,8 @@ export default function AgentPage() {
                 <button
                   type="submit"
                   className="chat-send-btn"
-                  disabled={loading || !message.trim() || isAdminOnlyMode || missingContext}
+                  disabled={isAdminOnlyMode}
+                  aria-disabled={loading || !message.trim() || missingContext || undefined}
                   aria-label="送出訊息"
                 >
                   {loading ? (

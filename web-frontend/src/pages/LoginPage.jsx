@@ -77,6 +77,7 @@ export default function LoginPage() {
 
   async function handleSubmit(e) {
     e.preventDefault();
+    if (loading) return;
     setError("");
     setLoading(true);
 
@@ -126,7 +127,7 @@ export default function LoginPage() {
               autoComplete="username"
               autoFocus
               required
-              disabled={loading}
+              readOnly={loading}
             />
           </label>
 
@@ -140,7 +141,7 @@ export default function LoginPage() {
                 placeholder="請輸入密碼"
                 autoComplete="current-password"
                 required
-                disabled={loading}
+                readOnly={loading}
               />
               <button
                 type="button"
@@ -159,7 +160,7 @@ export default function LoginPage() {
             </div>
           )}
 
-          <button type="submit" className="button" disabled={loading}>
+          <button type="submit" className="button" aria-disabled={loading || undefined}>
             {loading ? "登入中..." : "登入"}
           </button>
         </form>

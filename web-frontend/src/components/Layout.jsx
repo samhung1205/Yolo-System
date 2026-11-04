@@ -14,7 +14,12 @@ const NAV_ITEMS = [
 export default function Layout() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
-  useEffect(() => { document.getElementById("main-content")?.focus(); }, [pathname]);
+  // Start each page at the top (the mobile top bar stays visible) and move
+  // focus to the content without letting focus() scroll past that bar.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    document.getElementById("main-content")?.focus({ preventScroll: true });
+  }, [pathname]);
   const [menuOpen, setMenuOpen] = useState(false);
   const user = authService.getCurrentUser();
 

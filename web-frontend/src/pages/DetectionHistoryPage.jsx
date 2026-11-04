@@ -47,6 +47,21 @@ export default function DetectionHistoryPage() {
   const abortRef = useRef(null);
   const listScrollRef = useRef(null);
   const detailScrollRef = useRef(null);
+  const listHeadingRef = useRef(null);
+  const detailHeadingRef = useRef(null);
+  const deleteTriggerRef = useRef(null);
+  const cancelDeleteRef = useRef(null);
+  // Set before a state change that unmounts or hides the focused control;
+  // resolved after the next render so focus never falls back to <body>.
+  const pendingFocusRef = useRef(null);
+  const [statusMessage, setStatusMessage] = useState("");
+
+  useEffect(() => {
+    const resolveTarget = pendingFocusRef.current;
+    if (!resolveTarget) return;
+    pendingFocusRef.current = null;
+    resolveTarget()?.focus();
+  });
 
   const rangeStart = total === 0 ? 0 : (page - 1) * LIMIT + 1;
   const rangeEnd = Math.min(page * LIMIT, total);
@@ -112,28 +127,49 @@ export default function DetectionHistoryPage() {
     detailScrollRef.current?.scrollTo({ top: 0 });
   }, [selected?.id]);
 
-  async function handleSelect(id) {
+  async function handleSelect(id, trigger) {
     try {
       const detail = await detectionService.getDetection(id);
       setSelected(detail);
       setDeleteError("");
       setConfirmDelete(false);
       setMobileDetailOpen(true);
+      // On narrow screens the list is hidden once the detail opens.
+      pendingFocusRef.current = () => (trigger?.offsetParent ? null : detailHeadingRef.current);
     } catch (err) {
       setError(normalizeApiError(err, "無法載入 detection detail"));
     }
   }
 
-  async function handleDelete() {
-    if (!selected) return;
+  function closeMobileDetail() {
+    setMobileDetailOpen(false);
+    pendingFocusRef.current = () =>
+      listScrollRef.current?.querySelector('[aria-pressed="true"]') || listHeadingRef.current;
+  }
 
+  function openDeleteConfirm() {
+    setConfirmDelete(true);
+    pendingFocusRef.current = () => cancelDeleteRef.current;
+  }
+
+  function cancelDeleteConfirm() {
+    setConfirmDelete(false);
+    pendingFocusRef.current = () => deleteTriggerRef.current;
+  }
+
+  async function handleDelete() {
+    if (!selected || deleting) return;
+
+    const deletedId = selected.id;
     setDeleting(true);
     setDeleteError("");
-    setConfirmDelete(false);
     try {
-      await detectionService.deleteDetection(selected.id);
+      await detectionService.deleteDetection(deletedId);
+      setConfirmDelete(false);
       setSelected(null);
       setMobileDetailOpen(false);
+      setStatusMessage(`已刪除偵測 #${deletedId}。`);
+      pendingFocusRef.current = () => listHeadingRef.current;
       const pages = await loadHistory(page);
       // Deleting the last item of the last page can leave us on an empty
       // page; clamp back to the new final page.
@@ -144,6 +180,8 @@ export default function DetectionHistoryPage() {
       }
     } catch (err) {
       setDeleteError(normalizeApiError(err, "刪除失敗"));
+      setConfirmDelete(false);
+      pendingFocusRef.current = () => deleteTriggerRef.current;
     } finally {
       setDeleting(false);
     }
@@ -229,13 +267,14 @@ export default function DetectionHistoryPage() {
       </div>
 
       {error ? <div className="alert alert-error" role="alert" aria-live="assertive">{error}</div> : null}
+      <p className="sr-only" role="status">{statusMessage}</p>
 
       <section className={mobileDetailOpen ? "history-layout history-detail-open" : "history-layout"}>
         {/* List Panel */}
         <div className="panel history-panel history-list-panel">
           <div className="panel-header-row history-panel-header">
             <div>
-              <h2>偵測清單</h2>
+              <h2 ref={listHeadingRef} tabIndex={-1}>偵測清單</h2>
               <span className="muted small">
                 顯示 {rangeStart}-{rangeEnd}，共 {total} 筆
               </span>
@@ -253,7 +292,7 @@ export default function DetectionHistoryPage() {
                     type="button"
                     key={item.id}
                     className={selected?.id === item.id ? "list-item list-item-active" : "list-item"}
-                    onClick={() => handleSelect(item.id)}
+                    onClick={(event) => handleSelect(item.id, event.currentTarget)}
                     aria-pressed={selected?.id === item.id}
                   >
                     <div className="list-item-head">
@@ -307,38 +346,51 @@ export default function DetectionHistoryPage() {
               <button
                 type="button"
                 className="button-ghost history-mobile-back"
-                onClick={() => setMobileDetailOpen(false)}
+                onClick={closeMobileDetail}
               >
                 ← Task List
               </button>
-              <h2>結果詳情</h2>
+              <h2 ref={detailHeadingRef} tabIndex={-1}>結果詳情</h2>
             </div>
             {selected && !confirmDelete && (
               <button
+                ref={deleteTriggerRef}
                 type="button"
                 className="button button-danger"
                 disabled={deleting}
-                onClick={() => setConfirmDelete(true)}
+                onClick={openDeleteConfirm}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ marginRight: 6 }}><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
                 刪除
               </button>
             )}
             {selected && confirmDelete && (
-              <div className="inline-confirm">
+              <div
+                className="inline-confirm"
+                role="group"
+                aria-label={`刪除偵測 #${selected.id}`}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape" && !deleting) {
+                    event.preventDefault();
+                    cancelDeleteConfirm();
+                  }
+                }}
+              >
                 <span className="inline-confirm-label">確定刪除？</span>
                 <button
                   type="button"
                   className="button button-danger"
-                  disabled={deleting}
+                  aria-disabled={deleting || undefined}
                   onClick={handleDelete}
                 >
                   {deleting ? "刪除中…" : "確認"}
                 </button>
                 <button
+                  ref={cancelDeleteRef}
                   type="button"
                   className="button-ghost"
-                  onClick={() => setConfirmDelete(false)}
+                  disabled={deleting}
+                  onClick={cancelDeleteConfirm}
                 >
                   取消
                 </button>
@@ -450,7 +502,7 @@ export default function DetectionHistoryPage() {
                             <td>{obj.object_index}</td>
                             <td>{obj.class_name}</td>
                             <td>{obj.confidence.toFixed(3)}</td>
-                            <td>{obj.bbox.join(", ")}</td>
+                            <td>{obj.bbox.map((value) => Math.round(value)).join(", ")}</td>
                           </tr>
                         ))}
                       </tbody>

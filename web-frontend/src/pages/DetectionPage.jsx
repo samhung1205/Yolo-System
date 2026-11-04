@@ -1,12 +1,19 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 
 import ClassThresholdEditor from "../components/ClassThresholdEditor";
-import YoloModelSelect from "../components/YoloModelSelect";
+import YoloModelSelect, { orderedClassNames } from "../components/YoloModelSelect";
 import ThresholdSummary from "../components/ThresholdSummary";
 import ZoomableImage from "../components/ZoomableImage";
 import detectionService from "../services/detectionService";
 import { buildAssetUrl, normalizeApiError } from "../services/api";
+
+const MIN_CONF = 0.05;
+
+/** Pixel coordinates: sub-pixel precision adds noise and widens the table. */
+function formatBbox(bbox) {
+  return (bbox || []).map((value) => Math.round(value)).join(", ");
+}
 
 export default function DetectionPage() {
   const navigate = useNavigate();
@@ -23,6 +30,13 @@ export default function DetectionPage() {
   const [modelKey, setModelKey] = useState("");
   const [modelsLoading, setModelsLoading] = useState(true);
   const [modelsError, setModelsError] = useState("");
+  const [statusMessage, setStatusMessage] = useState("");
+
+  const submitRef = useRef(null);
+  const resultsHeadingRef = useRef(null);
+  const advancedRef = useRef(null);
+  const confInputRef = useRef(null);
+  const focusResultsRef = useRef(false);
 
   const unavailableModels = useMemo(
     () => yoloModels.filter((model) => !model.available),
@@ -33,6 +47,32 @@ export default function DetectionPage() {
     () => yoloModels.find((model) => model.key === modelKey),
     [yoloModels, modelKey]
   );
+
+  const resultModel = useMemo(
+    () => yoloModels.find((model) => model.key === result?.model_key),
+    [yoloModels, result?.model_key]
+  );
+
+  const cocoModel = useMemo(
+    () => yoloModels.find((model) => model.available && model.task !== "obb"
+      && /\bcoco\b/i.test(model.dataset_variant || "")),
+    [yoloModels]
+  );
+
+  const resultClassNames = orderedClassNames(
+    result?.model_class_map?.canonical || resultModel?.canonical_class_names
+  );
+  const resultIsStale = Boolean(result?.model_key && modelKey && result.model_key !== modelKey);
+
+  // Move focus to the results only when it is still on the submit button,
+  // so a user who moved on during a long inference is not pulled back.
+  useEffect(() => {
+    if (!focusResultsRef.current || !result) return;
+    focusResultsRef.current = false;
+    if (document.activeElement === submitRef.current || document.activeElement === document.body) {
+      resultsHeadingRef.current?.focus();
+    }
+  }, [result]);
 
   const previewUrl = useMemo(() => {
     if (!file) {
@@ -92,28 +132,53 @@ export default function DetectionPage() {
     }
   }
 
-  async function handleSubmit(event) {
-    event.preventDefault();
-    if (!file) {
+  async function runDetection(key, thresholds) {
+    if (!file || !key || loading) {
       return;
     }
 
     setLoading(true);
     setError("");
+    setStatusMessage("正在偵測，請稍候。");
 
     try {
       const detection = await detectionService.detectImage(file, {
         conf,
         iou,
-        modelKey,
-        classThresholds: perClassEnabled ? classThresholds : null,
+        modelKey: key,
+        classThresholds: thresholds,
       });
+      const count = detection.objects?.length || 0;
+      focusResultsRef.current = true;
       setResult(detection);
+      setStatusMessage(count
+        ? `偵測完成：找到 ${count} 個物件，耗時 ${detection.inference_ms ?? "-"} ms。`
+        : "偵測完成：沒有偵測到物件。");
     } catch (err) {
+      setStatusMessage("");
       setError(normalizeApiError(err, "圖片偵測失敗"));
     } finally {
       setLoading(false);
     }
+  }
+
+  function handleSubmit(event) {
+    event.preventDefault();
+    runDetection(modelKey, perClassEnabled ? classThresholds : null);
+  }
+
+  function retryWithCoco() {
+    // Per-class overrides are keyed by the previous model's class ids and
+    // cannot apply to COCO, so the retry uses the global thresholds only.
+    setModelKey(cocoModel.key);
+    setPerClassEnabled(false);
+    setClassThresholds({});
+    runDetection(cocoModel.key, null);
+  }
+
+  function openConfidenceSetting() {
+    if (advancedRef.current) advancedRef.current.open = true;
+    confInputRef.current?.focus();
   }
 
   return (
@@ -145,7 +210,7 @@ export default function DetectionPage() {
           </label>
 
           <YoloModelSelect models={yoloModels} value={modelKey} loading={modelsLoading}
-            onChange={(key) => { setModelKey(key); setResult(null); }} />
+            onChange={setModelKey} />
 
           {modelsError ? (
             <div className="alert alert-error" role="alert">
@@ -166,14 +231,15 @@ export default function DetectionPage() {
             </details>
           ) : null}
 
-          <details className="advanced-settings">
+          <details className="advanced-settings" ref={advancedRef}>
             <ThresholdSummary conf={conf} iou={iou} />
           <div className="threshold-controls">
             <label className="threshold-row">
               <span>信心閾值 <strong>(conf = {conf.toFixed(2)})</strong></span>
               <input
+                ref={confInputRef}
                 type="range"
-                min="0.05"
+                min={MIN_CONF}
                 max="0.95"
                 step="0.05"
                 value={conf}
@@ -210,14 +276,16 @@ export default function DetectionPage() {
 
           {error ? <div className="alert alert-error" role="alert" aria-live="assertive">{error}</div> : null}
 
-          <button type="submit" className="button" disabled={!file || !modelKey || loading}>
-            {loading ? "辨識中..." : "開始偵測"}
+          <button ref={submitRef} type="submit" className="button" disabled={!file || !modelKey}
+            aria-disabled={loading || undefined}>
+            {loading ? "辨識中…" : "開始偵測"}
           </button>
         </form>
+        <p className="sr-only" role="status">{statusMessage}</p>
       </section>
 
       <section className="two-column-grid detection-media-grid">
-        <div className="panel detection-media-panel">
+        <div className={previewUrl ? "panel detection-media-panel" : "panel detection-media-panel is-empty"}>
           <div className="section-title detection-media-header">
             <h2>原始影像</h2>
           </div>
@@ -234,7 +302,7 @@ export default function DetectionPage() {
           </div>
         </div>
 
-        <div className="panel detection-media-panel">
+        <div className={result?.result_image_url ? "panel detection-media-panel" : "panel detection-media-panel is-empty"}>
           <div className="section-title detection-media-header">
             <h2>標註結果</h2>
             {result?.result_image_url ? (
@@ -244,7 +312,7 @@ export default function DetectionPage() {
                 onClick={handleDownloadResult}
                 disabled={downloading}
               >
-                {downloading ? "Downloading..." : "下載"}
+                {downloading ? "下載中…" : "下載"}
               </button>
             ) : null}
           </div>
@@ -296,11 +364,17 @@ export default function DetectionPage() {
       {result && (
         <section className="panel">
           <div className="section-title">
-            <h2>偵測到的物件</h2>
+            <h2 ref={resultsHeadingRef} tabIndex={-1}>偵測到的物件</h2>
             <span className="muted">
               {result.objects?.length || 0} 個物件 · {result.inference_ms ?? "-"} ms
             </span>
           </div>
+          {resultIsStale ? (
+            <p className="alert alert-warning result-stale-note">
+              以下是 {resultModel?.display_name || result.model_key} 的結果；已改選
+              {" "}{selectedModel?.display_name || modelKey}，按「開始偵測」後更新。
+            </p>
+          ) : null}
           <div className="model-provenance result-provenance">
             <span>{result.model_key || result.model_name}</span>
             <span>conf {result.confidence_threshold ?? conf}</span>
@@ -320,36 +394,56 @@ export default function DetectionPage() {
               ))}
             </div>
           ) : null}
-          <div className="table-wrapper">
-            <table>
-              <thead>
-                <tr>
-                  <th scope="col">#</th>
-                  <th scope="col">類別</th>
-                  <th scope="col">信心值</th>
-                  <th scope="col">Bounding Box</th>
-                </tr>
-              </thead>
-              <tbody>
-                {result.objects?.length ? (
-                  result.objects.map((item) => (
+          {result.objects?.length ? (
+            <div className="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th scope="col">#</th>
+                    <th scope="col">類別</th>
+                    <th scope="col">信心值</th>
+                    <th scope="col">Bounding Box</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {result.objects.map((item) => (
                     <tr key={item.id}>
                       <td>{item.object_index}</td>
                       <td>{item.class_name}</td>
                       <td>{item.confidence.toFixed(3)}</td>
-                      <td>{item.bbox.join(", ")}</td>
+                      <td>{formatBbox(item.bbox)}</td>
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={4} className="muted center-cell">
-                      此設定下未偵測到物件。請確認模型的類別，或展開進階設定調低信心閾值後重試。
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="detection-empty-result">
+              <p className="detection-empty-title">這次沒有偵測到物件。</p>
+              {resultClassNames.length ? (
+                <p className="muted">
+                  {resultModel?.display_name || result.model_key} 只會找出這 {resultClassNames.length} 類：
+                  {resultClassNames.length > 12
+                    ? `${resultClassNames.slice(0, 10).join("、")} 等`
+                    : resultClassNames.join("、")}
+                  。影像中沒有這些物件時，結果就會是空的。
+                </p>
+              ) : null}
+              <div className="action-row">
+                {cocoModel && cocoModel.key !== result.model_key ? (
+                  <button type="button" className="button" onClick={retryWithCoco}
+                    aria-disabled={loading || undefined}>
+                    改用 COCO {cocoModel.class_count} 類模型重試
+                  </button>
+                ) : null}
+                {conf > MIN_CONF ? (
+                  <button type="button" className="button button-secondary" onClick={openConfidenceSetting}>
+                    調低信心閾值
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          )}
         </section>
       )}
     </div>

@@ -269,7 +269,7 @@ export default function UserManagementPage() {
               <button
                 type="button"
                 className="button button-secondary"
-                disabled={loading} onClick={() => loadUsers(search, 1)}
+                aria-disabled={loading || undefined} onClick={() => { if (!loading) loadUsers(search, 1); }}
               >
                 搜尋
               </button>
