@@ -1,7 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 
 import { normalizeApiError } from "../services/api";
 import agentService from "../services/agentService";
@@ -12,6 +10,8 @@ import SelectField from "../components/SelectField";
 import { useAssistantState } from "../state/assistantState";
 import SavedResultPicker from "../components/SavedResultPicker";
 import AnalysisEvidence from "../components/AnalysisEvidence";
+import AssistantTranscript, { AssistantEmpty, AssistantIcon, AssistantMarkdown, useAssistantScroll } from "../components/AssistantTranscript";
+import useAssistantPane from "../hooks/useAssistantPane";
 
 const BUILTIN_MODES = [
   { key: "auto", label: "自動選擇" },
@@ -22,7 +22,6 @@ const BUILTIN_MODES = [
   { key: "batch_analysis", label: "批次分析" },
   { key: "admin_help", label: "管理員協助" },
 ];
-const MARKDOWN_PLUGINS = [remarkGfm];
 
 // Tool names sent by the backend tool-calling engine (AGENT_ENGINE=tool_calling).
 const TOOL_LABELS = {
@@ -81,7 +80,7 @@ export default function AgentPage() {
   const [artifactReady, setArtifactReady] = useState(false);
   const [selectedArtifact, setSelectedArtifact] = useState(null);
   const [contextKind, setContextKind] = useAssistantState("agent", "contextKind", initialBatchId ? "batch" : "detection");
-  const [settingsOpen, setSettingsOpen] = useAssistantState("agent", "settingsOpen", false);
+  const { wide, paneOpen, setPaneOpen } = useAssistantPane("agent", "settingsOpen");
   const [modes, setModes] = useState(BUILTIN_MODES);
   const [mode, setMode] = useAssistantState("agent", "mode", initialMode);
   const [detectionId, setDetectionId] = useAssistantState("agent", "detectionId", initialDetectionId);
@@ -95,7 +94,10 @@ export default function AgentPage() {
   const [streaming, setStreaming] = useAssistantState("agent", "streaming", true);
   const [error, setError] = useAssistantState("agent", "error", "");
   const [reportDownloading, setReportDownloading] = useState("");
-  const threadRef = useRef(null);
+  const scroll = useAssistantScroll(messages, null, wide || !paneOpen);
+  const settingsHeadingRef = useRef(null);
+  const settingsToggleRef = useRef(null);
+  const analysisHeadingRef = useRef(null);
   const abortRef = useRef(null);
   // True while an IME (e.g. Chinese/Japanese/Korean input method) composition
   // is in progress, so the confirm-selection Enter key doesn't submit the form.
@@ -188,12 +190,6 @@ export default function AgentPage() {
   }, []);
 
 
-  useEffect(() => {
-    if (threadRef.current) {
-      threadRef.current.scrollTop = threadRef.current.scrollHeight;
-    }
-  }, [messages]);
-
   // Cleanup abort controller on unmount
   useEffect(() => {
     return () => {
@@ -219,6 +215,16 @@ export default function AgentPage() {
 
   const needsArtifact = requiresDetectionId || requiresBatchId || (mode === "auto" && Boolean(detectionId || batchId));
   const missingContext = needsArtifact && (!artifactReady || (requiresDetectionId && !detectionId) || (requiresBatchId && !batchId));
+  const canChooseArtifact = needsArtifact || mode === "auto";
+  const artifactName = selectedArtifact
+    ? selectedArtifact.source_filename || selectedArtifact.name || contextLabel
+    : contextLabel ? "資料尚未確認" : "尚未選擇資料";
+  const activeModeLabel = visibleModes.find((item) => item.key === mode)?.label || "偵測分析";
+
+  function openSettings() {
+    setPaneOpen(true);
+    requestAnimationFrame(() => settingsHeadingRef.current?.focus({ preventScroll: true }));
+  }
 
   function handleStop() {
     abortRef.current?.abort();
@@ -231,8 +237,13 @@ export default function AgentPage() {
     event.preventDefault();
     const trimmed = message.trim();
     if (!trimmed || isAdminOnlyMode || loading) return;
-    if (missingContext) { setSettingsOpen(true); setError("請先選擇一筆已完成的分析資料。"); return; }
+    if (missingContext) {
+      openSettings();
+      setError("請先選擇一筆已完成的分析資料。");
+      return;
+    }
 
+    scroll.jumpToLatest();
     setLoading(true);
     setError("");
     setMessage("");
@@ -422,10 +433,13 @@ export default function AgentPage() {
 
   function handleNewConversation() {
     abortRef.current?.abort();
+    if (!wide) setPaneOpen(false);
+    scroll.jumpToLatest();
     setMessages([]);
     setConversationId(null);
     setMessage("");
     setError("");
+    requestAnimationFrame(() => analysisHeadingRef.current?.focus({ preventScroll: true }));
   }
 
   function handleModeChange(nextMode) {
@@ -462,45 +476,39 @@ export default function AgentPage() {
   }
 
   return (
-    <div className="page-stack agent-page">
-      <div className="assistant-actions">
-        <div className="page-header-actions">
-          <button type="button" className="button button-secondary agent-settings-toggle"
-            aria-expanded={settingsOpen} aria-controls="analysis-settings"
-            onClick={() => setSettingsOpen((open) => !open)}>{settingsOpen ? "收合分析設定" : "分析設定"}</button>
-          <label className="field-checkbox">
-            <input
-              type="checkbox"
-              checked={streaming}
-              onChange={(e) => setStreaming(e.target.checked)}
-              disabled={loading}
-            />
-            <span>逐字顯示回覆</span>
-          </label>
-          <button
-            type="button"
-            className="button button-secondary"
-            onClick={handleNewConversation}
-            disabled={loading}
-          >
-            新對話
-          </button>
-        </div>
+    <div className="assistant-page agent-page" onKeyDown={(event) => {
+      if (event.key === "Escape" && !event.defaultPrevented && !wide && paneOpen) {
+        setPaneOpen(false);
+        settingsToggleRef.current?.focus();
+      }
+    }}>
+      <div className="assistant-toolbar">
+        <button type="button" className="assistant-tool-button" ref={settingsToggleRef}
+          aria-expanded={paneOpen} aria-controls="analysis-settings"
+          onClick={() => paneOpen ? setPaneOpen(false) : openSettings()}>
+          <AssistantIcon name={!wide && paneOpen ? "back" : "settings"} />
+          {paneOpen ? wide ? "收合設定" : "返回分析" : "分析設定"}
+        </button>
+        <h2 ref={analysisHeadingRef} tabIndex={-1}>{activeModeLabel}</h2>
+        <button type="button" className="assistant-tool-button assistant-new" aria-label="新對話"
+          onClick={handleNewConversation} disabled={loading}>
+          <AssistantIcon name="new" /><span>新對話</span>
+        </button>
       </div>
 
-      {error ? <div className="alert alert-error" role="alert" aria-live="assertive">{error}</div> : null}
+      {error && <div className="alert alert-error assistant-notice" role="alert">{error}</div>}
 
       {isAdminOnlyMode ? (
-        <div className="alert alert-warning" role="status">
+        <div className="alert alert-warning assistant-notice" role="status">
           「管理員協助」模式僅管理員可用，請改選其他分析模式。
         </div>
       ) : null}
 
       <p className="sr-only" role="status">{loading ? "分析助理正在回覆" : messages.length ? "分析回覆已更新" : "輸入訊息開始分析"}</p>
-      <div className={`agent-layout${settingsOpen ? " settings-open" : ""}`}>
+      <div className="assistant-layout" data-pane-open={paneOpen || undefined}>
 
-        <aside id="analysis-settings" className="panel agent-controls">
-          <h2>分析設定</h2>
+        <aside id="analysis-settings" className="assistant-side assistant-settings" aria-labelledby="analysis-settings-title" hidden={!paneOpen}>
+          <h3 id="analysis-settings-title" ref={settingsHeadingRef} tabIndex={-1}>分析設定</h3>
 
           <div className="field">
             <label htmlFor="agent-mode"><span>分析模式</span></label>
@@ -554,6 +562,11 @@ export default function AgentPage() {
             </div>
           ) : null}
 
+          <label className="field-checkbox assistant-streaming">
+            <input type="checkbox" checked={streaming} onChange={(event) => setStreaming(event.target.checked)} disabled={loading} />
+            <span>逐字顯示回覆</span>
+          </label>
+
           {conversationId ? (
             <div className="agent-meta">
               <span className="detail-label">對話編號</span>
@@ -562,25 +575,22 @@ export default function AgentPage() {
           ) : null}
         </aside>
 
-        <div className={needsArtifact ? "panel agent-main has-context" : "panel agent-main"}>
+        <div className="assistant-main" hidden={!wide && paneOpen}>
           {needsArtifact && <div className="analysis-current-context" role="status">
-            <span>分析依據</span>
-            <strong>{selectedArtifact
-              ? selectedArtifact.source_filename || selectedArtifact.name || `批次 #${batchId}`
-              : detectionId || batchId ? "正在確認所選資料…" : "尚未選擇資料"}</strong>
-            {(detectionId || batchId) && <span>{batchId ? "批次" : "偵測"} #{batchId || detectionId}</span>}
-            {(detectionId || batchId) && !artifactReady && <span>資料尚未確認可用，請在分析設定檢查。</span>}
+            <span>分析依據{contextLabel && ` · ${contextLabel}`}</span>
+            <strong title={artifactName}>{artifactName}</strong>
+            {contextLabel && !artifactReady && selectedArtifact && <span>尚未完成</span>}
           </div>}
-          <div ref={threadRef} className="agent-thread" role="region" aria-label="分析對話" tabIndex={0} aria-busy={loading}>
+          <AssistantTranscript label="分析對話" busy={loading} scroll={scroll} empty={!messages.length}>
             {messages.length ? (
               messages.map((msg, index) =>
                 msg.role === "user" ? (
-                  <div key={index} className="agent-message agent-message-user">
+                  <div key={index} className="assistant-message assistant-message-user">
                     <span className="chat-role">你</span>
                     <p>{msg.content}</p>
                   </div>
                 ) : (
-                  <div key={index} className="agent-message agent-message-assistant">
+                  <div key={index} className="assistant-message assistant-message-reply">
                     <span className="chat-role">
                       分析助理
                       {msg.mode ? (
@@ -605,11 +615,7 @@ export default function AgentPage() {
                         ))}
                       </ul>
                     ) : null}
-                    <div className="markdown-report">
-                      <ReactMarkdown remarkPlugins={MARKDOWN_PLUGINS}>
-                        {msg.content || (msg.isStreaming ? "" : "（沒有回覆內容）")}
-                      </ReactMarkdown>
-                    </div>
+                    <AssistantMarkdown>{msg.content || (msg.isStreaming ? "" : "（沒有回覆內容）")}</AssistantMarkdown>
 
                     {msg.interrupted && <p className="muted small">已停止接收，此回覆可能不完整。</p>}
                     {!msg.isStreaming && <AnalysisEvidence references={msg.references} tools={msg.tool_calls} />}
@@ -618,19 +624,23 @@ export default function AgentPage() {
                 )
               )
             ) : (
-              <div className="chat-empty">
-                <p className="muted">{needsArtifact && selectedArtifact
-                  ? "已選好分析資料，輸入問題即可開始。"
-                  : "選擇分析資料，再輸入問題開始對話。"}</p>
-              </div>
+              <AssistantEmpty icon="analysis" title={artifactReady ? "開始分析這筆結果" : "開始偵測分析"}>
+                <p>{artifactReady ? "可以詢問偵測到的物件、數量，或哪些結果需要人工確認。"
+                  : canChooseArtifact ? "選擇一筆已保存的偵測或批次，再輸入問題。"
+                  : "輸入想查的偵測趨勢或紀錄摘要。"}</p>
+                {canChooseArtifact && !artifactReady && (
+                  <button type="button" className="button button-secondary" onClick={openSettings}>選擇分析資料</button>
+                )}
+              </AssistantEmpty>
             )}
-          </div>
+          </AssistantTranscript>
 
           <form className="chat-form" onSubmit={handleSubmit}>
             <div className="chat-input-wrapper">
               <textarea
                 ref={messageInputRef}
                 aria-label="傳送給分析助理的訊息"
+                rows={2}
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 placeholder="輸入要問分析助理的問題"

@@ -6,15 +6,19 @@ import ModelPicker from "../components/ModelPicker";
 import { useAssistantState } from "../state/assistantState";
 import { normalizeApiError } from "../services/api";
 import ConfirmDialog from "../components/ConfirmDialog";
+import AssistantTranscript, { AssistantEmpty, AssistantIcon, AssistantMarkdown, useAssistantScroll } from "../components/AssistantTranscript";
+import useAssistantPane from "../hooks/useAssistantPane";
 
 const CONVERSATION_LIMIT = 100;
 
 export default function ChatPage() {
-  const [showConversations, setShowConversations] = useAssistantState("chat", "showConversations", false);
+  const { wide, paneOpen, setPaneOpen } = useAssistantPane("chat", "showConversations");
   const [conversations, setConversations] = useAssistantState("chat", "conversations", []);
   const [activeConversationId, setActiveConversationId] = useAssistantState("chat", "activeConversationId", null);
   const [messages, setMessages] = useAssistantState("chat", "messages", []);
   const [pendingQuestion, setPendingQuestion] = useState("");
+  const [openingConversationId, setOpeningConversationId] = useState(null);
+  const [historyQuery, setHistoryQuery] = useAssistantState("chat", "historyQuery", "");
   const [initialized, setInitialized] = useAssistantState("chat", "initialized", false);
   const requestRef = useRef(null);
   const [question, setQuestion] = useAssistantState("chat", "question", "");
@@ -24,6 +28,8 @@ export default function ChatPage() {
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [deleteError, setDeleteError] = useState("");
   const sidebarHeadingRef = useRef(null);
+  const paneToggleRef = useRef(null);
+  const conversationHeadingRef = useRef(null);
   // The deleted row (and its trigger) unmounts; land focus on the list heading.
   const focusListAfterDeleteRef = useRef(false);
   useEffect(() => {
@@ -46,9 +52,7 @@ export default function ChatPage() {
   // is in progress, so the confirm-selection Enter key doesn't submit the form.
   const isComposingRef = useRef(false);
   const questionInputRef = useRef(null);
-  // Scrollable thread container — the CSS caps its height, so we auto-scroll
-  // to the latest message instead of letting the page grow unbounded.
-  const threadRef = useRef(null);
+  const scroll = useAssistantScroll(messages, pendingQuestion, wide || !paneOpen);
 
   // Model selector state
   const [providerGroups, setProviderGroups] = useState([]);
@@ -60,6 +64,10 @@ export default function ChatPage() {
     [activeConversationId, conversations]
   );
   const confirmDeleteConversation = conversations.find((item) => item.conversation_id === confirmDeleteId) || null;
+  const historyTerm = historyQuery.trim().normalize("NFKC").toLowerCase();
+  const visibleConversations = historyTerm
+    ? conversations.filter((item) => item.title.normalize("NFKC").toLowerCase().includes(historyTerm))
+    : conversations;
 
   useEffect(() => {
     let active = true;
@@ -77,12 +85,6 @@ export default function ChatPage() {
     return () => { active = false; };
   }, []);
 
-
-  useEffect(() => {
-    if (threadRef.current) {
-      threadRef.current.scrollTop = threadRef.current.scrollHeight;
-    }
-  }, [messages]);
 
   useEffect(() => {
     pageActiveRef.current = true;
@@ -132,7 +134,12 @@ export default function ChatPage() {
     if (!auto) {
       userNavigatedRef.current = true;
       setInitialized(true);
-      setShowConversations(false);
+      setOpeningConversationId(conversationId);
+      setError("");
+      if (!wide) {
+        setPaneOpen(false);
+        requestAnimationFrame(() => conversationHeadingRef.current?.focus({ preventScroll: true }));
+      }
     }
     setConfirmDeleteId(null);
     const seq = ++openSeqRef.current;
@@ -145,12 +152,15 @@ export default function ChatPage() {
         return;
       }
       activeIdRef.current = detail.conversation_id;
+      if (!auto) scroll.readFromStart();
       setActiveConversationId(detail.conversation_id);
       setMessages(detail.messages);
     } catch (err) {
-      if (mounted) {
+      if (mounted && pageActiveRef.current && seq === openSeqRef.current) {
         setError(normalizeApiError(err, "無法載入對話內容"));
       }
+    } finally {
+      if (!auto && pageActiveRef.current && seq === openSeqRef.current) setOpeningConversationId(null);
     }
   }
 
@@ -168,6 +178,7 @@ export default function ChatPage() {
     try {
       await chatService.deleteConversation(conversationId);
       openSeqRef.current += 1;
+      setOpeningConversationId(null);
       setConversations((prev) =>
         prev.filter((item) => item.conversation_id !== conversationId)
       );
@@ -188,13 +199,14 @@ export default function ChatPage() {
 
   async function handleSubmit(event) {
     event.preventDefault();
-    if (!question.trim() || loading) {
+    if (!question.trim() || loading || openingConversationId) {
       return;
     }
 
     const sentInConversationId = activeConversationId;
     const controller = new AbortController();
     requestRef.current = controller;
+    scroll.jumpToLatest();
     setPendingQuestion(question.trim());
     setLoading(true);
     setError("");
@@ -225,27 +237,50 @@ export default function ChatPage() {
   }
 
   function handleNewConversation() {
-    setShowConversations(false);
+    if (!wide) setPaneOpen(false);
+    scroll.jumpToLatest();
     userNavigatedRef.current = true;
     setInitialized(true);
     openSeqRef.current += 1; // invalidate in-flight opens
     activeIdRef.current = null;
     setActiveConversationId(null);
     setMessages([]);
+    setOpeningConversationId(null);
     setQuestion("");
     setConfirmDeleteId(null);
+    setError("");
+    // Keep the mobile keyboard closed until the user taps the input.
+    requestAnimationFrame(() => conversationHeadingRef.current?.focus({ preventScroll: true }));
+  }
+
+  function toggleHistory() {
+    setPaneOpen(!paneOpen);
+    if (!wide && !paneOpen) requestAnimationFrame(() => sidebarHeadingRef.current?.focus({ preventScroll: true }));
   }
 
   return (
-    <div className="page-stack chat-page">
-      {error ? <div className="alert alert-error" role="alert" aria-live="assertive">{error}</div> : null}
-
-      <button type="button" className="button button-secondary chat-mobile-switch"
-        aria-expanded={showConversations} aria-controls="conversation-list"
-        onClick={() => setShowConversations((open) => !open)}>
-        {showConversations ? "返回對話" : "查看歷史對話"}
-      </button>
-      <p className="sr-only" role="status">{loading ? "AI 正在回覆" : messages.length ? "對話內容已更新" : "輸入訊息開始對話"}</p>
+    <div className="assistant-page chat-page" onKeyDown={(event) => {
+      if (event.key === "Escape" && !event.defaultPrevented && !wide && paneOpen) {
+        setPaneOpen(false);
+        paneToggleRef.current?.focus();
+      }
+    }}>
+      <div className="assistant-toolbar">
+        <button type="button" className="assistant-tool-button" ref={paneToggleRef}
+          aria-expanded={paneOpen} aria-controls="conversation-list" onClick={toggleHistory}>
+          <AssistantIcon name={!wide && paneOpen ? "back" : "history"} />
+          {paneOpen ? wide ? "收合歷史" : "返回對話" : "歷史對話"}
+        </button>
+        <h2 ref={conversationHeadingRef} tabIndex={-1} title={activeConversation?.title}>
+          {activeConversation?.title || "新對話"}
+        </h2>
+        <button type="button" className="assistant-tool-button assistant-new" aria-label="新對話"
+          onClick={handleNewConversation} disabled={loading}>
+          <AssistantIcon name="new" /><span>新對話</span>
+        </button>
+      </div>
+      {error && <div className="alert alert-error assistant-notice" role="alert">{error}</div>}
+      <p className="sr-only" role="status">{openingConversationId ? "正在開啟歷史對話" : loading ? "AI 正在回覆" : messages.length ? "對話內容已更新" : "輸入訊息開始對話"}</p>
       {confirmDeleteConversation && (
         <ConfirmDialog
           title="刪除這則對話？"
@@ -258,28 +293,26 @@ export default function ChatPage() {
           <p>「{confirmDeleteConversation.title}」的 {confirmDeleteConversation.turn_count} 輪問答會被刪除，無法復原。</p>
         </ConfirmDialog>
       )}
-      <section className={`chat-layout${showConversations ? " conversations-open" : ""}`}>
+      <div className="assistant-layout" data-pane-open={paneOpen || undefined}>
 
-        <aside id="conversation-list" className="panel chat-sidebar" aria-label="歷史對話">
-          <div className="section-title chat-sidebar-header">
-            <div>
-              <h2 ref={sidebarHeadingRef} tabIndex={-1}>歷史對話</h2>
-              <span className="muted small">
-                {conversations.length} 則對話 · 顯示最近 {CONVERSATION_LIMIT} 則
-              </span>
-            </div>
-            <button type="button" className="button button-secondary" onClick={handleNewConversation}>
-              新對話
-            </button>
+        <aside id="conversation-list" className="assistant-side assistant-history" aria-labelledby="conversation-list-title" hidden={!paneOpen}>
+          <div className="assistant-side-heading">
+            <h3 id="conversation-list-title" ref={sidebarHeadingRef} tabIndex={-1}>歷史對話</h3>
+            <input type="search" aria-label="篩選對話標題" placeholder="篩選對話標題"
+              value={historyQuery} onChange={(event) => setHistoryQuery(event.target.value)} />
+            <p className="muted small" role="status">
+              {historyTerm ? `${visibleConversations.length} 則符合 · 共 ${conversations.length} 則`
+                : `${conversations.length} 則對話 · 最多顯示最近 ${CONVERSATION_LIMIT} 則`}
+            </p>
           </div>
 
           <div className="chat-conversation-scroll">
-            <div className="list-stack chat-conversation-list">
+            <div className="chat-conversation-list">
               {initLoading ? (
                 <p className="muted small">載入聊天紀錄…</p>
               ) : (
                 <>
-                {conversations.map((item) => (
+                {visibleConversations.map((item) => (
                   <div
                     key={item.conversation_id}
                     className={
@@ -292,6 +325,7 @@ export default function ChatPage() {
                       type="button"
                       className="chat-conversation-open"
                       onClick={() => handleOpenConversation(item.conversation_id)}
+                      disabled={loading}
                       aria-current={activeConversationId === item.conversation_id ? "true" : undefined}
                     >
                       <span className="chat-conversation-title" title={item.title}>{item.title}</span>
@@ -316,55 +350,52 @@ export default function ChatPage() {
                     </button>
                   </div>
                 ))}
-                {!conversations.length ? <p className="muted">尚無聊天紀錄。</p> : null}
+                {!visibleConversations.length && <p className="muted small">
+                  {historyTerm ? "找不到符合的標題。試試其他關鍵字。" : "尚無聊天紀錄。"}
+                </p>}
                 </>
               )}
             </div>
           </div>
         </aside>
 
-        <div className="panel chat-main">
-          <div className="chat-header">
-            <h2>{activeConversation?.title || "新對話"}</h2>
-            <span className="muted">
-              {activeConversation ? `${activeConversation.turn_count} 輪對話` : "尚未建立對話"}
-            </span>
-          </div>
-
-          <div ref={threadRef} className="chat-thread" role="region" aria-label="對話內容" tabIndex={0} aria-busy={loading}>
-            {messages.length || pendingQuestion ? (
+        <div className="assistant-main" hidden={!wide && paneOpen}>
+          <AssistantTranscript label="對話內容" busy={loading || Boolean(openingConversationId)} scroll={scroll}
+            empty={Boolean(openingConversationId) || (!messages.length && !pendingQuestion)}>
+            {openingConversationId ? <p className="muted">載入對話內容…</p> : messages.length || pendingQuestion ? (
               <>{messages.map((item) => (
                 <div key={item.id} className="chat-turn">
-                  <div className="chat-bubble chat-bubble-user">
+                  <div className="assistant-message assistant-message-user">
                     <span className="chat-role">你</span>
                     <p>{item.question}</p>
                   </div>
-                  <div className="chat-bubble chat-bubble-assistant">
+                  <div className="assistant-message assistant-message-reply">
                     <span className="chat-role">
-                      {item.provider} · {item.model_name}
+                      {item.model_name || item.provider || "AI 助理"}
                     </span>
-                    <p>{item.answer}</p>
+                    <AssistantMarkdown>{item.answer}</AssistantMarkdown>
                   </div>
                 </div>
               ))}
-              {pendingQuestion && <div className="chat-turn"><div className="chat-bubble chat-bubble-user"><span className="chat-role">你</span><p>{pendingQuestion}</p></div><p role="status" className="muted">AI 正在回覆…</p></div>}
+              {pendingQuestion && <div className="chat-turn"><div className="assistant-message assistant-message-user"><span className="chat-role">你</span><p>{pendingQuestion}</p></div><p className="muted">AI 正在回覆…</p></div>}
               </>
             ) : (
-              <div className="chat-empty">
-                <p className="muted">輸入第一則訊息開始新的對話。</p>
-              </div>
+              <AssistantEmpty icon="chat" title="開始一段對話">
+                <p>輸入問題，或從歷史對話接續上次的討論。</p>
+              </AssistantEmpty>
             )}
-          </div>
+          </AssistantTranscript>
 
           <form className="chat-form" onSubmit={handleSubmit}>
             <div className="chat-input-wrapper">
               <textarea
                 ref={questionInputRef}
                 aria-label="傳送給 AI 的訊息"
+                rows={2}
                 value={question}
                 onChange={(event) => setQuestion(event.target.value)}
                 placeholder="請輸入想問 AI 的問題"
-                readOnly={loading}
+                readOnly={loading || Boolean(openingConversationId)}
                 onCompositionStart={() => {
                   isComposingRef.current = true;
                 }}
@@ -406,7 +437,7 @@ export default function ChatPage() {
                 <button
                   type="submit"
                   className="chat-send-btn"
-                  aria-disabled={loading || !question.trim() || undefined}
+                  aria-disabled={loading || Boolean(openingConversationId) || !question.trim() || undefined}
                   aria-label="送出訊息"
                 >
                   {loading ? (
@@ -425,7 +456,7 @@ export default function ChatPage() {
             </div>
           </form>
         </div>
-      </section>
+      </div>
     </div>
   );
 }
