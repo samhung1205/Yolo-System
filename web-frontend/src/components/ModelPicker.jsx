@@ -9,7 +9,6 @@ export default function ModelPicker({
       value: JSON.stringify([group.provider, model]),
       label: model,
       selectedDetail: group.label,
-      searchText: group.provider,
     })) : [{
       value: JSON.stringify([group.provider]),
       label: group.available ? "目前沒有可選模型" : "暫不可用",
@@ -22,7 +21,6 @@ export default function ModelPicker({
     <SelectField label="AI 模型" variant="composer" groups={groups}
       value={JSON.stringify([selectedProvider, selectedModel])}
       onChange={(value) => onSelect(...JSON.parse(value))} disabled={disabled}
-      placeholder="選擇 AI 模型" searchPlaceholder="搜尋模型或供應商"
-      emptyText="找不到符合的 AI 模型" />
+      placeholder="選擇 AI 模型" emptyText="目前沒有可選的 AI 模型" />
   );
 }
