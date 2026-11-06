@@ -12,10 +12,10 @@
 | Agent 引擎 | 預設 `tool_calling`／gemma4；唯讀工具與權限隔離，DeepAgents 不採用；固定案例於 2026-10-22 修正評分後為 [32/32](../tests/evals/results/agent_engine_eval_report.md)（原始回答重新評分，非新模型實測） |
 | 部署前安全修正 | JWT 撤銷、登入節流、上傳／頭像歸屬、受保護媒體、LLM 政策、輪次唯一鍵 |
 | 實驗室公開部署 | Ubuntu GPU、Compose、HTTPS、關閉註冊、原有資料、Chat／Agent SSE 皆通過；使用者確認手機行動網路正常 |
-| 正式 Web 介面版本 | 2026-11-06 已在 Ubuntu 切換 gateway 至來源 `2bc7e8d`，包含工作台捷徑及新版下拉選單。公開 HTTPS、DB health、SPA 路由與前端資產指紋通過。Mac Chromium 使用正式站資產與合成 API 資料，在桌面與 320px 驗證 Chat／Agent 模型清單及 YOLO 搜尋。實際推論與 AI 回覆屬先前驗收。 |
+| 正式 Web 介面版本 | 2026-11-06 已在 Ubuntu 切換 gateway 至來源 `35b68f1`，上線 AI 助理閱讀版面。公開 HTTPS、DB health、SPA 路由與五個前端資產指紋通過。Mac Chromium 使用正式站資產與合成 API 資料，在六種尺寸驗證一般對話與偵測分析，以及歷史篩選、焦點和模擬串流捲動。實際推論與 AI 回覆屬先前驗收。 |
 | 最初基準備份（舊版本） | 隔離 MySQL／檔案還原通過；Mac 副本完整 SQL 與 52 檔 SHA-256 核對通過 |
 
-2026-11-06 前端部署報告存於 Ubuntu 的 `/home/sam/.config/yolo-system/releases/web-2bc7e8d-20261106T071845Z-3814754/report.json`。切換前核對已通過還原驗證的快照 `20261105T153001Z-6106465e`。
+2026-11-06 AI 助理部署報告存於 Ubuntu 的 `/home/sam/.config/yolo-system/releases/web-35b68f1-20261106T093129Z-3846049/report.json`。切換前核對已通過還原驗證的快照 `20261105T153001Z-6106465e`。
 
 **平台已確定為實驗室伺服器，網站已部署成功，無須另外部署到 Vercel。** 10–50 個預計帳號不是 50 路同時推論的承諾。
 
