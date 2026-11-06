@@ -1,21 +1,13 @@
 import { useId, useState } from "react";
+import SelectField from "./SelectField";
 
 const CLASS_PREVIEW_LIMIT = 12;
 
 function modelGroup(model) {
-  if (model.task === "obb") return `旋轉框 OBB · ${model.class_count} 類別`;
-  if (/\bcoco\b/i.test(model.dataset_variant || "")) return `COCO · ${model.class_count} 類別`;
   const count = model.class_count ?? Object.keys(model.canonical_class_names || {}).length;
+  if (model.task === "obb") return `旋轉框 OBB · ${count} 類別`;
+  if (/\bcoco\b/i.test(model.dataset_variant || "")) return `COCO · ${count} 類別`;
   return `${count} 類別${/\bpre\b/i.test(model.dataset_variant || "") ? " · Pre" : ""}`;
-}
-
-/** Short family tag for option text, so same-named architectures stay distinct
- * in the closed select without overflowing narrow screens. */
-function modelTag(model) {
-  const count = model.class_count ?? Object.keys(model.canonical_class_names || {}).length;
-  if (model.task === "obb" && !/\bobb\b/i.test(model.architecture || "")) return `OBB ${count} 類`;
-  if (/\bcoco\b/i.test(model.dataset_variant || "")) return `COCO ${count} 類`;
-  return `${count} 類${/\bpre\b/i.test(model.dataset_variant || "") ? " Pre" : ""}`;
 }
 
 /** Class names in class-id order, from a `{ id: name }` map. */
@@ -46,7 +38,6 @@ function ModelClassList({ names }) {
   );
 }
 
-/** Native optgroups preserve keyboard navigation while separating model families. */
 export default function YoloModelSelect({ models, value, onChange, loading }) {
   const baseId = useId();
   const selectId = `${baseId}-select`;
@@ -57,25 +48,24 @@ export default function YoloModelSelect({ models, value, onChange, loading }) {
   for (const model of models) {
     const label = modelGroup(model);
     if (!groups.has(label)) groups.set(label, []);
-    groups.get(label).push(model);
+    groups.get(label).push({
+      value: model.key,
+      label: model.architecture || model.display_name,
+      selectedDetail: label,
+      searchText: `${model.key} ${model.display_name} ${orderedClassNames(model.canonical_class_names).join(" ")}`,
+      description: model.available ? undefined : "暫不可用",
+      disabled: !model.available,
+    });
   }
 
   return (
     <div className="field yolo-model-field">
       <label htmlFor={selectId}>選擇推論模型</label>
-      <select id={selectId} value={value} onChange={(event) => onChange(event.target.value)}
-        disabled={loading || !models.some((model) => model.available)} required
-        aria-describedby={selected ? descriptionId : undefined}>
-        {loading && <option value="">載入模型清單中…</option>}
-        {!loading && !value && <option value="">請選擇模型</option>}
-        {Array.from(groups, ([label, items]) => (
-          <optgroup key={label} label={label}>
-            {items.map((model) => <option key={model.key} value={model.key} disabled={!model.available}>
-              {model.architecture || model.display_name}（{modelTag(model)}）{model.available ? "" : "（不可用）"}
-            </option>)}
-          </optgroup>
-        ))}
-      </select>
+      <SelectField id={selectId} label="選擇推論模型" value={value} onChange={onChange}
+        groups={Array.from(groups, ([label, options]) => ({ label, options }))}
+        placeholder={loading ? "載入模型清單中…" : "請選擇模型"} searchPlaceholder="搜尋推論模型或類別"
+        emptyText="找不到符合的推論模型" disabled={loading || !models.length} required
+        describedBy={selected ? descriptionId : undefined} />
       {selected && <div className="yolo-model-description">
         <p id={descriptionId}>
           <span className="yolo-model-description-label">目前模型</span>

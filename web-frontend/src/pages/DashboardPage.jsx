@@ -54,40 +54,20 @@ function UsersIcon() {
   );
 }
 
-/* ─── Nav card definitions ───────────────────────────────────── */
+function ArrowRight() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4.5 12h15m-6-6 6 6-6 6" />
+    </svg>
+  );
+}
 
-const NAV_LINKS = [
-  {
-    to: "/detections",
-    icon: <ScanIcon />,
-    title: "物件偵測",
-    description: "上傳圖片，即時辨識並標注畫面中的物件。",
-  },
-  {
-    to: "/detections/batch",
-    icon: <StackIcon />,
-    title: "批次分析",
-    description: "一次上傳多張影像或整個資料夾，逐張偵測並彙總統計結果。",
-  },
-  {
-    to: "/detections/history",
-    icon: <ClockIcon />,
-    title: "偵測紀錄",
-    description: "查詢歷史偵測紀錄，依狀態或類型篩選，查看物件詳情。",
-  },
-  {
-    to: "/chat",
-    icon: <ChatIcon />,
-    title: "AI 助理",
-    description: "進行一般對話，或根據已保存結果分析偵測資料。",
-  },
-  {
-    to: "/profile",
-    icon: <UserIcon />,
-    title: "個人資料",
-    description: "查看帳號資訊、角色與帳號狀態。",
-  },
+const TOOL_LINKS = [
+  { to: "/detections/history", icon: <ClockIcon />, title: "偵測紀錄" },
+  { to: "/chat", icon: <ChatIcon />, title: "AI 助理" },
+  { to: "/profile", icon: <UserIcon />, title: "個人資料" },
 ];
+const ADMIN_LINK = { to: "/admin/users", icon: <UsersIcon />, title: "使用者管理" };
 
 export default function DashboardPage() {
   const user = authService.getCurrentUser();
@@ -126,25 +106,39 @@ export default function DashboardPage() {
           <Link className="button button-secondary" to="/detections/batch">開始批次偵測</Link></div>
       </section>
       <section className="recent-work" aria-labelledby="recent-work-title">
-        <div className="section-title-row"><h2 id="recent-work-title">繼續最近工作</h2><Link className="text-link" to="/detections/history">查看偵測紀錄</Link></div>
+        <div className="section-title-row">
+          <h2 id="recent-work-title">繼續最近工作</h2>
+          <Link className="dashboard-history-link" to="/detections/history">查看偵測紀錄 <ArrowRight /></Link>
+        </div>
         {recentLoading && <p role="status" className="muted">載入最近工作…</p>}
         {recentError && <p role="alert">部分紀錄無法載入。<button type="button" className="button-ghost" onClick={() => setRevision(revision + 1)}>重試</button></p>}
         {!recentLoading && !recent.length && !recentError && <p className="muted">尚無偵測紀錄。完成第一筆偵測後，可從這裡繼續分析。</p>}
-        <div className="recent-work-list">{recent.map((item) => {
+        {recent.length > 0 && <ul className="recent-work-list">{recent.map((item) => {
           const ready = ["completed", "completed_with_errors"].includes(item.status);
           const destination = ready ? `/agent?mode=${item.kind === "batch" ? "batch_analysis&batch_id" : "explain_detection&detection_id"}=${item.id}`
             : item.kind === "batch" ? "/detections/batch" : "/detections/history";
-          return <Link key={`${item.kind}-${item.id}`} className="recent-result-row" to={destination}>
-            <div><strong>{item.kind === "batch" ? item.name || `批次 #${item.id}` : item.source_filename}</strong>
-              <span className="muted small">{item.kind === "batch" ? `${item.total_files} 張影像` : `${item.object_count} 個物件`} · {String(item.created_at || "").slice(0, 10)}</span></div>
-            <span className="text-link">{ready ? "繼續分析" : "查看進度"}</span>
-          </Link>;
-        })}</div>
+          return (
+            <li key={`${item.kind}-${item.id}`}>
+              <Link className="recent-result-row" to={destination}>
+                <span className="recent-result-icon">{item.kind === "batch" ? <StackIcon /> : <ScanIcon />}</span>
+                <span className="recent-result-detail">
+                  <strong>{item.kind === "batch" ? item.name || `批次 #${item.id}` : item.source_filename}</strong>
+                  <span className="muted small">{item.kind === "batch" ? `${item.total_files} 張影像` : `${item.object_count} 個物件`} · {String(item.created_at || "").slice(0, 10)}</span>
+                </span>
+                <span className={`recent-result-action${ready ? " is-ready" : ""}`}>
+                  {ready ? "繼續分析" : "查看進度"} <ArrowRight />
+                </span>
+              </Link>
+            </li>
+          );
+        })}</ul>}
       </section>
       <section className="dashboard-tools" aria-label="其他功能">
         <h2>其他功能</h2>
-        <div className="dashboard-tool-links">{NAV_LINKS.slice(2).map((item) => <Link key={item.to} to={item.to}>{item.icon}<span>{item.title}</span></Link>)}
-          {user?.is_admin && <Link to="/admin/users"><UsersIcon /><span>使用者管理</span></Link>}
+        <div className="dashboard-tool-links">
+          {(user?.is_admin ? [...TOOL_LINKS, ADMIN_LINK] : TOOL_LINKS).map((item) => (
+            <Link key={item.to} to={item.to}>{item.icon}<span>{item.title}</span><ArrowRight /></Link>
+          ))}
         </div>
       </section>
     </div>

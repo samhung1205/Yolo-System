@@ -8,6 +8,7 @@ import agentService from "../services/agentService";
 import authService from "../services/authService";
 import modelService, { pickDefaultSelection } from "../services/modelService";
 import ModelPicker from "../components/ModelPicker";
+import SelectField from "../components/SelectField";
 import { useAssistantState } from "../state/assistantState";
 import SavedResultPicker from "../components/SavedResultPicker";
 import AnalysisEvidence from "../components/AnalysisEvidence";
@@ -501,30 +502,27 @@ export default function AgentPage() {
         <aside id="analysis-settings" className="panel agent-controls">
           <h2>分析設定</h2>
 
-          <label className="field">
-            <span>分析模式</span>
-            <select
-              value={mode}
-              onChange={(e) => handleModeChange(e.target.value)}
-              disabled={loading}
-            >
-              {visibleModes.map((m) => (
-                <option key={m.key} value={m.key} disabled={(m.admin_only || m.key === "admin_help") && !user?.is_admin}>
-                  {m.label}
-                </option>
-              ))}
-            </select>
-            <span className="field-hint">不需要讀取偵測資料的一般問答，請改用「一般對話」分頁。</span>
-          </label>
+          <div className="field">
+            <label htmlFor="agent-mode"><span>分析模式</span></label>
+            <SelectField id="agent-mode" label="分析模式" value={mode} onChange={handleModeChange}
+              options={visibleModes.map((item) => ({
+                value: item.key, label: item.label,
+                disabled: (item.admin_only || item.key === "admin_help") && !user?.is_admin,
+              }))}
+              disabled={loading} describedBy="agent-mode-hint" />
+            <span id="agent-mode-hint" className="field-hint">不需要讀取偵測資料的一般問答，請改用「一般對話」分頁。</span>
+          </div>
 
-          {mode === "auto" && <label className="field">
-            <span>分析資料類型</span>
-            <select value={contextKind} disabled={loading} onChange={(event) => {
-              setContextKind(event.target.value); setDetectionId(""); setBatchId("");
-            }}>
-              <option value="detection">單筆偵測</option><option value="batch">影像批次</option>
-            </select>
-          </label>}
+          {mode === "auto" && <div className="field">
+            <label htmlFor="agent-context-kind"><span>分析資料類型</span></label>
+            <SelectField id="agent-context-kind" label="分析資料類型" value={contextKind}
+              options={[{ value: "detection", label: "單筆偵測" }, { value: "batch", label: "影像批次" }]}
+              disabled={loading} onChange={(kind) => {
+                setContextKind(kind);
+                setDetectionId("");
+                setBatchId("");
+              }} />
+          </div>}
           {(requiresDetectionId || requiresBatchId || mode === "auto") && <>
             <SavedResultPicker kind={requiresBatchId ? "batch" : requiresDetectionId ? "detection" : contextKind}
               value={requiresBatchId || (mode === "auto" && contextKind === "batch") ? batchId : detectionId}

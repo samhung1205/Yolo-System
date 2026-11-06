@@ -2,14 +2,19 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 
 import ConfirmDialog from "../components/ConfirmDialog";
+import SelectField from "../components/SelectField";
 import ZoomableImage from "../components/ZoomableImage";
 import useYoloModelName from "../hooks/useYoloModelName";
 import detectionService from "../services/detectionService";
 import { buildAssetUrl, normalizeApiError } from "../services/api";
 import { sourceLabel, statusLabel } from "../utils/labels";
 
-const STATUS_OPTIONS = ["", "completed", "failed", "processing", "pending"];
-const SOURCE_OPTIONS = ["", "image", "video"];
+const STATUS_OPTIONS = ["", "completed", "failed", "processing", "pending"].map((value) => ({
+  value, label: value ? statusLabel(value) : "全部", indicator: value,
+}));
+const SOURCE_OPTIONS = ["", "image", "video"].map((value) => ({
+  value, label: value ? sourceLabel(value) : "全部",
+}));
 const RECORD_DATE_FORMAT = new Intl.DateTimeFormat("zh-TW", {
   month: "2-digit",
   day: "2-digit",
@@ -217,46 +222,29 @@ export default function DetectionHistoryPage() {
 
       {/* Filter Bar */}
       <div className="filter-bar">
-        <label className="filter-label">
-          狀態
-          <select
-            className="filter-select"
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-          >
-            {STATUS_OPTIONS.map((s) => (
-              <option key={s} value={s}>
-                {s ? statusLabel(s) : "全部"}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="filter-label">
+          <label htmlFor="history-status-filter">狀態</label>
+          <SelectField id="history-status-filter" label="狀態" variant="filter"
+            options={STATUS_OPTIONS} value={filterStatus} onChange={setFilterStatus} applied={Boolean(filterStatus)} />
+        </div>
 
-        <label className="filter-label">
-          類型
-          <select
-            className="filter-select"
-            value={filterSource}
-            onChange={(e) => setFilterSource(e.target.value)}
-          >
-            {SOURCE_OPTIONS.map((s) => (
-              <option key={s} value={s}>
-                {s ? sourceLabel(s) : "全部"}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="filter-label">
+          <label htmlFor="history-source-filter">類型</label>
+          <SelectField id="history-source-filter" label="類型" variant="filter"
+            options={SOURCE_OPTIONS} value={filterSource} onChange={setFilterSource} applied={Boolean(filterSource)} />
+        </div>
 
         {(filterStatus || filterSource) && (
           <button
             type="button"
             className="button button-ghost"
             onClick={() => {
+              document.getElementById("history-status-filter")?.focus();
               setFilterStatus("");
               setFilterSource("");
             }}
           >
-            × 清除篩選
+            清除篩選
           </button>
         )}
       </div>
